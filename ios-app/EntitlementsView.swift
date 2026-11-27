@@ -112,6 +112,8 @@ final class EntitlementsManager: ObservableObject {
     @Published private(set) var hasLoaded = false
 
     private var session: OpaquePointer?            // CertSession*
+    /// A2：登录代际号——signOut 递增；signIn 完成后核对，未变才写会话。
+    private var signInGeneration = 0
     private let queue = DispatchQueue(label: "sideinstaller.entitlements")
 
     private var engine: Engine { Engine.shared }
@@ -178,12 +180,18 @@ final class EntitlementsManager: ObservableObject {
         lastError = nil
         engine.log("=== Entitlements: loading App IDs ===")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let list = try await onQueue { try self.performList() }
+                guard generation == signInGeneration else { throw CancellationError() }
                 apps = list.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
                 hasLoaded = true
                 engine.log("Entitlements: \(list.count) App ID(s).")
+            } catch is CancellationError {
+                // A2：切账号后本次加载作废，不记错（isWorking 在分支后统一复位）。
+                engine.log("Entitlements: load cancelled.")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Entitlements: \(lastError ?? "failed")")
@@ -203,12 +211,17 @@ final class EntitlementsManager: ObservableObject {
         outcomes[app.id] = nil
         engine.log("Entitlements: enabling \(ids.count) capability(ies) on \(app.identifier) …")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 let results = try await onQueue { try self.performEnable(appIdId: app.appIdId, ids: ids) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 outcomes[app.id] = results
                 reportedID = app.id
                 let granted = results.filter(\.ok).count
                 engine.log("Entitlements: Apple accepted \(granted)/\(results.count) on \(app.identifier).")
+            } catch is CancellationError {
+                // B-48-B1：切账号后本次启用作废，不记错、不弹结果窗。
+                engine.log("Entitlements: enable cancelled (account changed).")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Entitlements: \(lastError ?? "failed")")
@@ -221,8 +234,13 @@ final class EntitlementsManager: ObservableObject {
     /// No-op if not signed in.
     @MainActor
     func signOut() {
+        // A2：世代递增放 guard 之前——登录在途时 session 还是 nil，早退会漏递增。
+        signInGeneration += 1
         guard let session else { return }
-        si_cert_session_free(session)
+        // C18：释放排进权限队列（与在途的 FFI 调用串行），不在主线程直接
+        // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。
+        let freed = session
+        queue.async { si_cert_session_free(freed) }
         self.session = nil
         teamSummary = nil
         apps = []
@@ -238,6 +256,8 @@ final class EntitlementsManager: ObservableObject {
     @MainActor
     private func signIn(id: String, pw: String) async throws {
         // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        // A2：排队等待期间切账号同样作废本次尝试，世代在等位前抓。
+        let generation = signInGeneration
         let ticket = try await engine.appleSignIns.waitForTurn(.entitlements, appleID: id)
         defer { engine.appleSignIns.finished(ticket) }
         // The team picked for this Apple ID, so the page shows the App IDs of
@@ -251,6 +271,8 @@ final class EntitlementsManager: ObservableObject {
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
+            // A3：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             if appleRefusals.rulesOut(ani) {
                 engine.log("Entitlements: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
                 failures.skip()
@@ -260,13 +282,23 @@ final class EntitlementsManager: ObservableObject {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
+                // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.session {
+                        self.session = nil
+                        queue.async { si_cert_session_free(stale) }
+                    }
+                    throw CancellationError()
+                }
                 engine.anisetteSignedIn(ani)
                 AccountStore.shared.signedIn(id, withTeam: Engine.teamID(inSummary: summary))
                 teamSummary = summary
                 engine.log("Entitlements: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
-                let failure = error.errorDescription ?? "sign-in failed"
+                // A3：同 CertManager——旧登录的失败不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
+                let failure = error.errorDescription ?? L("Sign-in failed.")
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
@@ -353,6 +385,7 @@ final class EntitlementsManager: ObservableObject {
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
+            engine.log("Entitlements: sign-in failed: \(msg)")
             throw EngineError.message(msg)
         }
     }
@@ -360,7 +393,7 @@ final class EntitlementsManager: ObservableObject {
     // MARK: FFI
 
     private func performList() throws -> [AppIdentifier] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_appid_list(session, &json, &error)
@@ -370,17 +403,21 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([AppIdentifier].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read the App ID list: \(error)")
+                // C-5：App ID 列表读失败只显示友好文案，不嵌 error 原串；
+                // error 原文进活动日志，不进用户面。
+                engine.log("Entitlements: couldn't read the App ID list: \(error)")
+                throw EngineError.message(L("Couldn't read the App ID list."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Listing App IDs failed: \(msg)")
+            engine.log("Entitlements: list failed: \(msg)")
+            throw EngineError.message(L("Listing App IDs failed: %@", friendlyRustError(msg)))
         }
     }
 
     private func performEnable(appIdId: String, ids: [String]) throws -> [EntitlementOutcome] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_appid_enable(session, appIdId, ids.joined(separator: ","), &json, &error)
@@ -390,12 +427,15 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([EntitlementOutcome].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read Apple's reply: \(error)")
+                // C-5：同上——只显示友好文案，error 原文进活动日志。
+                engine.log("Entitlements: couldn't read Apple's reply: \(error)")
+                throw EngineError.message(L("Couldn't read Apple's reply."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Enabling entitlements failed: \(msg)")
+            engine.log("Entitlements: enable failed: \(msg)")
+            throw EngineError.message(L("Enabling entitlements failed: %@", friendlyRustError(msg)))
         }
     }
 
@@ -413,11 +453,20 @@ final class EntitlementsManager: ObservableObject {
     }
 
     private func onQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            queue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                queue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 }
@@ -461,7 +510,7 @@ struct EntitlementsView: View {
     private var header: some View {
         BrandHeader(icon: "checklist", image: "EntitlementsLogo", title: L("Entitlements")) {
             if let team = manager.teamSummary {
-                StatusDot(text: team, color: Theme.positive)
+                StatusDot(text: team, color: Theme.positive, textColor: Theme.muted)
                     .transition(.opacity)
             }
         }
@@ -497,7 +546,7 @@ struct EntitlementsView: View {
                          ? L("%d App ID", manager.apps.count)
                          : L("%d App IDs", manager.apps.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
                 .cascadeItem(2)
@@ -519,25 +568,28 @@ struct EntitlementsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "app.badge.checkmark")
                     .font(.title3)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(app.displayName)
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                     Text(app.identifier)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if let results = manager.outcomes[app.id] {
                         Text(L("%d of %d enabled", results.filter(\.ok).count, results.count))
-                            .font(.caption2.weight(.medium))
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(results.contains(where: \.ok) ? Theme.positive : Theme.warning)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.muted.opacity(0.6))
             }
         }
     }
@@ -552,7 +604,7 @@ struct EntitlementsView: View {
                     .font(.headline)
                 Text(L("This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -600,7 +652,7 @@ private struct EntitlementPicker: View {
                     .font(.title3.weight(.semibold))
                 Text(app.identifier)
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 HStack(spacing: 8) {
                     Button(L("Recommended")) { selected = Entitlement.recommendedIDs }
                         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
@@ -635,7 +687,7 @@ private struct EntitlementPicker: View {
                 ForEach(Entitlement.inGroup(group)) { entitlement in
                     row(entitlement)
                     if entitlement.id != Entitlement.inGroup(group).last?.id {
-                        Divider().overlay(Color.white.opacity(0.06))
+                        Divider()
                     }
                 }
             }
@@ -650,14 +702,15 @@ private struct EntitlementPicker: View {
             HStack(spacing: 12) {
                 Image(systemName: selected.contains(entitlement.id) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected.contains(entitlement.id) ? Theme.accent : .secondary)
+                    .foregroundStyle(selected.contains(entitlement.id) ? Theme.accent : Theme.muted)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entitlement.name)
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                         .foregroundStyle(.primary)
                     Text(entitlement.id)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -689,7 +742,8 @@ private struct EntitlementPicker: View {
         // The button keeps the page's width; the bar under it spans the window.
         .pageColumn()
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
+        .cardSurface(in: Rectangle())
+        .overlay(alignment: .top) { Divider() }
     }
 }
 
@@ -731,7 +785,7 @@ struct EntitlementsPopup: View {
                 if !granted.isEmpty {
                     Text(L("Install the app again for these to take effect."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(refused) { outcome in
@@ -739,8 +793,8 @@ struct EntitlementsPopup: View {
                         Text(outcome.name)
                             .font(.caption.weight(.medium))
                         Text(outcome.error)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

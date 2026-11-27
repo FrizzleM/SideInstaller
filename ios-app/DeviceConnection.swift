@@ -186,35 +186,13 @@ final class DeviceConnection {
         let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
         switch kind {
         case TunnelFailureHostsRefused:
-            return """
-                The device answered on the RSD port at \(deviceIP), then the tunnel port \
-                it opened was unreachable on that same address — dropped or refused, \
-                across \(tried). The device is there; what's in front of it is forwarding \
-                some ports and not others. The tunnel opens on a fresh high port every \
-                attempt, so a rule-based proxy that forwards the RSD port alone can never \
-                cover it. Use a loopback VPN that blanket-forwards every port on the RSD \
-                subnet. Re-pairing won't help — the pairing is fine.
-                """
+            return L("The device answered on the RSD port at %@, then the tunnel port it opened was unreachable on that same address — dropped or refused, across %@. The device is there; what's in front of it is forwarding some ports and not others. The tunnel opens on a fresh high port every attempt, so a rule-based proxy that forwards the RSD port alone can never cover it. Use a loopback VPN that blanket-forwards every port on the RSD subnet. Re-pairing won't help — the pairing is fine.", deviceIP, tried)
         case TunnelFailureTimeout:
-            return """
-                The tunnel port never answered and never refused on any address \
-                (\(tried)) — the connection is being swallowed rather than rejected. \
-                That's usually a VPN or firewall dropping traffic on the RSD subnet. \
-                Check the VPN is still up, then try again.
-                """
+            return L("The tunnel port never answered and never refused on any address (%@) — the connection is being swallowed rather than rejected. That's usually a VPN or firewall dropping traffic on the RSD subnet. Check the VPN is still up, then try again.", tried)
         case TunnelFailureTlsHandshake:
-            return """
-                Something accepted the tunnel connection but failed the encrypted \
-                handshake on top of it. Either another process holds that port, or this \
-                pairing file's key no longer matches the device. Pair again, and if that \
-                doesn't take, restart the loopback VPN.
-                """
+            return L("Something accepted the tunnel connection but failed the encrypted handshake on top of it. Either another process holds that port, or this pairing file's key no longer matches the device. Pair again, and if that doesn't take, restart the loopback VPN.")
         case TunnelFailurePairVerify:
-            return """
-                The device rejected this pairing file: it's for a different device, or \
-                the pairing was revoked (a reset, a restore, or Developer Mode being \
-                turned off). Pair with this iPhone again to get a fresh file.
-                """
+            return L("The device rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with this iPhone again to get a fresh file.")
         case TunnelFailureRsdUnreachable:
             // ECONNREFUSED means the tunnel works and the address is right, but
             // nothing is listening on the pairing port (often Developer Mode
@@ -233,17 +211,10 @@ final class DeviceConnection {
                              deviceIP, Int(port))
                 }
             }
-            return """
-                Couldn't reach the device at \(deviceIP):\(port) at all. The \
-                loopback VPN is most likely off, or Device IP isn't the address it \
-                carries: in LocalDevVPN that's the one under Settings › Device IP \
-                (10.7.0.1 by default), not the “Connected to” address on its main screen.
-                """
+            return L("Couldn't reach the device at %@:%d at all. The loopback VPN is most likely off, or Device IP isn't the address it carries: in LocalDevVPN that's the one under Settings › Device IP (10.7.0.1 by default), not the “Connected to” address on its main screen. First check that the phone and the computer are on the same Wi-Fi (the local tunnel needs a local network).",
+                     deviceIP, Int(Self.rsdPort))
         default:
-            return """
-                The tunnel didn't come up, and the failure didn't match any known cause. \
-                The raw error is in the log.
-                """
+            return L("The tunnel didn't come up, and the failure didn't match any known cause. The raw error is in the log.")
         }
     }
 
@@ -424,6 +395,9 @@ final class DeviceConnection {
     /// as the listener isn't dialled: the dial has no time limit, and would
     /// wait for ever on one that never answers, as the iPhone's other
     /// listeners do.
+    ///
+    /// R-3: the failure text carries the Bonjour result and the Developer
+    /// Mode reading, instead of leaving both in the log only.
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
                                       hostname: String, findsMovedPort: Bool) throws {
         var pf: OpaquePointer?
@@ -459,6 +433,8 @@ final class DeviceConnection {
             return Self.refusedOutright(failure) ? .refused(failure) : .failed(failure)
         }
         var port = Self.rsdPort
+        // The Bonjour result of the last lookup, for the failure text (R-3).
+        var lastAdvertSummary: String?
         if findsMovedPort, let moved = movedListenerPort {
             Engine.shared.log("Dialling port \(moved), where this iPhone's remote pairing listener was found before …")
             port = moved
@@ -491,6 +467,7 @@ final class DeviceConnection {
         if findsMovedPort, let notThere = miss.notThere {
             passed.append(port)
             let advert = NetworkStatus.ownRemotePairingAdvert()
+            lastAdvertSummary = advert.summary
             Engine.shared.log("Port \(port) \(notThere). This iPhone's remote pairing advertisement: \(advert.summary).")
             if let moved = advert.port, !passed.contains(moved) {
                 Engine.shared.log("Dialling the advertised port \(moved) instead …")
@@ -532,7 +509,22 @@ final class DeviceConnection {
                 }
             }
         }
-        throw tunnelError(miss, deviceIP: deviceIP, port: port, candidates: candidates)
+        let err = tunnelError(miss, deviceIP: deviceIP, port: port, candidates: candidates)
+        if err.kind == TunnelFailureRsdUnreachable {
+            let developerMode: String
+            switch Engine.developerModeIsOn {
+            case true?:
+                developerMode = "on"
+            case false?:
+                developerMode = "off"
+            case nil:
+                developerMode = "unknown"
+            }
+            throw TunnelError(kind: err.kind,
+                              advice: err.advice + "\n\n" + L("Diagnostics: remote pairing advertisement: %@; Developer Mode: %@.", lastAdvertSummary ?? "not checked", developerMode),
+                              underlying: err.underlying)
+        }
+        throw err
     }
 
     /// Why a `dialRemotePairing` failed.
@@ -1301,6 +1293,21 @@ final class DeviceConnection {
                               UInt(count * MemoryLayout<plist_t?>.stride))
         }
         return (0..<count).contains { plistString(apps[$0], "CFBundleIdentifier") == bundleID }
+    }
+
+    /// Uninstall the app with this bundle ID, via installation_proxy
+    /// (F-1, 0.9.161). `options` is NULL: installd needs none for a
+    /// plain uninstall. Same connect pattern as `installedApps` above.
+    func uninstallApp(bundleID: String) throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(installation_proxy_connect_rsd(adapter, handshake, &client),
+                  "installation_proxy_connect_rsd failed")
+        guard let client else { throw fail("installation_proxy client was null") }
+        defer { installation_proxy_client_free(client) }
+
+        let err = bundleID.withCString { installation_proxy_uninstall(client, $0, nil) }
+        try check(err, "installation_proxy_uninstall failed")
     }
 
     /// The host app's exact bundle id for the pairing write, matched on display

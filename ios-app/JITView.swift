@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The JIT page: the apps a debugger can attach to, each opened with JIT on in
-/// a tap, and the session while one runs. Pushed from Tools (relies on its
+/// a tap, and the session while one runs. Pushed from Settings (relies on its
 /// `NavigationStack`).
 struct JITView: View {
     /// Observed so labels redraw when the language changes.
@@ -9,12 +9,18 @@ struct JITView: View {
     @ObservedObject var manager: JITManager
 
     @State private var showSettings = false
+    /// F-3 (0.9.181): the app list's search text — the other list
+    /// pages all filter by name; the JIT list never did.
+    @State private var appSearchText = ""
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 header.cascadeItem(0)
+                ddiProgressCard
                 sessionCard
+                lastJITCard
+                jitSearchBar
                 loadButton.cascadeItem(1)
                 // Errors show as a popup, which `RootView` lays over the app.
                 appList
@@ -24,6 +30,7 @@ struct JITView: View {
             .animation(.smooth(duration: 0.35), value: manager.apps)
             .animation(.smooth(duration: 0.3), value: manager.isLoading)
             .animation(.smooth(duration: 0.35), value: manager.status)
+            .animation(.smooth(duration: 0.3), value: manager.ddiDownloadProgress)
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -39,7 +46,9 @@ struct JITView: View {
                 StatusDot(text: L("JIT on for %@", status.app.name), color: Theme.positive)
                     .transition(.opacity)
             } else if manager.hasLoaded {
-                let count = manager.apps.count
+                // F-3 (0.9.181) 打磨：搜索时计数跟列表走（过滤后的
+                // 数量），不搜索时仍是总数；文案键复用现成的两条。
+                let count = appSearchText.isEmpty ? manager.apps.count : filteredApps.count
                 StatusDot(text: count == 1 ? L("%d app can use JIT", count) : L("%d apps can use JIT", count),
                           color: Theme.positive, idle: count == 0)
                     .transition(.opacity)
@@ -48,6 +57,29 @@ struct JITView: View {
     }
 
     // MARK: Session
+
+    /// The disk-image download while a session starts: percent and a way
+    /// out (B2, 0.9.147).
+    @ViewBuilder
+    private var ddiProgressCard: some View {
+        if let progress = manager.ddiDownloadProgress {
+            PanelCard {
+                HStack(spacing: 8) {
+                    ProgressView(value: progress)
+                        .tint(Theme.accent)
+                    Text(L("Downloading… %d%%", Int(progress * 100)))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.muted)
+                        .contentTransition(.numericText())
+                    Spacer(minLength: 8)
+                    Button(L("Cancel")) { manager.cancelStart() }
+                        .buttonStyle(.plain, sound: .tap)
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            .transition(.cardAppear)
+        }
+    }
 
     /// The session while it runs: what it's doing, and the way to end it
     /// while the debugger stays attached.
@@ -97,6 +129,35 @@ struct JITView: View {
         }
     }
 
+    /// F-3 (0.9.162): the app JIT last ran for, one tap to run it again.
+    /// Only while nothing is starting or attached — then the session card
+    /// already shows it — and only when the app is still on the device
+    /// (`lastJITApp` resolves against the loaded list, so a removed app
+    /// offers no dead button).
+    @ViewBuilder
+    private var lastJITCard: some View {
+        if let app = manager.lastJITApp, !manager.isBusy {
+            PanelCard {
+                Button {
+                    manager.enable(app)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .foregroundStyle(Theme.accent)
+                        Text(L("Continue JIT for %@", app.name))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .buttonStyle(.plain, sound: .tap)
+            }
+            .transition(.cardAppear)
+        }
+    }
+
     // MARK: Primary action
 
     private var loadButton: some View {
@@ -121,14 +182,36 @@ struct JITView: View {
 
     // MARK: App list
 
+    /// F-3 (0.9.181): filter the JIT app list by name or bundle ID —
+    /// the file, download, source and history pages all have one.
+    /// Only while apps are loaded: an empty list has nothing to filter.
+    private var jitSearchBar: some View {
+        Group {
+            if !manager.apps.isEmpty {
+                SearchBar(text: $appSearchText, placeholder: L("搜索"))
+            }
+        }
+    }
+
+    /// The loaded apps, filtered by the search text — name or bundle
+    /// ID, case-insensitive; empty text shows everything.
+    private var filteredApps: [JITApp] {
+        guard !appSearchText.isEmpty else { return manager.apps }
+        let query = appSearchText
+        return manager.apps.filter { app in
+            app.name.localizedCaseInsensitiveContains(query)
+                || app.bundleID.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     @ViewBuilder
     private var appList: some View {
         if manager.hasLoaded && manager.apps.isEmpty && !manager.isLoading {
             emptyState.transition(.cardAppear)
-        } else if !manager.apps.isEmpty {
+        } else if !filteredApps.isEmpty {
             VStack(spacing: 12) {
                 // Enumerated so rows redraw on a language change.
-                ForEach(Array(manager.apps.enumerated()), id: \.element.id) { index, app in
+                ForEach(Array(filteredApps.enumerated()), id: \.element.id) { index, app in
                     appRow(app).cascadeItem(2 + index)
                 }
             }

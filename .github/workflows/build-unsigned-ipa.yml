@@ -1,0 +1,148 @@
+name: Build Unsigned IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write   # publish the release below
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Build Rust FFI
+        run: |
+          chmod +x build-rust.sh
+          ./build-rust.sh
+        env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned IPA
+        run: |
+          xcodebuild -project SideInstaller.xcodeproj \
+            -scheme SideInstaller \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/SideInstaller.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/SideInstaller.xcarchive/Products/Applications/SideInstaller.app Payload/
+          zip -r SideInstaller-unsigned.ipa Payload
+          shasum -a 256 SideInstaller-unsigned.ipa > SideInstaller-unsigned.ipa.sha256
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideInstaller-unsigned
+          path: |
+            SideInstaller-unsigned.ipa
+            SideInstaller-unsigned.ipa.sha256
+
+      # Publish this build as the release `v<version>` with the IPA attached
+      # as SideInstaller.ipa (0.9.149): that is the URL the app's self-update
+      # downloads — releases/latest/download/SideInstaller.ipa — and until
+      # now it pointed at the stale v0.9.87 release, so tapping it would
+      # have downgraded the app. The release is formal, never a draft or
+      # prerelease, or releases/latest won't serve it.
+      # Idempotent: a release that already exists is left alone (its asset
+      # is only topped up when missing), and a version older than the
+      # latest release is never published as latest, so re-dispatching an
+      # old commit can't downgrade anyone.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^[[:space:]]*MARKETING_VERSION: *"([^"]+)"[[:space:]]*$/\1/p' project.yml | head -n 1)"
+          if [[ -z "$version" ]]; then
+            echo "::error::MARKETING_VERSION not found in project.yml"
+            exit 1
+          fi
+          tag="v$version"
+          # Never publish an older version over a newer latest release.
+          # (POSIX field sort, not sort -V: the macOS runner's BSD sort
+          # has no -V.)
+          latest_tag="$(gh release view --json tagName --jq .tagName 2>/dev/null || true)"
+          if [[ -n "$latest_tag" && "${latest_tag#v}" != "$version" ]]; then
+            newest="$(printf '%s\n%s\n' "${latest_tag#v}" "$version" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -n 1)"
+            if [[ "$newest" != "$version" ]]; then
+              echo "::warning::$tag is older than the latest release $latest_tag; not publishing it."
+              exit 0
+            fi
+          fi
+          # The release asset must be named SideInstaller.ipa: that is what
+          # releases/latest/download serves.
+          cp SideInstaller-unsigned.ipa SideInstaller.ipa
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag already exists; leaving the release itself alone."
+            if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx "SideInstaller.ipa"; then
+              echo "SideInstaller.ipa is already on $tag; nothing to upload."
+            else
+              gh release upload "$tag" SideInstaller.ipa
+              echo "Uploaded SideInstaller.ipa to $tag."
+            fi
+            if [[ "$(gh release view "$tag" --json isDraft,isPrerelease --jq '.isDraft or .isPrerelease')" == "true" ]]; then
+              gh release edit "$tag" --draft=false --prerelease=false --latest
+              echo "Promoted $tag to a formal release."
+            fi
+          else
+            gh release create "$tag" SideInstaller.ipa --title "$tag" \
+              --notes "SideInstaller $version (built from ${GITHUB_SHA:0:7})." \
+              --target "$GITHUB_SHA" --latest
+            echo "Published $tag."
+          fi
+          gh release view "$tag" --json tagName,isDraft,isPrerelease,assets \
+            --jq '{tag: .tagName, draft: .isDraft, prerelease: .isPrerelease, assets: [.assets[].name]}'
+          # B-1 (0.9.189): keep latest_version.txt in sync — the app's
+          # UpdateChecker reads this file first; 0.9.181-0.9.187 never
+          # updated it, so 0.9.186 always read "up to date". Only reached
+          # when this version is >= the latest release (the guard above
+          # exits early otherwise), so writing it here can never
+          # downgrade anyone. Idempotent: no commit when already equal.
+          # Push-back mirrors update-altsource.yml (checkout token +
+          # github-actions[bot] + pull --rebase + 3 retries); a failed
+          # push fails the step loudly instead of silently going stale.
+          git fetch origin main
+          git checkout main
+          git pull --rebase origin main || true
+          if [[ "$(cat latest_version.txt 2>/dev/null || true)" != "$version" ]]; then
+            printf '%s\n' "$version" > latest_version.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add latest_version.txt
+            git commit -m "chore: bump latest_version.txt to $version"
+            for attempt in 1 2 3; do
+              git pull --rebase origin main || true
+              if git push origin "HEAD:main"; then
+                echo "latest_version.txt is now $version."
+                break
+              fi
+              if [[ "$attempt" == "3" ]]; then
+                echo "::error::failed to push latest_version.txt after 3 attempts" >&2
+                exit 1
+              fi
+              echo "Push failed; retrying (attempt $attempt)" >&2
+              sleep 5
+            done
+          else
+            echo "latest_version.txt is already $version; nothing to commit."
+          fi

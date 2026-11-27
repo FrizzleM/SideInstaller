@@ -134,6 +134,15 @@ enum DeveloperDiskImage {
         }
         progress(1)
     }
+
+    /// Deletes the downloaded files, so a corrupt or truncated copy can be
+    /// fetched again (B3, 0.9.147).
+    static func clearDownloaded() {
+        for variant in Variant.allCases {
+            try? FileManager.default.removeItem(at: variant.directory)
+        }
+    }
+
 }
 
 // MARK: - Saved places
@@ -740,6 +749,12 @@ final class LocationManager: ObservableObject {
     }
 
     @Published private(set) var stage: Stage = .notReady
+    /// DDI download progress (0…1) while `stage` is `.downloading`; nil
+    /// otherwise (B2, 0.9.147).
+    @Published private(set) var downloadProgress: Double?
+    /// The task running setup (`prepareQuietly`, `simulate`, `playRoute`),
+    /// so a download in progress can be cancelled (B2, 0.9.147).
+    private var readyTask: Task<Void, Never>?
     @Published private(set) var isBusy = false
     /// The coordinate the device is currently being told it is at.
     @Published private(set) var simulated: CLLocationCoordinate2D?
@@ -749,6 +764,20 @@ final class LocationManager: ObservableObject {
     /// The imported GPX route, drawn on the map until it's removed.
     @Published private(set) var route: GPXRoute?
     @Published var routeSpeed: RouteSpeed = .walk
+    /// F-1 (0.9.164): loop a playing route — when the end is reached, start
+    /// again from the first point instead of stopping there. Off by default,
+    /// so an untouched page behaves exactly as before; Shortcuts' Play GPX
+    /// Route can turn it on for one playback.
+    @Published var routeLoop = UserDefaults.standard.bool(forKey: "locationRouteLoop") {
+        didSet { UserDefaults.standard.set(routeLoop, forKey: "locationRouteLoop") }
+    }
+    /// F-3 (0.9.166): hand the device its real location back when a route
+    /// ends, instead of staying at its last point. Off by default, so an
+    /// untouched page behaves exactly as before; Shortcuts' Play GPX Route
+    /// leaves it alone (the switch on this page decides).
+    @Published var restoreRealAfterRoute = UserDefaults.standard.bool(forKey: "locationRestoreRealAfterRoute") {
+        didSet { UserDefaults.standard.set(restoreRealAfterRoute, forKey: "locationRestoreRealAfterRoute") }
+    }
     /// Set while a route is playing.
     @Published private(set) var routeProgress: RouteProgress?
     @Published private(set) var isImportingRoute = false
@@ -826,12 +855,37 @@ final class LocationManager: ObservableObject {
     func prepareQuietly() {
         guard stage != .ready, !isBusy else { return }
         isBusy = true
-        Task {
+        readyTask = Task {
             do { try await ensureReady(quietly: true) }
             catch is CancellationError { }
             catch { engine.log("Location: not ready yet (\(message(error)))") }
             isBusy = false
+            readyTask = nil
         }
+    }
+
+    /// Cancels a disk-image download in progress. The download stops in
+    /// `downloadMissing`; setup stays not ready (B2, 0.9.147).
+    func cancelDownload() {
+        readyTask?.cancel()
+    }
+
+    /// Deletes the disk image and downloads it again, for a copy that mounts
+    /// badly or came back truncated (B3, 0.9.147). Not while simulating:
+    /// the mounted image's files stay put until the session ends.
+    func redownloadDDI() {
+        guard !isBusy, simulated == nil else { return }
+        DeveloperDiskImage.clearDownloaded()
+        stage = .notReady
+        prepareQuietly()
+    }
+
+    /// Deletes the downloaded disk image, freeing the space (B3, 0.9.147).
+    /// Not while simulating, for the same reason as `redownloadDDI`.
+    func clearDDI() {
+        guard !isBusy, simulated == nil else { return }
+        DeveloperDiskImage.clearDownloaded()
+        stage = .notReady
     }
 
     /// Download the image if it's missing, mount it if the device has none, and
@@ -854,7 +908,20 @@ final class LocationManager: ObservableObject {
         if !DeveloperDiskImage.isDownloaded {
             try await MobileDataMode.shared.requireInternet(.diskImageDownload)
             stage = .downloading
-            try await DeveloperDiskImage.downloadMissing { _ in }
+            downloadProgress = 0
+            do {
+                try await DeveloperDiskImage.downloadMissing { fraction in
+                    Task { @MainActor in self.downloadProgress = fraction }
+                }
+            } catch {
+                downloadProgress = nil
+                // Back to not ready, or the page would sit on "downloading"
+                // with nothing running — a cancelled quiet download ends
+                // here, with no other code resetting the stage.
+                stage = .notReady
+                throw error
+            }
+            downloadProgress = nil
         }
         if quietly {
             engine.refreshNetworkStatus()
@@ -883,7 +950,13 @@ final class LocationManager: ObservableObject {
     /// Runs setup first if it hasn't finished (often the tunnel wasn't up when
     /// the page opened). Setup errors are shown to the user here.
     func simulate(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
-        guard !isBusy else { return }
+        // B5 (0.9.160): a tap while setup is still running used to die
+        // silently in the guard — say so in the popup instead of
+        // leaving the user to tap again, blind.
+        guard !isBusy else {
+            lastError = L("Still getting ready. Try again in a moment.")
+            return
+        }
         guard Self.isValid(coordinate) else {
             lastError = ErrorHelp.explained(L("That isn't a valid coordinate."))
             return
@@ -892,16 +965,19 @@ final class LocationManager: ObservableObject {
         isBusy = true
         lastError = nil
         lastSuccess = nil
-        Task {
+        readyTask = Task {
             do {
                 try await performSimulate(coordinate)
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
             } catch is CancellationError {
-                // Mobile Data Mode's popup was closed: nothing to report.
+                // Cancelled mid-download, or Mobile Data Mode's popup was
+                // closed: setup just stays not ready, with no error popup
+                // (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
             isBusy = false
+            readyTask = nil
         }
     }
 
@@ -929,7 +1005,12 @@ final class LocationManager: ObservableObject {
 
     /// Hand the device its real location back.
     func stop() {
-        guard !isBusy else { return }
+        // B5 (0.9.160): same as simulate above — a Reset tap mid-run
+        // says it's still getting ready instead of doing nothing.
+        guard !isBusy else {
+            lastError = L("Still getting ready. Try again in a moment.")
+            return
+        }
         isBusy = true
         lastError = nil
         lastSuccess = nil
@@ -991,6 +1072,9 @@ final class LocationManager: ObservableObject {
         keepAlive.stopAll()
         lastSuccess = nil
         lastError = ErrorHelp.explained(L("Location session closed — set it up again."))
+        // SIDE-2：会话在底下断掉时也释放 prepare 拿的那一次隧道持有
+        // （没持有时空操作；与 stopSimulatingLocation 的释放互斥）。
+        Task { @MainActor in engine.releaseLocationTunnelHold() }
     }
 
     private func stopResending() {
@@ -1065,7 +1149,9 @@ final class LocationManager: ObservableObject {
 
     /// Sets the location to the route's first point, then moves it along the
     /// route: a GPX route at `routeSpeed`, a planned one at each road's speed.
-    /// At the end it stays on the last point.
+    /// At the end it stays on the last point — or starts again from the
+    /// first one when looping is on (F-1, 0.9.164), or hands the device its
+    /// real location back when restoring is on (F-3, 0.9.166).
     ///
     /// Sets up first, like `simulate`.
     func playRoute() {
@@ -1085,15 +1171,17 @@ final class LocationManager: ObservableObject {
         isBusy = true
         lastError = nil
         lastSuccess = nil
-        Task {
+        readyTask = Task {
             do {
                 try await beginPlayback(timeline, name: name)
             } catch is CancellationError {
-                // Mobile Data Mode's popup was closed: nothing to report.
+                // Cancelled mid-download, or Mobile Data Mode's popup was
+                // closed: no error popup (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
             isBusy = false
+            readyTask = nil
         }
     }
 
@@ -1117,13 +1205,36 @@ final class LocationManager: ObservableObject {
         }
     }
 
-    /// Stops a playing route where it is, and keeps the device there.
+    /// Stops a playing route where it is, and keeps the device there —
+    /// unless restoring the real location when done is on (F-3, 0.9.166),
+    /// in which case the device gets its own location back instead.
     func stopRoute() {
         guard isPlayingRoute else { return }
         endPlayback()
         lastError = nil
+        if restoreRealAfterRoute {
+            engine.log("Location: route stopped — restoring real location.")
+            restoreRealLocationAfterRoute()
+            return
+        }
         lastSuccess = L("Route stopped. The device stays where it got to.")
         engine.log("Location: route stopped.")
+    }
+
+    /// F-3 (0.9.166): hands the device its real location back when a route
+    /// ends, through the same `resetLocation()` the manual Reset button
+    /// uses. Runs as its own task so both end paths (stopped mid-route,
+    /// played to the end) share it; the success line is reset's own, so a
+    /// failed restore reports instead of claiming the device stayed put.
+    private func restoreRealLocationAfterRoute() {
+        Task {
+            do {
+                try await resetLocation()
+                lastSuccess = L("Location reset. The device is using its own again.")
+            } catch {
+                lastError = message(error)
+            }
+        }
     }
 
     /// Sends where the route should be every `playbackTick`, going by the time
@@ -1131,9 +1242,11 @@ final class LocationManager: ObservableObject {
     /// last point that went through, as StikDebug does.
     private func startPlayback(_ timeline: RouteTimeline) {
         stopResending()
-        let started = Date()
         routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
         playbackTask = Task { [weak self] in
+            // Local to this task, so looping back just resets it — no
+            // captured var is mutated across the task boundary.
+            var started = Date()
             while true {
                 try? await Task.sleep(for: .seconds(Self.playbackTick))
                 guard let self, !Task.isCancelled else { return }
@@ -1150,7 +1263,17 @@ final class LocationManager: ObservableObject {
                     guard !Task.isCancelled else { return }
                     self.endPlayback()
                     self.lastSuccess = nil
-                    self.lastError = L("Route playback stopped: %@", self.message(error))
+                    // B-1 (0.9.167)：中途发送失败也是路线的结束——原来这里只
+                    // endPlayback() + 报错就返回，开关开着也不恢复，设备一直
+                    // 停在伪造点（endPlayback 还会重开重发定时器，顶着最后
+                    // 那个伪造点继续发）。播完路径同款：开关开就
+                    // 走 restoreRealLocationAfterRoute()，关才保留这条报错。
+                    if self.restoreRealAfterRoute {
+                        self.engine.log("Location: route playback failed — restoring real location.")
+                        self.restoreRealLocationAfterRoute()
+                    } else {
+                        self.lastError = L("Route playback stopped: %@", self.message(error))
+                    }
                     return
                 }
                 // Stopped or replaced while that was sending.
@@ -1159,10 +1282,24 @@ final class LocationManager: ObservableObject {
                 self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration,
                                                    segment: timeline.segment(at: elapsed))
                 if elapsed >= timeline.duration {
+                    // F-1 (0.9.164): looping restarts from the first point
+                    // instead of stopping — the switch is read here, so
+                    // turning it on mid-route takes effect at the end.
+                    if self.routeLoop {
+                        started = Date()
+                        self.routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
+                        self.engine.log("Location: route finished — looping back to the start.")
+                        continue
+                    }
                     self.endPlayback()
                     self.lastError = nil
-                    self.lastSuccess = L("Route finished. The device stays at its last point.")
-                    self.engine.log("Location: route finished.")
+                    if self.restoreRealAfterRoute {
+                        self.engine.log("Location: route finished — restoring real location.")
+                        self.restoreRealLocationAfterRoute()
+                    } else {
+                        self.lastSuccess = L("Route finished. The device stays at its last point.")
+                        self.engine.log("Location: route finished.")
+                    }
                     return
                 }
             }
@@ -1243,6 +1380,7 @@ final class LocationManager: ObservableObject {
             } catch {
                 // Changing the stops or the mode cancels a plan on its way.
                 guard !Task.isCancelled else { return }
+                engine.log("Route plan failed: \(error)")
                 lastError = message(error)
             }
             isPlanningRoute = false
@@ -1396,6 +1534,9 @@ final class LocationManager: ObservableObject {
     }
 
     private func message(_ error: Error) -> String {
+        if error is DeviceConnection.FFIError {
+            return L("Couldn't reach this iPhone. Check the connection and try again.")
+        }
         if let engineError = error as? EngineError { return engineError.localizedDescription }
         return error.localizedDescription
     }
@@ -1412,6 +1553,7 @@ struct LocationView: View {
     @ObservedObject var manager: LocationManager
 
     @State private var showSettings = false
+    @State private var showingClearStopsConfirm = false
     /// Where the map is looking, and the point under the crosshair.
     @State private var camera: MapCameraPosition = .region(
         MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090),
@@ -1449,6 +1591,7 @@ struct LocationView: View {
                     plannerCard.cascadeItem(3)
                     savedPlacesCard.cascadeItem(4)
                     routeCard.cascadeItem(5)
+                    ddiCard.cascadeItem(6)
                     // Errors and confirmations show as popups, which `RootView`
                     // lays over the app.
                 }
@@ -1533,14 +1676,36 @@ struct LocationView: View {
     }
 
     private var vpnNote: some View {
-        PanelCard {
-            HStack(alignment: .top, spacing: 8) {
+        CalloutCard(tint: Theme.negative) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled")
                     .foregroundStyle(Theme.negative)
                 Text(L("Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// The developer disk image: whether it's on disk, and a way to fetch
+    /// it again or delete it when the copy is corrupt (B3, 0.9.147).
+    private var ddiCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(title: L("Developer disk image"), systemImage: "internaldrive")
+                HStack(spacing: 8) {
+                    Text(DeveloperDiskImage.isDownloaded ? L("Downloaded") : L("Not downloaded"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 8)
+                    Button(L("Re-download")) { manager.redownloadDDI() }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .disabled(manager.isBusy || manager.isSimulating)
+                    Button(L("Clear")) { manager.clearDDI() }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .disabled(manager.isBusy || manager.isSimulating || !DeveloperDiskImage.isDownloaded)
+                }
             }
         }
     }
@@ -1550,7 +1715,7 @@ struct LocationView: View {
     private var mapCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Pick a place"), systemImage: "mappin.and.ellipse")
+                SectionTitle(title: L("Pick a place"), systemImage: "mappin.and.ellipse")
 
                 searchField
 
@@ -1586,13 +1751,12 @@ struct LocationView: View {
                         .allowsHitTesting(false)
                 }
                 .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                // 0.9.188：圆角走卡片 token（原来硬编码 16）。
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
 
-                // Icons only where the coordinate and both labels don't fit.
-                ViewThatFits(in: .horizontal) {
-                    pinActions(labelled: true)
-                    pinActions(labelled: false)
-                }
+                // Always the labelled row: the coordinate and both labels fit
+                // at this width, and the row no longer swaps layouts.
+                pinActions(labelled: true)
 
                 // On first use, the spinner also covers disk image setup.
                 Button { manager.simulate(target) } label: {
@@ -1609,6 +1773,29 @@ struct LocationView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!canSetLocation)
 
+                // DDI download progress, with a way out (B2, 0.9.147).
+                if manager.stage == .downloading {
+                    HStack(spacing: 8) {
+                        // B1 (0.9.155): no total — indeterminate spinner
+                        // plus the bytes so far, not a 0% that never moves.
+                        if let fraction = manager.downloadProgress {
+                            ProgressView(value: fraction)
+                                .tint(Theme.accent)
+                            Text(L("Downloading… %d%%", Int(fraction * 100)))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Theme.muted)
+                                .contentTransition(.numericText())
+                        } else {
+                            ProgressView()
+                                .tint(Theme.accent)
+                        }
+                        Spacer(minLength: 8)
+                        Button(L("Cancel")) { manager.cancelDownload() }
+                            .buttonStyle(.plain, sound: .tap)
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+
                 if manager.isSimulating {
                     Button { manager.stop() } label: {
                         Label(L("Reset to real location"), systemImage: "location.slash")
@@ -1616,7 +1803,6 @@ struct LocationView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .controlSize(.regular)
                     .disabled(manager.isBusy)
                 }
             }
@@ -1628,7 +1814,7 @@ struct LocationView: View {
         HStack(spacing: 8) {
             Label(LocationManager.format(target), systemImage: "scope")
                 .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .lineLimit(1)
             Spacer(minLength: 0)
             Button { addStopAtPin() } label: {
@@ -1672,20 +1858,21 @@ struct LocationView: View {
     }
 
     private var crosshair: some View {
+        // 0.9.188：阴影删掉（全仓仅剩的 3 处阴影之三）——白针蓝底圆标
+        // 本身对比够，在地图上仍可读，不用阴影托底。
         Image(systemName: "mappin.circle.fill")
             .font(.system(size: 30))
-            .foregroundStyle(.white, Theme.accent)
-            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+            .foregroundStyle(.white, Theme.blue)
     }
 
     private var searchField: some View {
+        // 0.9.188：与共享 SearchBar 二选一统一——用 SearchBar 做字段
+        // （放大镜 + 清除同款），搜索按钮与进行中转圈保留在外面；
+        // 回车提交经 .onSubmit 接到 search()（SearchBar 内的字段
+        // 本身是过滤用的，没有提交回调）。
         HStack(spacing: 8) {
-            TextField(L("Search for a place"), text: $query)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
+            SearchBar(text: $query, placeholder: L("Search for a place"))
                 .onSubmit { search() }
-                .fieldBackground()
             Button { search() } label: {
                 if isSearching {
                     ProgressView().controlSize(.small)
@@ -1743,7 +1930,7 @@ struct LocationView: View {
     private var plannerCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Plan a route"), systemImage: "signpost.right.and.left")
+                SectionTitle(title: L("Plan a route"), systemImage: "signpost.right.and.left")
 
                 Picker(L("Travel by"), selection: $manager.travelMode) {
                     ForEach(TravelMode.allCases) { mode in
@@ -1755,7 +1942,7 @@ struct LocationView: View {
 
                 Text(Self.modeExplanation(manager.travelMode))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // Playing moves the device, which isn't where the route started.
@@ -1782,8 +1969,8 @@ struct LocationView: View {
                     Text(L("Routes from OpenStreetMap, © OpenStreetMap contributors"))
                         .multilineTextAlignment(.leading)
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -1793,7 +1980,7 @@ struct LocationView: View {
         if manager.stops.isEmpty {
             Text(L("Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order."))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             VStack(spacing: 2) {
@@ -1803,7 +1990,7 @@ struct LocationView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
-                            .background(Circle().fill(Theme.positive))
+                            .background(Circle().fill(Theme.badgePositive))
                     } trailing: {
                         EmptyView()
                     }
@@ -1814,13 +2001,13 @@ struct LocationView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
-                            .background(Circle().fill(Theme.warning))
+                            .background(Circle().fill(Theme.badgeWarning))
                     } trailing: {
                         Menu { stopMenu(stop, index: index) } label: {
                             Image(systemName: "ellipsis.circle")
                                 .font(.title3)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 36, height: 36)
+                                .foregroundStyle(Theme.muted)
+                                .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
                         .disabled(manager.isPlayingPlannedRoute)
@@ -1834,9 +2021,15 @@ struct LocationView: View {
                         .font(.caption.weight(.medium))
                 }
                 Spacer()
-                Button(role: .destructive) { manager.removeAllStops() } label: {
+                Button(role: .destructive) { showingClearStopsConfirm = true } label: {
                     Label(L("Clear stops"), systemImage: "trash")
                         .font(.caption.weight(.medium))
+                }
+                .alert(L("Clear stops"), isPresented: $showingClearStopsConfirm) {
+                    Button(L("Delete"), role: .destructive) { manager.removeAllStops() }
+                    Button(L("Cancel"), role: .cancel) {}
+                } message: {
+                    Text(L("删除后无法恢复"))
                 }
                 .tint(Theme.negative)
             }
@@ -1864,7 +2057,7 @@ struct LocationView: View {
                     .lineLimit(1)
                 Text(LocationManager.format(coordinate))
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -1916,7 +2109,7 @@ struct LocationView: View {
         if manager.routeWaypoints.count == 1 {
             Text(L("Add one more stop to plan a route."))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -1934,7 +2127,7 @@ struct LocationView: View {
                     .font(.subheadline.weight(.medium))
                 Text(Self.routeDetail(planned))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -1949,8 +2142,10 @@ struct LocationView: View {
             Button { manager.removePlannedRoute() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
+                    .padding(8)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(L("Remove"))
             .disabled(manager.isPlayingRoute)
@@ -1965,7 +2160,7 @@ struct LocationView: View {
             } else {
                 Image(systemName: mode.systemImage)
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(Theme.control))
             }
@@ -1975,16 +2170,15 @@ struct LocationView: View {
                     .lineLimit(1)
                 Text(Self.roadDetail(stretch))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .fill(Theme.control))
-        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
+        // 0.9.188：行面走 cardSurface（原来手写 Theme.control 底 +
+        // hairline 描边）；此行直接落在页上，不是卡中卡。
+        .cardSurface(in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
         .animation(.smooth(duration: 0.3), value: stretch)
     }
 
@@ -1993,11 +2187,11 @@ struct LocationView: View {
     private var savedPlacesCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Saved places"), systemImage: "bookmark")
+                SectionTitle(title: L("Saved places"), systemImage: "bookmark")
                 if manager.savedPlaces.isEmpty {
                     Text(L("Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away."))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     VStack(spacing: 2) {
@@ -2012,7 +2206,9 @@ struct LocationView: View {
 
     /// Tap to set the place; the menu shows it on the map or deletes it.
     private func savedPlaceRow(_ place: SavedPlace) -> some View {
-        HStack(spacing: 8) {
+        // 0.9.188：与 stopRow 同款行面（HStack 间距 12、标题不另写
+        // .primary、行高 minHeight 36 + 纵向内边距 4）。
+        HStack(spacing: 12) {
             Button {
                 moveMap(to: place.coordinate)
                 manager.simulate(place.coordinate, name: place.name)
@@ -2020,20 +2216,19 @@ struct LocationView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.title3)
-                        .foregroundStyle(.white, Theme.accent)
+                        .foregroundStyle(.white, Theme.blue)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(place.name)
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
                             .lineLimit(1)
                         Text(LocationManager.format(place.coordinate))
                             .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain, sound: .tap)
@@ -2062,11 +2257,12 @@ struct LocationView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, height: 36)
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
+        .frame(minHeight: 36)
     }
 
     // MARK: Route
@@ -2074,14 +2270,14 @@ struct LocationView: View {
     private var routeCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Play a GPX route"),
+                SectionTitle(title: L("Play a GPX route"),
                              systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                 if let route = manager.route {
                     loadedRoute(route)
                 } else {
-                    Text(L("Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point."))
+                    Text(L("Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on."))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     Button { showRouteImporter = true } label: {
                         HStack(spacing: 8) {
@@ -2096,7 +2292,6 @@ struct LocationView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .controlSize(.regular)
                     .disabled(manager.isImportingRoute)
                 }
             }
@@ -2113,7 +2308,7 @@ struct LocationView: View {
                 Text("\(Self.formatDistance(route.distance)) · "
                      + Self.formatDuration(route.duration(at: manager.routeSpeed)))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             Spacer(minLength: 0)
             Button {
@@ -2127,8 +2322,10 @@ struct LocationView: View {
             Button { manager.removeRoute() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
+                    .padding(8)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(L("Remove"))
             .disabled(manager.isPlayingRoute)
@@ -2147,7 +2344,7 @@ struct LocationView: View {
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             .fieldBackground()
             .contentShape(Rectangle())
@@ -2170,7 +2367,7 @@ struct LocationView: View {
                        Self.formatClock(progress.elapsed, total: progress.duration),
                        Self.formatClock(progress.duration, total: progress.duration)))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             .transition(.opacity)
 
@@ -2182,7 +2379,20 @@ struct LocationView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .controlSize(.regular)
+
+            // F-1 (0.9.164): the loop switch stays live while playing — it
+            // is read when the end is reached, so turning it on mid-route
+            // loops, and turning it off stops at the end.
+            Toggle(L("Loop route"), isOn: $manager.routeLoop)
+                .font(.subheadline)
+                .tint(Theme.accent)
+
+            // F-3 (0.9.166): restore the real location when the route ends
+            // instead of staying at the last point. Off by default; read
+            // when the end is reached, like the loop switch above.
+            Toggle(L("Restore real location when done"), isOn: $manager.restoreRealAfterRoute)
+                .font(.subheadline)
+                .tint(Theme.accent)
         } else {
             Button { manager.playRoute() } label: {
                 HStack(spacing: 8) {
@@ -2197,6 +2407,18 @@ struct LocationView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canSetLocation)
+
+            // F-1 (0.9.164): loop the route from the start when it ends,
+            // instead of stopping at the last point. Off by default.
+            Toggle(L("Loop route"), isOn: $manager.routeLoop)
+                .font(.subheadline)
+                .tint(Theme.accent)
+
+            // F-3 (0.9.166): restore the real location when the route ends
+            // instead of staying at the last point. Off by default.
+            Toggle(L("Restore real location when done"), isOn: $manager.restoreRealAfterRoute)
+                .font(.subheadline)
+                .tint(Theme.accent)
         }
     }
 
@@ -2310,9 +2532,8 @@ struct LocationView: View {
 
     // MARK: Helpers
 
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        SectionTitle(title: title, systemImage: systemImage)
-    }
+    // 0.9.188：本地 sectionTitle 已并入 Theme SectionTitle（原来只是
+    // 一层透传），调用处直接用 SectionTitle。
 }
 
 // MARK: - Speed limit sign

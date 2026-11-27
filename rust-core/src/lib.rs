@@ -10,6 +10,7 @@ extern crate idevice_ffi as _;
 mod account;
 mod apple_session;
 mod certs;
+mod enterprise;
 mod entitlements;
 mod error_text;
 mod ffi_util;
@@ -289,6 +290,132 @@ pub unsafe extern "C" fn si_sign_ipa(
     )
 }
 
+/// Sign an IPA with a user-supplied enterprise certificate,
+/// locally: no Apple ID, no network. The .p12 is parsed by the
+/// caller (Swift's Security framework), so the certificate and
+/// RSA private key arrive as DER files, alongside the
+/// .mobileprovision. On success `*out_signed_path` is the signed
+/// bundle's directory.
+///
+/// # Safety
+/// All `*const c_char` args must be null or valid C strings; the
+/// out pointers must be valid and writable.
+#[no_mangle]
+pub unsafe extern "C" fn si_sign_ipa_with_cert(
+    ipa_path: *const c_char,
+    cert_der_path: *const c_char,
+    key_der_path: *const c_char,
+    provision_path: *const c_char,
+    out_signed_path: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::sign_ipa_with_cert(
+        ipa_path,
+        cert_der_path,
+        key_der_path,
+        provision_path,
+        out_signed_path,
+        out_error,
+    )
+}
+
+/// Like `si_sign_ipa_with_cert`, plus a JSON options object with
+/// optional pre-signing modifications (display name, bundle ID,
+/// version, minimum OS, icon) and a signed-.ipa output path.
+///
+/// # Safety
+/// Same contract as `si_sign_ipa_with_cert`; `options_json` may be
+/// null for no modifications.
+#[no_mangle]
+pub unsafe extern "C" fn si_sign_ipa_with_cert_ex(
+    ipa_path: *const c_char,
+    cert_der_path: *const c_char,
+    key_der_path: *const c_char,
+    provision_path: *const c_char,
+    options_json: *const c_char,
+    out_signed_path: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::sign_ipa_with_cert_ex(
+        ipa_path,
+        cert_der_path,
+        key_der_path,
+        provision_path,
+        options_json,
+        out_signed_path,
+        out_error,
+    )
+}
+
+/// Extract an .ipa and return its .app bundle directory, for
+/// installing an already-signed IPA without signing it again.
+///
+/// # Safety
+/// Same contract as `si_sign_ipa_with_cert`.
+#[no_mangle]
+pub unsafe extern "C" fn si_extract_ipa(
+    ipa_path: *const c_char,
+    out_bundle_path: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::extract_ipa(ipa_path, out_bundle_path, out_error)
+}
+
+/// Zip files/folders (JSON array of absolute paths) into an .ipa-
+/// style archive, for the file manager.
+///
+/// # Safety
+/// All `*const c_char` args must be null or valid C strings; the
+/// out pointers must be valid and writable.
+#[no_mangle]
+pub unsafe extern "C" fn si_zip_create(
+    paths_json: *const c_char,
+    out_zip: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::zip_create_ffi(paths_json, out_zip, out_error)
+}
+
+/// Extract a zip archive into a directory, for the file manager.
+///
+/// # Safety
+/// Same contract as `si_zip_create`.
+#[no_mangle]
+pub unsafe extern "C" fn si_unzip_archive(
+    archive_path: *const c_char,
+    dest_dir: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::unzip_archive_ffi(archive_path, dest_dir, out_error)
+}
+
+/// Mach-O dependency info (JSON) for the file manager's viewer.
+///
+/// # Safety
+/// All `*const c_char` args must be null or valid C strings; the
+/// out pointers must be valid and writable.
+#[no_mangle]
+pub unsafe extern "C" fn si_macho_info(
+    path: *const c_char,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::macho_info_ffi(path, out_json, out_error)
+}
+
+/// One Mach-O dependency edit: {action: remove|rename, name, newName}.
+///
+/// # Safety
+/// Same contract as `si_macho_info`.
+#[no_mangle]
+pub unsafe extern "C" fn si_macho_edit(
+    path: *const c_char,
+    op_json: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    enterprise::macho_edit_ffi(path, op_json, out_error)
+}
+
 /// Set `*out_json` to the sign-in an app needs to renew its own provisioning
 /// profile: `{team_id, adsid, token, token_expires, anisette_identifier,
 /// anisette_adi_pb}`. Blocks, but asks Apple nothing.
@@ -359,7 +486,7 @@ pub unsafe extern "C" fn si_forget_apple_session(
 }
 
 // ---------------------------------------------------------------------------
-// Certificates — list, revoke, import and export
+// Certificates — list and revoke
 // ---------------------------------------------------------------------------
 
 /// Open a developer session on the team that signs, for certificate
@@ -416,10 +543,6 @@ pub unsafe extern "C" fn si_cert_revoke(
     certs::cert_revoke(session, serial_number, out_error)
 }
 
-/// Sign with the certificate in a PKCS#12 archive (SideStore's export) from
-/// now on, once the portal lists it on the session's team; JSON in
-/// `*out_json`. Returns 3 when no certificate on the team has its key. Blocks.
-///
 /// # Safety
 /// See `certs::cert_import`.
 #[no_mangle]
@@ -434,21 +557,20 @@ pub unsafe extern "C" fn si_cert_import(
     certs::cert_import(session, p12, p12_len, password, out_json, out_error)
 }
 
-/// Write the certificate with `serial_number` and its private key to
-/// `out_path` as a PKCS#12 archive encrypted with `password`. Returns 3 when
-/// it isn't the certificate SideInstaller signs with. Blocks.
+/// Export the signing certificate as PKCS#12 (base64 JSON). Blocks.
 ///
 /// # Safety
-/// See `certs::cert_export`.
+/// See `certs::cert_export_p12`.
 #[no_mangle]
-pub unsafe extern "C" fn si_cert_export(
+pub unsafe extern "C" fn si_cert_export_p12(
     session: *mut CertSession,
-    serial_number: *const c_char,
-    password: *const c_char,
-    out_path: *const c_char,
+    email: *const c_char,
+    machine_name: *const c_char,
+    storage_dir: *const c_char,
+    out_b64: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
-    certs::cert_export(session, serial_number, password, out_path, out_error)
+    certs::cert_export_p12(session, email, machine_name, storage_dir, out_b64, out_error)
 }
 
 /// Free a certificate session.

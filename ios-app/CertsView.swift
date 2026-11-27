@@ -1,57 +1,73 @@
 import SwiftUI
 
 /// Lists and revokes the Apple ID's development certificates (e.g. to fix error
-/// 7460), exports the one SideInstaller signs with, or signs with SideStore's
-/// instead. Pushed from Tools (relies on its `NavigationStack`).
+/// 7460). Pushed from Tools (relies on its `NavigationStack`).
 struct CertsView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: CertManager
 
+    /// P1-3 (0.9.186): the saved Apple IDs, for the per-account
+    /// certificate groups below (Settings › Account 同款来源）.
+    @EnvironmentObject private var accounts: AccountStore
+
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
-    /// The certificate the user tapped "Export" on, pending a password (or none).
-    @State private var pendingExport: DevCert?
-    @State private var exportPassword = ""
+    /// B-3 (0.9.171): the certificate whose affected-apps read is still
+    /// in flight — its Revoke button shows the wait instead of opening
+    /// a confirm box with an empty list.
+    @State private var loadingAppsForRevokeCert: DevCert?
+    /// F-2 (0.9.163): the installed apps, for the revoke confirm's
+    /// affected list — the shared instance, not an environment object,
+    /// so the confirm works wherever this page is pushed from.
+    @ObservedObject private var appsManager = SideloadedAppsManager.shared
+    /// Exported p12 file URL for ShareLink.
+    @State private var exportURL: URL?
+    /// Exported password txt URL for ShareLink: written next to the p12 in
+    /// `doExport`, shared together with it (0.9.140).
+    @State private var exportPasswordURL: URL?
+    @State private var exportPassword: String?
+    @State private var isExporting = false
+    @State private var exportError: String?
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 header.cascadeItem(0)
+                expiryBanner
                 loadButton.cascadeItem(1)
+                exportButton.cascadeItem(2)
                 if manager.canUseSideStoreCertificate {
-                    sideStoreCard.cascadeItem(2)
+                    sideStoreCard.cascadeItem(3)
                 }
+                accountGroups
                 // Errors show as a popup, which `RootView` lays over the app.
                 certList
             }
-            // Here rather than beside the revoke alert: one view, one alert.
-            .alert(L("Export certificate"),
-                   isPresented: Binding(get: { pendingExport != nil },
-                                        set: { if !$0 { endExport() } })) {
-                SecureField(L("Password (optional)"), text: $exportPassword)
-                Button(L("Export")) {
-                    if let cert = pendingExport {
-                        manager.export(cert, password: exportPassword, share: share)
-                    }
-                    endExport()
-                }
-                Button(L("Cancel"), role: .cancel) { endExport() }
-            } message: {
-                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself."))
-            }
             .padding(20)
-            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.certs)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
-            .animation(.smooth(duration: 0.3), value: manager.isImporting)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
+        }
+        .refreshable {
+            // F2 (0.9.141): pull to reload the certificate list.
+            // loadCerts declines silently when a revoke is running or no
+            // Apple ID is saved, and a stored `then` is dropped when the
+            // load fails — so don't wait on its callback, or the spinner
+            // could stick forever. Wait on isWorking instead, bounded.
+            await MainActor.run { manager.loadCerts() }
+            for _ in 0..<120 {
+                let working = await MainActor.run { manager.isWorking }
+                guard working else { break }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }
+        .onDisappear { Self.deleteExportTempFiles() }
         .alert(L("Revoke this certificate?"),
                isPresented: Binding(get: { pendingRevoke != nil },
                                     set: { if !$0 { pendingRevoke = nil } })) {
@@ -62,10 +78,74 @@ struct CertsView: View {
             Button(L("Cancel"), role: .cancel) { pendingRevoke = nil }
         } message: {
             if let cert = pendingRevoke {
-                Text(L("“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.",
-                       cert.displayName))
+                Text(revokeMessage(for: cert))
             }
         }
+    }
+
+    /// B-3 (0.9.171): open the revoke confirm only once the installed
+    /// list is in — the confirm's affected-apps list reads
+    /// `appsManager.entries`, and the old tap set `pendingRevoke` first
+    /// and fired a fire-and-forget `autoLoad()` after it, so on a cold
+    /// start the box always rendered against empty entries. Now the tap
+    /// waits on the load (`inFlightLoadTask`, A-5 SIDE-32) before the
+    /// box opens; a load that fails still opens the box (generic
+    /// warning only), never wedges the revoke entry — and the failed
+    /// attempt resets `didAutoLoad`, so the next tap retries instead
+    /// of being guarded off for the rest of the launch. A tap while
+    /// the tunnel is down skips the wait (autoLoad declines without
+    /// consuming the chance) and opens the box at once.
+    private func revokeTapped(_ cert: DevCert) {
+        guard loadingAppsForRevokeCert == nil else { return }
+        // Already read: nothing to wait for.
+        if appsManager.hasLoaded {
+            pendingRevoke = cert
+            return
+        }
+        loadingAppsForRevokeCert = cert
+        Task { @MainActor in
+            // A previous failed auto-load must not burn this tap's
+            // chance: reset first, so autoLoad gets a fresh attempt.
+            appsManager.resetAutoLoad()
+            appsManager.autoLoad()
+            if let task = appsManager.inFlightLoadTask {
+                await task.value
+            }
+            // Still nothing: this attempt failed too — reset again, so
+            // the next tap can retry.
+            if !appsManager.hasLoaded { appsManager.resetAutoLoad() }
+            loadingAppsForRevokeCert = nil
+            pendingRevoke = cert
+        }
+    }
+
+    /// F-2 (0.9.163): the revoke confirm names the installed apps it
+    /// will break, not just "apps signed with it" — the names come from
+    /// `affectedApps()`, matched by team (see `CertManager.teamID`).
+    /// No team, or no device read yet, means the generic warning alone:
+    /// never list an app the match can't prove.
+    private func revokeMessage(for cert: DevCert) -> String {
+        let base = L("“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.",
+                     cert.displayName)
+        let affected = affectedApps()
+        guard !affected.isEmpty else { return base }
+        let shown = affected.prefix(5)
+        var list = shown.joined(separator: "\n")
+        if affected.count > 5 {
+            list += "\n" + L("等 %d 个", affected.count - 5)
+        }
+        return base + "\n\n" + L("Apps signed with this certificate:\n%@", list)
+    }
+
+    /// F-2 (0.9.163): the installed apps signed under this certificate's
+    /// team — an app counts when its current profile's team is the
+    /// certificate's team. Sorted by name for the confirm box.
+    private func affectedApps() -> [String] {
+        guard let teamID = manager.teamID else { return [] }
+        return appsManager.entries
+            .filter { $0.current?.teamIdentifier == teamID }
+            .map(\.app.name)
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     // MARK: Header
@@ -73,10 +153,97 @@ struct CertsView: View {
     private var header: some View {
         BrandHeader(icon: "checkmark.seal", image: "CertsLogo", title: L("Certificates")) {
             if let team = manager.teamSummary {
-                StatusDot(text: team, color: Theme.positive)
+                StatusDot(text: team, color: Theme.positive, textColor: Theme.muted)
                     .transition(.opacity)
             }
         }
+    }
+
+    // MARK: Expiry warning
+
+    /// 7 天内到期（含已过期）的证书：跟 EnterpriseCertView.expirySoon
+    /// 同一条规则（剩余天数 ≤7 天），只做展示。
+    private var expiringCerts: [DevCert] {
+        manager.certs.filter { cert in
+            guard let expiry = cert.expiresAt else { return false }
+            return (Calendar.current.dateComponents([.day], from: Date(), to: expiry).day ?? 0) <= 7
+        }
+    }
+
+    /// F-2 (0.9.165)：红条下受影响的已装 App——跟吊销确认框同一份
+    /// `affectedApps()`（按 team 匹配）、同一份前 5 +「等 N 个」
+    /// 截断；没 team、没读到设备列表就 nil，红条不画蛇添足。
+    private var affectedAppsText: String? {
+        let affected = affectedApps()
+        guard !affected.isEmpty else { return nil }
+        let shown = affected.prefix(5)
+        var list = shown.joined(separator: "\n")
+        if affected.count > 5 {
+            list += "\n" + L("等 %d 个", affected.count - 5)
+        }
+        return L("Apps signed with this certificate:\n%@", list)
+    }
+
+    /// 企业页已有同款红条，个人证书页之前只有行内小字到期日：
+    /// 7 天有效期的个人证书到期前毫无预警，App 打不开才发现。
+    /// 任一证书 7 天内到期就出红条，写明证书名 + 到期日，下附一行
+    /// 动作指引；只展示，不碰续签过滤、团队判定等任何逻辑。
+    @ViewBuilder
+    private var expiryBanner: some View {
+        if !expiringCerts.isEmpty {
+            CalloutCard(tint: Theme.negative) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("证书到期提醒"))
+                        .font(.subheadline.weight(.semibold))
+                    ForEach(expiringCerts, id: \.id) { cert in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(cert.displayName)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                                if let expiry = cert.expiresAt {
+                                    Text(expiryLabel(expiry))
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                            }
+                        }
+                    }
+                    // B-3 (0.9.186): the affected-apps list is team-wide,
+                    // not per certificate — it used to render under every
+                    // expiring certificate, repeating the same names.
+                    // Once, after the list, is enough.
+                    if let affectedText = affectedAppsText {
+                        Text(affectedText)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    Text(L("证书到期后请重新登录 Apple ID 获取新证书，再用全部续签重签 App。"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .transition(.opacity)
+        }
+    }
+
+    /// 到期日 + 剩余天数，跟 EnterpriseCertView.remainingText、已装 App 页
+    /// AppsView.daysRemaining 同一套算法（自然日对齐，见 S7），
+    /// 同一到期日在三页说法一致。只改日期显示，不动 ID 签名/
+    /// 续签逻辑。
+    private func expiryLabel(_ expiry: Date) -> String {
+        let date = expiry.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .omitted)
+                .locale(Localizer.locale))
+        let calendar = Calendar.current
+        let days = calendar.dateComponents([.day],
+            from: calendar.startOfDay(for: Date()),
+            to: calendar.startOfDay(for: expiry)).day ?? 0
+        if days < 0 { return L("%@（已过期）", date) }
+        if days == 0 { return L("%@（今天到期）", date) }
+        return L("%@（剩 %d 天）", date, days)
     }
 
     // MARK: Primary action
@@ -97,7 +264,62 @@ struct CertsView: View {
             }
         }
         .buttonStyle(PrimaryButtonStyle())
-        .disabled(manager.isBusy)
+        .disabled(manager.isWorking || manager.revokingID != nil)
+    }
+
+    /// Export certificate as p12 for LiveContainer import.
+    /// The share sheet offers the .p12 together with its password txt
+    /// (0.9.140): the txt was already written to tmp, only the .p12 was
+    /// shared, so the password had to be retyped by hand on the other end.
+    private var exportButton: some View {
+        VStack(spacing: 10) {
+            if exportURL != nil {
+                ShareLink(items: exportItems) {
+                    Label(L("Export certificate (p12)"), systemImage: "square.and.arrow.up")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                if let pwd = exportPassword {
+                    VStack(spacing: 4) {
+                        Text(L("Certificate password:"))
+                            .font(.caption)
+                            .foregroundColor(Theme.muted)
+                        Text(pwd)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding(8)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(Theme.controlRadius)
+                    }
+                }
+            } else {
+                Button {
+                    doExport()
+                } label: {
+                    HStack(spacing: 10) {
+                        if isExporting {
+                            ProgressView().tint(.white)
+                            Text(L("Exporting"))
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                            Text(L("Export certificate (p12)"))
+                        }
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(manager.isWorking || isExporting || !manager.isSignedIn)
+            }
+            if let err = exportError {
+                Text(err).font(.caption).foregroundColor(Theme.negative)
+            }
+        }
+    }
+
+    /// The files the share sheet offers: the .p12, and its password txt
+    /// when one was written (always, from `doExport`).
+    private var exportItems: [URL] {
+        [exportURL, exportPasswordURL].compactMap { $0 }
     }
 
     // MARK: SideStore's certificate
@@ -112,7 +334,7 @@ struct CertsView: View {
                      ? L("SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.")
                      : L("SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button {
                     manager.requestSideStoreCertificate(retryInstall: false)
@@ -135,7 +357,159 @@ struct CertsView: View {
         }
     }
 
+    /// N4：证书导出把明文密码写进 tmp（certificate-password.txt），
+    /// 分享完就删——导出开始时清上一份，页面离开时清最后一份；
+    /// 固定名，下次导出直接覆盖，残留最多只剩最新的一组。
+    private static func deleteExportTempFiles() {
+        let tmp = FileManager.default.temporaryDirectory
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate.p12"))
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate-password.txt"))
+    }
+
+    private func doExport() {
+        isExporting = true
+        exportError = nil
+        exportURL = nil
+        exportPasswordURL = nil
+        Self.deleteExportTempFiles()
+        Task {
+            do {
+                // 证书页导出同款：先自动登录再导出，否则刚启动没开过证书页
+                // 之外的入口点进来也会报 Not signed in.（App 详情页同款已修）。
+                try await manager.ensureSignedIn()
+                let (p12Data, password) = try manager.exportP12()
+                // Write to temp file
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("certificate.p12")
+                try p12Data.write(to: tempURL)
+                // Also save password to a txt file for convenience
+                let pwdURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("certificate-password.txt")
+                try password.write(to: pwdURL, atomically: true, encoding: .utf8)
+                await MainActor.run {
+                    isExporting = false
+                    exportURL = tempURL
+                    exportPasswordURL = pwdURL
+                    exportPassword = password
+                }
+            } catch is CancellationError {
+                // A2：切账号后本次导出作废，不记错。
+                await MainActor.run { isExporting = false }
+            } catch {
+                await MainActor.run {
+                    isExporting = false
+                    exportError = error.localizedDescription
+                }
+            }
+        }
+    }
+
     // MARK: Certificate list
+
+    /// P1-3 (0.9.186): the certificates, grouped by Apple ID — one
+    /// group per saved account, so both accounts' certificates are
+    /// visible on one page. Only the active account's certificates
+    /// are loaded (loading every account would sign in as each one,
+    /// 2FA prompts included); the other groups show the recorded
+    /// team and switch on tap — activating also signs the
+    /// CertManager out and reloads as the new account, so the tap
+    /// is the signing-account switch. Renewal is untouched: this
+    /// only picks which account signs, never which team a renewal
+    /// touches.
+    @ViewBuilder
+    private var accountGroups: some View {
+        if !accounts.accounts.isEmpty {
+            VStack(spacing: 12) {
+                ForEach(accounts.accounts) { account in
+                    accountGroupCard(account)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func accountGroupCard(_ account: SavedAccount) -> some View {
+        let isActive = accounts.isActive(account)
+        let teamText: String? = {
+            if let teamID = account.teamID { return teamID }
+            return accounts.team(for: account.normalized)?.label
+        }()
+        if isActive {
+            PanelCard {
+                accountGroupContent(account, teamText: teamText, isActive: true)
+            }
+        } else {
+            Button { switchSigningAccount(account) } label: {
+                PanelCard {
+                    accountGroupContent(account, teamText: teamText, isActive: false)
+                }
+            }
+            .buttonStyle(.plain, sound: .tick)
+        }
+    }
+
+    private func accountGroupContent(_ account: SavedAccount, teamText: String?, isActive: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "person.crop.circle")
+                    .foregroundStyle(Theme.muted)
+                Text(account.appleID)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                if isActive {
+                    Text(L("当前签名账号"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.positive)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            HStack(spacing: 8) {
+                if let teamText {
+                    Text(teamText)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                if isActive, manager.hasLoaded {
+                    Text(L("%d certificate(s)", manager.certs.count))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    if let soonest = manager.certs.compactMap(\.expiresAt).min() {
+                        Text(expiryLabel(soonest))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                } else if !isActive {
+                    Text(L("点一下切换签名账号"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+    }
+
+    /// Switches the signing account to `account` and reloads the
+    /// certificates as it. The revision listener signs the manager
+    /// out (clearing the old account's list) right after the
+    /// activate; loadCerts' Task body reads the generation after
+    /// that signOut, so it signs in as the new account. The delayed
+    /// re-check covers a load the listener's signOut cancelled
+    /// mid-flight — then the list just loads again, and the manual
+    /// Refresh button is still there as the last resort.
+    private func switchSigningAccount(_ account: SavedAccount) {
+        guard !accounts.isActive(account) else { return }
+        accounts.activate(account)
+        manager.loadCerts()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if !manager.hasLoaded, !manager.isWorking { manager.loadCerts() }
+        }
+    }
 
     @ViewBuilder
     private var certList: some View {
@@ -147,20 +521,12 @@ struct CertsView: View {
                     // Count only; Apple doesn't report the account's limit.
                     Text(L("%d certificate(s)", manager.certs.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
-                .cascadeItem(3)
-                if manager.hasLoaded && !manager.certs.contains(where: \.isSigning) {
-                    Text(L("SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .cascadeItem(3)
-                }
+                .cascadeItem(2)
                 ForEach(Array(manager.certs.enumerated()), id: \.element.id) { idx, cert in
-                    certRow(cert).cascadeItem(4 + idx)
+                    certRow(cert).cascadeItem(3 + idx)
                 }
             }
         }
@@ -168,24 +534,16 @@ struct CertsView: View {
 
     private var emptyState: some View {
         PanelCard {
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.seal")
-                    .font(.largeTitle)
-                    .foregroundStyle(Theme.muted)
-                Text(L("No certificates"))
-                    .font(.headline)
-                Text(L("This Apple ID has no development certificates to revoke."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            EmptyState(title: L("No certificates"),
+                       message: L("This Apple ID has no development certificates to revoke."),
+                       systemImage: "checkmark.seal")
+                .padding(.vertical, 8)
         }
     }
 
     private func certRow(_ cert: DevCert) -> some View {
-        PanelCard {
+        let revoking = manager.revokingID == cert.id
+        return PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "seal")
@@ -194,15 +552,12 @@ struct CertsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(cert.displayName)
                             .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         if let machine = cert.machineLabel {
                             Label(machine, systemImage: "desktopcomputer")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if cert.isSigning {
-                            Label(L("SideInstaller signs with this one"), systemImage: "checkmark.seal")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(Theme.positive)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                     Spacer()
@@ -211,6 +566,29 @@ struct CertsView: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(Theme.warning)
                     }
+                    // Revoke lives at the card's top right as a small text
+                    // button, so the card's foot isn't a full-width button.
+                    Button(role: .destructive) {
+                        revokeTapped(cert)
+                    } label: {
+                        HStack(spacing: 4) {
+                            if revoking {
+                                ProgressView().controlSize(.small)
+                                Text(L("Revoking"))
+                            } else if loadingAppsForRevokeCert == cert {
+                                ProgressView().controlSize(.small)
+                                Text(L("正在读取已装 App…"))
+                            } else {
+                                Image(systemName: "trash")
+                                Text(L("Revoke"))
+                            }
+                        }
+                        .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.plain, sound: .tap)
+                    .foregroundStyle(Theme.negative)
+                    .disabled(revoking || loadingAppsForRevokeCert != nil || manager.isWorking || manager.revokingID != nil)
+                    .opacity(revoking || loadingAppsForRevokeCert != nil || manager.isWorking || manager.revokingID != nil ? 0.4 : 1)
                 }
 
                 if cert.expiresAt != nil || !cert.serialNumber.isEmpty {
@@ -228,95 +606,10 @@ struct CertsView: View {
                         }
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 }
 
-                HStack(spacing: 8) {
-                    // Only this one's private key is on the iPhone (see `DevCert.isSigning`).
-                    if cert.isSigning {
-                        exportButton(cert)
-                    }
-                    revokeButton(cert)
-                }
             }
         }
-    }
-
-    private func exportButton(_ cert: DevCert) -> some View {
-        Button {
-            exportPassword = ""
-            pendingExport = cert
-        } label: {
-            HStack(spacing: 8) {
-                if manager.exportingID == cert.id {
-                    ProgressView().controlSize(.small)
-                    Text(L("Exporting"))
-                } else {
-                    Image(systemName: "square.and.arrow.up")
-                    Text(L("Export"))
-                }
-            }
-            .font(.subheadline.weight(.medium))
-            // Two side by side leave little room for "Exporting" in some languages.
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-        .controlSize(.regular)
-        .disabled(manager.isBusy)
-    }
-
-    private func revokeButton(_ cert: DevCert) -> some View {
-        Button(role: .destructive) {
-            pendingRevoke = cert
-        } label: {
-            HStack(spacing: 8) {
-                if manager.revokingID == cert.id {
-                    ProgressView().controlSize(.small)
-                    Text(L("Revoking"))
-                } else {
-                    Image(systemName: "trash")
-                    Text(L("Revoke"))
-                }
-            }
-            .font(.subheadline.weight(.medium))
-            // Two side by side leave little room for "Exporting" in some languages.
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(SecondaryButtonStyle(tint: Theme.negative), sound: .tap)
-        .controlSize(.regular)
-        .disabled(manager.isBusy)
-    }
-
-    // MARK: Export
-
-    private func endExport() {
-        pendingExport = nil
-        exportPassword = ""
-    }
-
-    /// Offers the exported .p12 to Files, AirDrop or a signing app, then deletes
-    /// it and its folder: it holds the private key.
-    private func share(_ file: URL) {
-        let folder = file.deletingLastPathComponent()
-        // The password prompt may still be animating away.
-        var top = UIApplication.shared.topViewController
-        while let leaving = top, leaving.isBeingDismissed { top = leaving.presentingViewController }
-        guard let top else {
-            try? FileManager.default.removeItem(at: folder)
-            return
-        }
-        let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
-        sheet.completionWithItemsHandler = { _, _, _, _ in
-            try? FileManager.default.removeItem(at: folder)
-        }
-        // On iPad the share sheet is a popover and needs an anchor.
-        sheet.popoverPresentationController?.sourceView = top.view
-        sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
-                                                                 width: 0, height: 0)
-        top.present(sheet, animated: true)
     }
 }

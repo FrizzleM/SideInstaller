@@ -1,0 +1,197 @@
+name: plist-and-index
+
+# Regenerates the OTA manifests (.plist) and the install page from the signed
+# IPAs ALREADY committed in the output folder — it does NOT re-sign anything.
+# Handy after you hand-edit the output folder or just want to rebuild the page.
+# Byte-identical duplicate IPAs are pruned first so a build can't show up twice.
+#
+# Cert validity shown on the page comes from the committed certificate-validity.tsv
+# (recorded at the last signing run); this workflow refreshes neither the expiry
+# dates nor the Valid/Revoked verdict — both are re-queried by a signing run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Build channel: stable -> index.html (public), beta -> beta.html (test)"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - beta
+
+# Share the signing workflow's lock so the two never push over each other.
+concurrency:
+  group: sign-sideinstaller
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # commit generated files back to the repo
+  pages: write      # publish the install page to GitHub Pages
+  id-token: write   # required by actions/deploy-pages
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # Tag/release triggers check out a detached HEAD, which can't be pushed
+          # to. Force a real branch (the triggering branch, or the default branch
+          # when a tag fired the run) so the commit step has somewhere to push.
+          ref: ${{ github.ref_type == 'tag' && (github.event.repository.default_branch || 'main') || github.ref_name }}
+
+      - name: Make scripts executable
+        run: chmod +x scripts/generate_plist.sh scripts/generate_index.sh
+
+      # Same resolver the signing workflow uses, so both target the same paths.
+      - name: Resolve release channel
+        shell: bash
+        env:
+          CHANNEL_INPUT: ${{ github.event.inputs.channel }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          channel="${CHANNEL_INPUT:-stable}"
+
+          # Tag/release triggers run with GITHUB_REF_NAME set to the tag and a
+          # detached HEAD. Commit to — and build manifest URLs against — the
+          # default branch in that case, so links point at the branch that
+          # actually receives the new files instead of an immutable tag snapshot.
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            target_branch="${DEFAULT_BRANCH:-main}"
+          else
+            target_branch="${GITHUB_REF_NAME}"
+          fi
+
+          base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${target_branch}"
+          {
+            echo "TARGET_BRANCH=$target_branch"
+            echo "CHANNEL=$channel"
+            if [[ "$channel" == "beta" ]]; then
+              echo "OUTPUT_HTML=beta.html"
+              echo "OUTPUT_DIR=output-beta"
+              echo "OUTPUT_BASE_URL=$base/output-beta"
+              echo "PAGE_TITLE=SideInstaller — Beta"
+              echo "APP_TAGLINE=Beta test build, not the public release. Follow the three steps below to get set up."
+            else
+              echo "OUTPUT_HTML=index.html"
+              echo "OUTPUT_DIR=output"
+              echo "OUTPUT_BASE_URL=$base/output"
+            fi
+          } >> "$GITHUB_ENV"
+          echo "Resolved channel: $channel (target branch: $target_branch)"
+
+      - name: Deduplicate IPAs
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="${OUTPUT_PREFIX:-sideinstaller}"
+          shopt -s nullglob
+          ipas=("${OUTPUT_DIR}"/"${prefix}"-*.ipa)
+          shopt -u nullglob
+
+          if [[ ${#ipas[@]} -eq 0 ]]; then
+            echo "No ${prefix}-*.ipa files in ${OUTPUT_DIR}/ — nothing to dedupe."
+            exit 0
+          fi
+
+          # Keep one copy of each byte-identical IPA and delete the rest, so a
+          # duplicated build never becomes two install cards. The keeper is the
+          # shortest filename (tie-broken lexicographically) so a clean
+          # "sideinstaller-Foo.ipa" wins over a "sideinstaller-Foo-copy.ipa".
+          # Prefix each line with the path length, group by hash, order by
+          # (length, path), then any path after the first in its hash group is a
+          # duplicate.
+          dupes="$(shasum -a 256 "${ipas[@]}" \
+            | awk '{ print length($2), $0 }' \
+            | LC_ALL=C sort -k2,2 -k1,1n -k3 \
+            | awk '{ if ($2 == prev) print $3; prev = $2 }')"
+
+          if [[ -z "$dupes" ]]; then
+            echo "No duplicate IPAs found."
+            exit 0
+          fi
+
+          while IFS= read -r f; do
+            [[ -n "$f" ]] || continue
+            echo "Removing duplicate IPA: $f"
+            rm -f "$f"
+          done <<< "$dupes"
+
+      - name: Ensure IPAs exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="${OUTPUT_PREFIX:-sideinstaller}"
+          shopt -s nullglob
+          ipas=("${OUTPUT_DIR}"/"${prefix}"-*.ipa)
+          shopt -u nullglob
+          if [[ ${#ipas[@]} -eq 0 ]]; then
+            echo "No ${prefix}-*.ipa files in ${OUTPUT_DIR}/ — nothing to generate." >&2
+            exit 1
+          fi
+          printf 'Found %d IPA(s):\n' "${#ipas[@]}"
+          printf '%s\n' "${ipas[@]}"
+
+      - name: Generate OTA manifests
+        run: ./scripts/generate_plist.sh
+
+      - name: Generate install page
+        run: ./scripts/generate_index.sh
+
+      - name: Commit and push generated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A "$OUTPUT_DIR" "$OUTPUT_HTML"
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+
+          git commit -m "plist-and-index ($CHANNEL): rebuild manifests and install page from existing IPAs"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${TARGET_BRANCH}" || true
+            if git push origin "HEAD:${TARGET_BRANCH}"; then exit 0; fi
+            echo "Push failed; retrying (attempt $attempt)" >&2
+            sleep 5
+          done
+
+          echo "Failed to push after 3 attempts" >&2
+          exit 1
+
+      - name: Assemble Pages site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          # Publish whichever channel pages exist so this deploy never drops the
+          # other channel's page. Install links inside each page point at committed
+          # raw-githubusercontent manifests, so the pages work standalone.
+          if [[ -f index.html ]]; then cp index.html _site/index.html; fi
+          if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
+          # DNS profile linked from the page's Setup step — must ship with the site.
+          if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
+          # Terms of Service linked from the page footer.
+          if [[ -f terms.html ]]; then cp terms.html _site/terms.html; fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  # Publishes the install page. Requires Settings -> Pages -> Source = "GitHub Actions".
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

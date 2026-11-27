@@ -1,7 +1,9 @@
+import BackgroundTasks
 import Foundation
 import Network
 import Observation
 import UIKit
+import UserNotifications
 import SideInstallerFFI
 
 /// One ordered step of the one-click install.
@@ -46,25 +48,6 @@ struct Guide: Hashable {
     var actionURL: URL? { actionURLString.flatMap(URL.init(string:)) }
 }
 
-/// What signing a custom IPA costs in App IDs, shown before it's signed.
-struct AppIDCost: Hashable {
-    /// The App IDs signing would register: the app's, if the Apple ID doesn't
-    /// have it yet. Extensions are signed with the app's profile and need none.
-    let newIDs: [String]
-    /// How many more Apple allows now; nil when it doesn't say.
-    let available: Int?
-    /// The limit, 10 a week for a free Apple ID; nil when Apple doesn't say.
-    let limit: Int?
-    /// When the soonest of the Apple ID's App IDs expires, freeing its slot.
-    let nextExpiry: Date?
-
-    var cost: Int { newIDs.count }
-    /// False when Apple says too few are left: signing would stop with 9120.
-    var isAffordable: Bool { available.map { cost <= $0 } ?? true }
-    /// What's left once this install has registered its App IDs.
-    var remainingAfter: Int? { available.map { Swift.max(0, $0 - cost) } }
-}
-
 /// A step failure carrying a user-facing message.
 enum EngineError: LocalizedError {
     case message(String)
@@ -104,7 +87,7 @@ enum EngineError: LocalizedError {
         case let .deviceRegistration(udid, raw):
             let tail = udid.isEmpty ? "" : L(" (UDID %@)", udid)
             return L("Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.",
-                     tail, raw)
+                     tail, friendlyRustError(raw))
         }
     }
 }
@@ -146,6 +129,112 @@ final class Engine {
 
     static let anisetteAutoKey = "anisetteServerAuto"
 
+    private(set) var appIDCost: AppIDCost?
+    /// P0-4 (0.9.185): the last App ID quota `confirmAppIDCost` saw,
+    /// for the install page's quota row. Display-only — unlike
+    /// `appIDCost` it never raises the (2026-11-08 removed)
+    /// confirmation popup.
+    var lastAppIDCost: AppIDCost?
+    /// Resumed with the answer to `appIDCost`: true to sign and install.
+    private var appIDCostReply: CheckedContinuation<Bool, Never>?
+    /// A pairing file whose UDID differs from the connected iPhone, waiting for
+    /// the user to confirm the switch.
+    struct PairingImportMismatch: Hashable {
+        let fileUDID: String
+        let deviceUDID: String
+    }
+    private(set) var pairingImportMismatch: PairingImportMismatch?
+    private var pairingImportMismatchReply: CheckedContinuation<Bool, Never>?
+
+    /// F-G (0.9.156): a download the user asked for on cellular data, waiting
+    /// for the go-ahead. Settings › Downloads › "Wi-Fi only downloads" asks
+    /// first, so a big IPA doesn't eat mobile data unnoticed.
+    struct CellularDownloadRequest: Hashable {
+        /// What is being downloaded — the app or build name.
+        let what: String
+        /// The file's size in bytes, when the server stated one.
+        let size: Int64?
+    }
+    private(set) var cellularDownloadRequest: CellularDownloadRequest?
+    private var cellularDownloadReply: CheckedContinuation<Bool, Never>?
+    /// B-1 (0.9.166): downloads waiting behind the cellular prompt on
+    /// screen — one prompt at a time, but the rest queue instead of
+    /// declining silently. Each waiter suspends on its own continuation;
+    /// answering the prompt on screen presents the next one in turn.
+    private struct QueuedCellularDownload {
+        let id: UUID
+        let size: Int64?
+        let what: String
+        let reply: CheckedContinuation<Bool, Never>
+    }
+    private var cellularDownloadQueue: [QueuedCellularDownload] = []
+    /// B-1 (0.9.166): the queued waiter whose prompt is on screen now, if
+    /// it got there from the queue rather than asking first — so cancelling
+    /// it answers its own prompt, and a cancel landing before a waiter
+    /// even queued can't decline somebody else's.
+    private var presentedQueuedCellularDownloadID: UUID?
+
+    /// The Settings switch for F-G. Off by default: the app's behaviour on
+    /// cellular doesn't change until the user turns it on.
+    static let wifiOnlyDownloadsKey = "SIDWifiOnlyDownloads"
+    static var wifiOnlyDownloads: Bool {
+        UserDefaults.standard.bool(forKey: wifiOnlyDownloadsKey)
+    }
+
+    /// The Settings switch for F-1 (0.9.159): delete the source IPA after a
+    /// successful install. Off by default. The key lives on `Engine` so the
+    /// success path reads the same value the Settings toggle writes.
+    static let deleteAfterInstallKey = "SIDDeleteAfterInstall"
+    static var deleteAfterInstall: Bool {
+        UserDefaults.standard.bool(forKey: deleteAfterInstallKey)
+    }
+
+    /// A downloaded IPA was deleted by the F-1 post-install cleanup: the
+    /// Downloads and Files lists rescan on it instead of waiting for the
+    /// next time they're opened.
+    static let downloadsChanged = Notification.Name("CZFDownloadsChanged")
+
+    /// F-3 (0.9.164): a history row asked to reveal its IPA in Downloads
+    /// (`userInfo["url"]` is the file path); RootView switches to the
+    /// Downloads tab and DownloadsListView scrolls to it.
+    static let revealDownload = Notification.Name("CZFRevealDownload")
+    /// P0-2 (0.9.185): the error popup's "View log" — RootView closes
+    /// the install sheet, switches to the Settings tab and scrolls to
+    /// the activity log (revealDownload 同款通道）.
+    static let revealLog = Notification.Name("CZFRevealLog")
+    /// P1-1/P1-4 (0.9.186): a "Go to Settings" action — RootView closes
+    /// the install sheet, switches to the Settings tab and scrolls to
+    /// the Account section (revealLog 同款通道）.
+    static let revealAccount = Notification.Name("CZFRevealAccount")
+    /// P1-4 (0.9.186): a failed refresh whose next step is the
+    /// Certificates page — RootView switches to the Settings tab and
+    /// opens it (enterpriseRequest 同款 one-shot).
+    static let revealCertificates = Notification.Name("CZFRevealCertificates")
+
+    /// Answer the pairing-file mismatch popup: true replaces the pairing file.
+    @MainActor
+    func answerPairingImportMismatch(_ proceed: Bool) {
+        guard let reply = pairingImportMismatchReply else { return }
+        pairingImportMismatchReply = nil
+        reply.resume(returning: proceed)
+        pairingImportMismatch = nil
+    }
+    /// The `sideinstaller://` link waiting for the go-ahead.
+    private(set) var pendingLink: DeepLink?
+    /// An invalid `sideinstaller://` link that arrived mid-run: the run's own
+    /// popups come first, so it waits here and shows once the run ends
+    /// (B1, 0.9.152) instead of only landing in the log.
+    private(set) var pendingInvalidLinkMessage: String?
+    /// When SideStore was last asked for its pairing file, so the file it sends
+    /// back can be told from one some other link brought.
+    private var sideStorePairingRequestedAt: Date?
+    /// When SideStore was last asked for its certificate, and whether the
+    /// install that stopped on error 7460 runs again once it's in.
+    private var sideStoreCertificateRequest: (at: Date, retryInstall: Bool)?
+    /// A certificate a link brought, for `RootView` to hand to the Certificates
+    /// manager, which checks it against the Apple ID's own before using it.
+    var certificateToImport: CertificateImport?
+
     /// The saved anisette server, or the one to start with, saved.
     ///
     /// Until 1.5.2 the default was `AnisetteServer.legacyDefault`, and a pick
@@ -167,6 +256,9 @@ final class Engine {
     private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     /// "Start LocalDevVPN when needed" setting: whatever needs the tunnel starts
     /// LocalDevVPN when it's down, instead of asking for it. On by default.
+    /// With an entitled signature the built-in tunnel is tried first and
+    /// almost always wins, so this only ever fires for signatures whose
+    /// profile can't run the built-in tunnel (personal ID etc.).
     /// Stored here (not `@AppStorage`) so the engine and the Settings toggle
     /// share one value.
     var autoStartVPN: Bool =
@@ -208,7 +300,7 @@ final class Engine {
     var deviceHost: String { NetworkStatus.host(deviceIP) }
     // Which build to install (SideStore, LiveContainer + SideStore, Madeira, or
     // an imported IPA).
-    var installSource: InstallSource = .sideStore
+    var installSource: InstallSource = .custom
     // Which release track to pull that build from (stable or nightly).
     var releaseChannel: ReleaseChannel = .stable
     /// The track the selected build is installed from: the picked one, or the
@@ -228,6 +320,11 @@ final class Engine {
         Set((UserDefaults.standard.stringArray(forKey: Engine.stableReleasedKey) ?? [])
             .compactMap(InstallSource.init(rawValue:)))
     private static let stableReleasedKey = "stableReleased"
+    /// Last time each build's stable channel was checked on GitHub
+    /// (`checkStableRelease`); 15-minute TTL, same as `loadReleaseCatalog`,
+    /// so switching builds doesn't HEAD the same release page every time.
+    /// A failed check leaves the timestamp alone, so the next pick retries.
+    private var lastStableCheck: [InstallSource: Date] = [:]
     /// Versions picked under Advanced, per build and channel; a missing entry
     /// installs the latest release. Not persisted, like the channel.
     private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
@@ -317,25 +414,15 @@ final class Engine {
     /// LiveContainer's Info.plist to the process, not SideInstaller's.
     static var runsInLiveContainer: Bool { getenv("LC_HOME_PATH") != nil }
 
-    /// False from iOS 26.4 on, where lockdownd hangs up on a connection that
-    /// reaches it through a loopback VPN, on its first request. A lockdown pair
-    /// record (jitterbugpair, “pymobiledevice3 lockdown pair”, idevice_pair's
-    /// “Lockdown”) then can't open the tunnel however fresh it is, while an
-    /// RPPairing one can. Reported from 26.4 beta 1 through 26.6.2, and the
-    /// same reset is measured here on iOS 27. See NOTES.md ("iOS 26.4+:
-    /// lockdownd hangs up on loopback connections").
-    static var lockdownWorksOverLoopback: Bool {
+    /// False on iOS 27 and later, where this iPhone can't make itself a classic
+    /// lockdown pair record: lockdownd answers `Pair` over the tunnel with
+    /// `InvalidHostID` whatever the request carries, and resets every request
+    /// on port 62078, so no app could use such a record there anyway. See
+    /// NOTES.md ("lockdownd refuses it").
+    static var canMintLockdownRecord: Bool {
         !ProcessInfo.processInfo.isOperatingSystemAtLeast(
-            OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
+            OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0))
     }
-
-    /// False from iOS 26.4 on, where a classic lockdown pair record made here
-    /// would be no use: lockdownd hangs up on it through the loopback VPN, for
-    /// this app and for every app it's handed to (`lockdownWorksOverLoopback`).
-    /// On iOS 27 it can't even be made: lockdownd answers `Pair` over the
-    /// tunnel with `InvalidHostID` whatever the request carries. See NOTES.md
-    /// ("lockdownd refuses it").
-    static var canMintLockdownRecord: Bool { lockdownWorksOverLoopback }
 
     /// False when iOS is too old for the install tunnel, even with an imported
     /// pairing file.
@@ -364,7 +451,6 @@ final class Engine {
     private(set) var isImportingPairing = false
 
     static let importedPairingNameKey = "importedPairingFileName"
-    var pairingStatus: String = L("not paired")
     var signInStatus: String = "signed out"
 
     // Path to the pairing file in use (generated by RPPairing or imported).
@@ -378,6 +464,28 @@ final class Engine {
 
     /// Install percentage (0…1) streamed from installation_proxy.
     var installProgress: Double = 0
+
+    /// Download percentage (0…1) streamed from the downloader while that
+    /// step is running; mirrors SideBySideView's own downloadProgress.
+    var downloadProgress: Double = 0
+
+    /// B1 (0.9.155): bytes arrived so far on a download whose total the
+    /// server never stated — non-nil only then, so the progress card can
+    /// switch to an indeterminate bar plus this byte count instead of a
+    /// 0% that never moves. Reset with the run and at each download start.
+    var downloadBytesWritten: Int64?
+
+    /// F-2 (0.9.157): the download step's speed in bytes per second, and
+    /// the estimated seconds left — the Install tab's progress card shows
+    /// them like the source rows do (F-C). Speed is 0 until two samples
+    /// arrive; the estimate is nil while the total is unknown or no speed
+    /// is known yet. The total the server promised, -1 while unknown:
+    /// drives the "x of y" in the card's detail line.
+    var downloadSpeed: Double = 0
+    var estimatedTimeRemaining: TimeInterval?
+    var downloadTotalBytes: Int64 = -1
+    /// The last sample `noteDownloadDetail` measured speed from.
+    private var downloadSpeedSampler = DownloadSpeedSampler()
 
     /// The pairing PIN to display prominently, when one has been issued.
     var pairingPIN: String?
@@ -398,12 +506,62 @@ final class Engine {
     /// True while the one-click pipeline is running.
     var isRunning: Bool = false
 
+    /// B-2 (0.9.172): true while a Sources update-all batch is running —
+    /// including the download gaps, when `isRunning` is false. The row
+    /// install buttons and the detail page's install entry read this,
+    /// so a tap between two batch items can't start a second install
+    /// and knock the batch over; both batch sites (single-source and
+    /// cross-source) set it, and it also bars the other batch starting.
+    var batchUpdateRunning: Bool = false
+
+    /// B-3 (0.9.178): how long a landed download waits for the install
+    /// slot before giving up — 10 minutes. The single home for the
+    /// bound every slot wait shares (`DownloadsManager.retryWaitTimeout`,
+    /// `UpdateChecker.selfUpdateWaitTimeout`,
+    /// `InstallHistoryView.reinstallWaitTimeout`, and the source page's
+    /// two slot waits): the install itself keeps going, only the wait
+    /// gives up, and a cancelled or timed-out wait drops the staged file
+    /// through `discardInboxCopy` instead of orphaning it in tmp.
+    static let installSlotWaitTimeout: TimeInterval = 600
+
+    /// 本次安装会话的归属凭证：三条管线起跑时（resetRun 之后、
+    /// isRunning = true 之前）各 mint 一个新 UUID，resetRun 先把
+    /// 旧值清掉，旧凭证从此再匹配不上。Engine 是单管线，isRunning
+    /// 只能说“有安装在跑”，说不出是谁的——企业页/文件页起跑后快照
+    /// 它、结束时比对才认。跑完不清零（下一跑起跑时自然轮换；
+    /// 清零会让结束时的比对永远对不上）。
+    var installSessionID: UUID?
+
+    /// B4 (0.9.158): the signer the history records for this run, when it
+    /// isn't the Apple ID — the enterprise-cert and already-signed installs
+    /// never sign in, so they set this to the active enterprise profile's
+    /// name (see `enterpriseCertHistoryIdentity`); nil means the Apple ID
+    /// path, which records `normalizedAppleID` as before. Set after
+    /// `resetRun` (which clears it), read by `finishSuccess` and the two
+    /// recordFailure sites of those two pipelines.
+    var historyIdentityOverride: String?
+
     /// True from a cancel until the run stops, which waits for the step in
     /// flight to reach a safe point.
     private(set) var isCancelling: Bool = false
 
     /// Set when the pipeline stops on an error; cleared on a new run.
     var lastError: String?
+
+    /// F-2 (0.9.160): the entitlements precheck's warning for this run
+    /// (a free Apple ID certificate can't provide some capabilities the
+    /// IPA asks for). A warning, not an error: the run goes on, and the
+    /// Install tab shows it in an alert; cleared by `resetRun`.
+    var installWarning: String?
+
+    /// Set when a download falls back to a copy already in Documents; shown
+    /// as a caption under the progress card, never a blocking error.
+    var downloadFallbackNotice: String?
+
+    /// C25：安装时配对/证书交接失败只记日志时留的提示（照抄 C23 的
+    /// SideBySide 手法）：run 照常成功，但这句留在进度卡下方，几天后
+    /// SideStore 索要配对文件/要求重签时能把因果连起来。resetRun 清掉。
+    var handOffNotice: String?
 
     /// Set once the whole pipeline has completed successfully.
     var finished: Bool = false
@@ -437,6 +595,11 @@ final class Engine {
     /// The files signing won't change, copied to the device from the downloaded
     /// IPA while signing runs; see `startPrestage`.
     @ObservationIgnored private var prestage: Task<DeviceConnection.PrestagedBundle?, Never>?
+    /// The certificate hand-off for the build just signed, built on the sign
+    /// queue while the install runs; see `startAccountConfig`. Cancelled with
+    /// the rest of the pipeline (B-C1) — a cancelled run used to leave it
+    /// holding the sign queue.
+    @ObservationIgnored private var accountConfigTask: Task<String?, Never>?
     /// Runs that have ended. A background sign-in carries the count from when it
     /// started, so a 2FA request it makes after its run stopped can be declined.
     /// Main thread only.
@@ -484,8 +647,13 @@ final class Engine {
     var overallProgress: Double {
         let total = Double(Step.allCases.count)
         let done = Double(Step.allCases.filter { stepStates[$0] == .done }.count)
-        let frac = (stepStates[.install] == .active || stepStates[.install] == .waiting)
-            ? installProgress : 0
+        // The download step fills its own share as bytes arrive (SideBySideView
+        // does the same); the install step keeps its own fraction after it.
+        var frac = 0.0
+        if stepStates[.download] == .active { frac = downloadProgress }
+        if stepStates[.install] == .active || stepStates[.install] == .waiting {
+            frac = installProgress
+        }
         return min(1, (done + frac) / total)
     }
 
@@ -496,10 +664,26 @@ final class Engine {
     // Apple ID sign-in and signing (isideload), serialized on signQueue.
     private let signQueue = DispatchQueue(label: "sideinstaller.sign")
     @ObservationIgnored private var signSession: OpaquePointer?          // SignSession*
+    /// Sign-in generation stamp (A21-1, mirrors CertManager.signInGeneration):
+    /// bumped on every account switch, so a sign-in that waited through a
+    /// switch is discarded instead of signing back into the old account.
+    private var signInGeneration = 0
     /// Team ID of the signed-in account, parsed from the sign-in summary. Only
     /// apps signed by this team can be refreshed in place.
     private(set) var signingTeamID: String?
+    /// UserDefaults key persisting the last signed-in team across launches,
+    /// so the refresh list can leave other teams' apps out from a cold start,
+    /// before any sign-in has happened this run.
+    static let savedTeamKey = "CZFSavedSigningTeamID"
     var downloadedIPAPath: String?
+    /// B2：两路已签名安装（企业证书 / 已签 IPA）在配对窗口期的源路径——
+    /// 配对完成前 downloadedIPAPath 还没置位，isInstallingSource 认不出
+    /// 源文件，删/移/改名会把安装读的文件弄没。起跑时（isRunning = true
+    /// 之后、管线 Task 之前）登记，收尾（isRunning = false 处）注销；
+    /// 只做守卫用，不进 download() 的“已下载”快路径（那是
+    /// downloadedIPAPath 的事，提前置它会让后续 custom 一键安装误采
+    /// 残留路径——importCustomIPA 只在新导入时清它）。
+    var installingSourcePath: String?
     // Source, channel and picked version (nil: latest) the current download
     // corresponds to.
     private var downloadedSource: InstallSource?
@@ -513,27 +697,31 @@ final class Engine {
     private(set) var signedDisplayName: String?
     /// Filename of the IPA imported for `InstallSource.custom`, if any.
     private(set) var customIPAName: String?
+    /// Set by the share / “Open with” path after a successful IPA import.
+    /// RootView jumps to the Install tab on it, so a run the share started
+    /// (or the guide it stopped on) is in front instead of the user having
+    /// to go to the Install tab by hand. Cleared when RootView consumes it.
+    var sharedIPAReady = false
+    /// F-2 (0.9.179): a share-in IPA import waiting on the certificate
+    /// choice — set by the share path once the IPA is staged (RootView
+    /// shows the choice sheet for it); the choice clears it. Nil when
+    /// no choice is pending.
+    var pendingSigningChoice: SigningChoiceRequest?
     /// The build of SideInstaller's own that the imported IPA is, if it is one.
     private(set) var customIPABuild: InstallSource?
     /// True while a picked IPA is being copied in.
     private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
     private(set) var importProgress: Double?
-    /// The App ID cost a custom IPA's run is waiting on the go-ahead for.
-    private(set) var appIDCost: AppIDCost?
-    /// Resumed with the answer to `appIDCost`: true to sign and install.
-    @ObservationIgnored private var appIDCostReply: CheckedContinuation<Bool, Never>?
-    /// The `sideinstaller://` link waiting for the go-ahead.
-    private(set) var pendingLink: DeepLink?
-    /// When SideStore was last asked for its pairing file, so the file it sends
-    /// back can be told from one some other link brought.
-    @ObservationIgnored private var sideStorePairingRequestedAt: Date?
-    /// When SideStore was last asked for its certificate, and whether the
-    /// install that stopped on error 7460 runs again once it's in.
-    @ObservationIgnored private var sideStoreCertificateRequest: (at: Date, retryInstall: Bool)?
-    /// A certificate a link brought, for `RootView` to hand to the Certificates
-    /// manager, which checks it against the Apple ID's own before using it.
-    var certificateToImport: CertificateImport?
+    /// B1 (0.9.155): bytes arrived so far on a link import whose total the
+    /// server never stated — set only then (with `importProgress` cleared,
+    /// so the link row goes indeterminate), so the row can show the byte
+    /// count instead of a stuck 0%.
+    private(set) var importBytes: Int?
+    /// The link import's task, so the link row can cancel a download in
+    /// progress (B1, 0.9.147). The file-copy import has no such task: it
+    /// finishes too fast to need one.
+    @ObservationIgnored private var linkImportTask: Task<Bool, Never>?
 
     /// Lets one Apple ID sign-in talk to Apple at a time, whichever feature
     /// started it.
@@ -552,6 +740,9 @@ final class Engine {
 
     private init() {
         installLogging()
+        // Restore the last signed-in team so refresh lists can exclude other
+        // teams' apps (enterprise certificates etc.) from a cold start.
+        signingTeamID = UserDefaults.standard.string(forKey: Self.savedTeamKey)
         log("SideInstaller ready.")
         // Self-test of the Rust tracing -> FFI callback -> console path.
         ping()
@@ -560,24 +751,34 @@ final class Engine {
         startStatusMonitor()
         // Refresh the anisette server picker from the live community list.
         loadAnisetteServers()
-        // Reflect an IPA imported in an earlier run.
-        showCustomImport(IPALibrary.customImport()?.url)
-        // A Madeira CI build from before Madeira had channels is its nightly.
-        IPALibrary.moveMadeiraCIBuildsToNightly()
         // What's installed may have changed while the app was away.
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             self?.foregroundVisits += 1
+        }
+        // A-11：启动时三件磁盘活（自定义导入读盘 + 源识别 + Madeira CI
+        // 搬家）移出主线程——以前在 init 里同步跑，进页第一帧就卡；
+        // 算完回主线程一次写回。showCustomImport 的 build 参数接
+        // 预计算值，不再主线程上重读 zip。
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let customURL = IPALibrary.customImport()?.url
+            let build = customURL.flatMap { IPALibrary.knownSource(ofIPAAt: $0) }
+            IPALibrary.moveMadeiraCIBuildsToNightly()
+            await MainActor.run {
+                self.showCustomImport(customURL, build: build)
+            }
         }
     }
 
     // MARK: - Anisette servers
 
     /// Swap the bundled anisette list for the live one, keeping it on failure.
+    /// The live list is cached for 24h (S5), so most launches don't re-fetch.
     func loadAnisetteServers() {
         Task { @MainActor in
             do {
-                let servers = try await AnisetteServer.fetchList()
+                let servers = try await AnisetteServer.fetchListCached()
                 guard !servers.isEmpty else { return }
                 self.anisetteServers = servers
                 log("Loaded \(servers.count) anisette servers.")
@@ -623,19 +824,37 @@ final class Engine {
         setMain {
             for s in Step.allCases { self.stepStates[s] = .pending }
             self.installProgress = 0
+            self.downloadProgress = 0
+            self.downloadBytesWritten = nil
+            self.clearDownloadSpeed()
+            self.downloadFallbackNotice = nil
+            self.handOffNotice = nil
             self.pairingPIN = nil
             self.guide = nil
             self.deviceSummary = nil
             self.deviceUDID = nil
             self.deviceName = nil
+            // B-2：旧会话凭证在此过期——三个入口在 resetRun 之后、
+            // isRunning = true 之前各 mint 一个新 UUID；跑完不清零
+            //（结束时的比对还要认它），下一跑起跑时自然轮换。
+            self.installSessionID = nil
+            // B4 (0.9.158): the history-signer override goes with it — the
+            // Apple ID path reads nil, the other two set it after this.
+            self.historyIdentityOverride = nil
             self.lastError = nil
+            self.installWarning = nil
+            self.pendingInvalidLinkMessage = nil
             self.finished = false
             self.successClosed = false
             self.liveContainerImportClosed = false
             self.certConflict = false
-            self.appIDCost = nil
             self.madeiraHandoff = MadeiraHandoff()
             self.altStoreHoldsPairing = false
+            // F-2 (0.9.159): the last run's downgrade decline goes with it —
+            // a fresh run asks again, and the batch path must not read a
+            // stale decline as this run's.
+            self.downgradeDeclined = false
+            self.downgradeDeclinedMessage = nil
         }
     }
 
@@ -650,14 +869,99 @@ final class Engine {
 
     // MARK: - One-click pipeline (the default flow)
 
+    /// F-1 (0.9.158): nil when the IPA described by `info` runs on `os`,
+    /// else the user-facing reason it can't — the IPA's own
+    /// MinimumOSVersion, not the source's floor
+    /// (`InstallSource.minimumOSMajorVersion`, which only covers
+    /// SideInstaller/SideStore/LiveContainer's own builds). An IPA whose
+    /// minimum can't be read never blocks: it signs ahead as before.
+    static func minOSBlockReason(info: IPALibrary.AppInfo,
+                                 runningOn os: OperatingSystemVersion, osText: String) -> String? {
+        guard let minOS = info.minOS,
+              !SideStoreDownloader.runs(on: os, from: minOS, to: nil) else { return nil }
+        return L("%@ needs iOS %@ or later. This iPhone runs iOS %@.", info.name, minOS, osText)
+    }
+
+    /// F-2 (0.9.160): entitlement keys a free Apple ID certificate can't
+    /// provide, mapped to the name the warning shows. Grounded in the
+    /// repo, not from memory: `Entitlement.all`'s catalogue comment
+    /// names Push, iCloud and Associated Domains as the paid-only ones
+    /// left out of what a free account can be granted, and `SideloadedApp`
+    /// notes `beta-reports-active` is granted only by App Store
+    /// distribution profiles. Every other key is deliberately NOT here:
+    /// the free catalogue (App Groups, Game Center, HealthKit, …) is
+    /// grantable, and an unknown key may be harmless — warn only on
+    /// what the code proves a free certificate can't give.
+    private static let paidOnlyEntitlementNames: [String: String] = [
+        "aps-environment": "Push Notifications",
+        "com.apple.developer.icloud-container-identifiers": "iCloud",
+        "com.apple.developer.ubiquity-container-identifiers": "iCloud",
+        "com.apple.developer.icloud-services": "iCloud",
+        "com.apple.developer.associated-domains": "Associated Domains",
+        "beta-reports-active": "TestFlight beta reports",
+    ]
+
+    /// F-2 (0.9.160): the paid-only capabilities the IPA at `url` asks
+    /// for, from the Entitlements in its `embedded.mobileprovision`
+    /// (`IPALibrary.embeddedProvisionData` + `ProvisioningProfile`,
+    /// the same single-entry read `provisionTeamID` uses — no full
+    /// unpack). An unsigned IPA's profile is its original signing's,
+    /// the only capability signal the file carries; no profile, or an
+    /// unreadable one, means nothing is known, so no warning — never a
+    /// guess. Boilerplate keys never reach here: `capabilityKeys`
+    /// already filters `application-identifier`, the team id, the
+    /// keychain groups and `get-task-allow`.
+    static func unsupportedEntitlements(inIPA url: URL) -> [String] {
+        guard let data = IPALibrary.embeddedProvisionData(inIPA: url),
+              let profile = ProvisioningProfile(data: data) else { return [] }
+        return Array(Set(profile.capabilityKeys.compactMap { paidOnlyEntitlementNames[$0] })).sorted()
+    }
+
+    /// B4 (0.9.158): the signer the history records for the two installs
+    /// that never sign in with an Apple ID (enterprise-cert and
+    /// already-signed): the active enterprise profile's name. No profile:
+    /// the provisioning profile file's name when one is on disk, else
+    /// empty — never the Apple ID saved in Settings.
+    private static func enterpriseCertHistoryIdentity() -> String {
+        if let name = EnterpriseCertStore.activeProfile()?.name, !name.isEmpty { return name }
+        if EnterpriseCertStore.hasProvision { return EnterpriseCertStore.provisionURL.lastPathComponent }
+        return ""
+    }
+
     /// Run every install step in order, stopping at the first failure.
     /// `afterProbe` is set on the second pass, once a full-tunnel VPN's probe
     /// has answered.
     @MainActor
     func runOneClick(afterProbe: Bool = false) {
         guard !isRunning else { return }
+        // F-2 (0.9.160): the last run's precheck warning goes with it —
+        // the early guards below return before resetRun runs, so a stale
+        // warning would otherwise pop on a run that never started.
+        installWarning = nil
+        // B-1 (0.9.163): a run the guards stop never reaches resetRun, so
+        // a stale lastError/guide from the previous run would outlive it
+        // — the batch and history readers below would report the old
+        // failure as this run's. Clear both up front; every guard below
+        // leaves its own fresh reason (a guide, or lastError), so nothing
+        // real is lost.
+        lastError = nil
+        guide = nil
+        // B-3 (0.9.163): a pairing file being generated drops the device
+        // link when it finishes (`pairThisDevice`), so an install started
+        // now would lose its link mid-run — refuse until generation is
+        // done (`generateForPage` refuses the other way round, while an
+        // install is running).
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
         // Nothing downstream works on an older iOS.
         guard osSupported else {
+            // B-1 (0.9.163): the log-only branch left no reason behind —
+            // the readers below would report the previous run's error.
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
             return
         }
@@ -677,8 +981,8 @@ final class Engine {
         if let needed = installSource.minimumOSMajorVersion,
            !ProcessInfo.processInfo.isOperatingSystemAtLeast(
                OperatingSystemVersion(majorVersion: needed, minorVersion: 0, patchVersion: 0)) {
-            lastError = ErrorHelp.explained(L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
-                                              installSource.displayName, needed, osVersionText))
+            lastError = L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
+                          installSource.displayName, needed, osVersionText)
             log("⛔️ \(installSource.displayName) needs iOS \(needed) or later; this iPhone runs iOS \(osVersionText).")
             return
         }
@@ -687,6 +991,32 @@ final class Engine {
             setGuide(Guides.customIPA)
             log("⛔️ No IPA imported yet. Tap “Import .ipa” and pick one, then tap Install again.")
             return
+        }
+        // F-1 (0.9.158): the imported IPA's own minimum — the source floor
+        // above only covers SideInstaller's own builds. Block before
+        // signing, so a too-new IPA doesn't burn an App ID first.
+        if installSource == .custom, let entry = IPALibrary.customImport(),
+           let info = IPALibrary.appInfo(at: entry.url),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            lastError = reason
+            log("⛔️ \(reason)")
+            return
+        }
+        // F-2 (0.9.160): entitlements precheck — warn, don't block. A
+        // free certificate signs the app either way, but capabilities it
+        // can't provide fail silently after install (push never arrives,
+        // iCloud never syncs), so say so up front while the run is
+        // starting instead of letting the user find out later. Only the
+        // custom path has an IPA to read; the built-in sources are
+        // SideInstaller's own builds.
+        if installSource == .custom, let entry = IPALibrary.customImport() {
+            let missing = Self.unsupportedEntitlements(inIPA: entry.url)
+            if !missing.isEmpty {
+                installWarning = L("This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.", missing.joined(separator: ", "))
+                log("⚠️ Entitlements precheck: \(missing.joined(separator: ", ")) not available on a free certificate.")
+            }
         }
         // The install runs over the loopback tunnel, so require it up front,
         // unless the run can start LocalDevVPN itself (see `ensureNetwork`).
@@ -702,25 +1032,62 @@ final class Engine {
                 }
                 return
             }
-            setGuide(Guides.vpn)
-            log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
+            if BuiltinTunnel.useBuiltinDirectly {
+                // 内置隧道在包里就不再弹 LocalDevVPN 指引卡：
+                // 自动启动关着时，装不成的原因是那个开关。
+                // B-1 (0.9.163): the log-only branch left no reason
+                // behind — say it in lastError too, so the callers that
+                // read it report this run's cause, not the last run's.
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+                log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+            } else {
+                setGuide(Guides.vpn)
+                log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
+            }
             return
         }
         // A tunnel pointed at this iPhone's own address can never connect.
-        guard deviceIPIsUsable() else {
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
             setGuide(Guides.deviceIPMismatch)
             return
         }
         resetRun()
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
+        installSessionID = UUID()
         isRunning = true
         log("=== Starting one-click install ===")
-        // Its progress outside the app, and background time to carry on there.
+        // 切后台断安装的根因：InstallActivity（iOS 26 的
+        // BGContinuedProcessingTask + 全程 UIKit 后台时间）写好了却
+        // 从没被接进管线，runStarted/runEnded 全仓零调用。接上后，
+        // 切后台由后台任务接着跑，没任务时也有半分钟 grace + 回前台续跑，
+        // 而不是一离前台就被挂起、隧道断掉。
         InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
-          await MobileDataMode.shared.run(.install) {
-            var outcome = InstallActivity.Outcome.cancelled
+            await MobileDataMode.shared.run(.install) {
+            var outcome: InstallActivity.Outcome = .stopped
+            var tunnelAcquired = false
             do {
+                // F-2 (0.9.159): an older custom IPA asks first, before the
+                // tunnel is taken — a decline stops here with
+                // CancellationError (no failure history), a cancel answers
+                // the prompt the same way.
+                if let downgrade = downgradeCheckForCurrentRun(),
+                   !(await confirmDowngrade(downgrade)) {
+                    throw CancellationError()
+                }
+                // SIDE-2：隧道按需开——管线开始拿租约，收尾统一还；拿不到按
+                // ensurePairingConnection 同款文案报错（入口 tunnelAvailable
+                // 守卫已先拦过一轮，这里是竞态兜底）。
+                guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
                 try await ensureNetwork()
                 // On mobile data alone the device link may need Airplane Mode
                 // (`MobileDataMode`), which takes the internet away, so the
@@ -752,35 +1119,63 @@ final class Engine {
                 try await signApp()
                 // The certificate hand-off is built on the sign queue, which the
                 // install doesn't use, so it's ready once the install is done.
-                let accountConfig = startAccountConfig()
+                accountConfigTask = startAccountConfig()
                 // Both share the device queue with the install.
                 let prepared = await devicePreparation?.value
                 let staged = await prestage?.value
                 try Task.checkCancellation()
                 try await install(prestaged: staged)
-                try await writePairing(accountConfig: accountConfig, prepared: prepared)
+                try await writePairing(accountConfig: accountConfigTask, prepared: prepared)
                 finishSuccess()
                 outcome = .installed
             } catch is CancellationError {
+                outcome = .cancelled
                 log("Install cancelled.")
                 // A cancelled run leaves no progress behind, so the Install
                 // tab goes back to its button.
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
+                downloadProgress = 0
+                clearDownloadSpeed()
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
                 setGuide(nil)
             } catch {
-                let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastError = msg
-                log("⛔️ Stopped: \(msg)")
+                log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
-                outcome = .stopped
+                // F-A (0.9.155): a failed run leaves a history entry too,
+                // with the reason it stopped — the success path's
+                // `finishSuccess` is the only other writer, so one run
+                // writes exactly one entry, success or failure.
+                // B-3 (0.9.170): a custom run's IPA is the current import
+                // (`customImport()?.url`) — never `downloadedIPAPath`,
+                // which resetRun doesn't clear and still points at the
+                // previous run before this run's download. A built-in
+                // source has no local file before its download, so it
+                // passes nil and keeps the name-match fallback.
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: normalizedAppleID,
+                                                  reason: msg,
+                                                  bundleID: failureRecordBundleID(ipaURL: installSource == .custom ? IPALibrary.customImport()?.url : nil))
             }
+            InstallActivity.shared.runEnded(outcome)
+            if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
-            InstallActivity.shared.runEnded(outcome)
-          }
+            }
         }
     }
 
@@ -793,6 +1188,8 @@ final class Engine {
         prefetch?.task.cancel()                 // stop the download now, not at its step
         devicePreparation?.cancel()             // skip its ahead-of-install write
         prestage?.cancel()
+        accountConfigTask?.cancel()             // B-C1：交接任务也随管线取消
+        accountConfigTask = nil
         PairingController.shared.softCancel()   // unblock a pending pairing wait
     }
 
@@ -816,9 +1213,37 @@ final class Engine {
         case liveContainerImport
         /// What signing an imported IPA costs in App IDs, before it's signed.
         case appIDCost(AppIDCost)
+        /// A pairing file for another iPhone, asking before it replaces the one in use.
+        case pairingImportMismatch(PairingImportMismatch)
         /// A `sideinstaller://` link, asking before it's acted on.
         case link(DeepLink)
+        /// A big download on cellular data, asking before it starts (F-G, 0.9.156).
+        case cellularDownload(CellularDownloadRequest)
+        /// A custom IPA older than the copy on this iPhone, asking before it
+        /// installs over it (F-2, 0.9.159).
+        case downgrade(DowngradeRequest)
     }
+
+    /// F-2 (0.9.159): what the downgrade prompt shows — the app, the version
+    /// on this iPhone, and the version in the IPA about to install over it.
+    struct DowngradeRequest: Hashable {
+        let appName: String
+        let installedVersion: String
+        let ipaVersion: String
+    }
+
+    /// F-2 (0.9.159): a custom IPA older than the installed copy, waiting for
+    /// the go-ahead. The pipeline asks before it takes the tunnel, so a
+    /// declined downgrade burns nothing — no App ID, no signing.
+    private(set) var downgradeRequest: DowngradeRequest?
+    private var downgradeReply: CheckedContinuation<Bool, Never>?
+
+    /// F-2 (0.9.159): true when the user declined the downgrade prompt for
+    /// this run (as opposed to the run being cancelled). The batch path reads
+    /// it so one declined item skips instead of stopping the whole batch;
+    /// `downgradeDeclinedMessage` is the reason it reports for that item.
+    private(set) var downgradeDeclined = false
+    private(set) var downgradeDeclinedMessage: String?
 
     /// True while the run is held up on the user — joining Wi-Fi, connecting
     /// the tunnel, or pairing in Settings.
@@ -830,19 +1255,31 @@ final class Engine {
     /// what it's waiting on shows; the rest waits for it to end.
     var popups: [Popup] {
         if isRunning {
-            guard isWaitingOnUser else { return [] }
+            // F-G (0.9.156): the cellular prompt is a waiting popup too, but
+            // no step is `.waiting` while it asks — the download hasn't
+            // started yet — so it joins this list on its own, or the run
+            // would hang on an answer the user can't give.
+            // F-2 (0.9.159): the downgrade prompt is the same shape — asked
+            // before the tunnel is taken, while no step is `.waiting`.
+            guard isWaitingOnUser || cellularDownloadRequest != nil || downgradeRequest != nil else { return [] }
             return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide),
-                    appIDCost.map(Popup.appIDCost)].compactMap { $0 }
+                    appIDCost.map(Popup.appIDCost),
+                    cellularDownloadRequest.map(Popup.cellularDownload),
+                    downgradeRequest.map(Popup.downgrade)].compactMap { $0 }
         }
-        // A link that came in during a run asks once the run is over.
-        let link = pendingLink.map(Popup.link)
-        if finished { return [link].compactMap { $0 } + finishedPopups }
-        var shown: [Popup] = [link].compactMap { $0 }
+        if finished { return finishedPopups }
+        var shown: [Popup] = []
+        if let mismatch = pairingImportMismatch { shown.append(.pairingImportMismatch(mismatch)) }
+        if let link = pendingLink { shown.append(.link(link)) }
+        // B1 (0.9.152): an invalid link that arrived mid-run also shows once
+        // the run ends — on a failed run the finished list never appears.
+        if let invalid = pendingInvalidLinkMessage { shown.append(.error(invalid, stoppedRun: false)) }
         if certConflict { shown.append(.certConflict) }
         if let guide { shown.append(.guide(guide)) }
         if let lastError {
             shown.append(.error(lastError, stoppedRun: stepStates.values.contains(.failed)))
         }
+        if let cellular = cellularDownloadRequest { shown.append(.cellularDownload(cellular)) }
         return shown
     }
 
@@ -855,7 +1292,23 @@ final class Engine {
             ? .liveContainerImport : nil
         let leads = trust != nil && certificate != nil
         let success: Popup? = successClosed ? nil : .success(installedSourceName, leads: leads)
-        return (leads ? [success, trust, certificate] : [trust, success, certificate])
+        // B1 (0.9.152): a link that arrived mid-run used to sit in
+        // `pendingLink` while `finished` made `popups` return only this
+        // list — it never showed until a later run failed. It joins the
+        // finished popups now, after the success/trust steps; an invalid
+        // link from the same run shows as an error card instead of only
+        // landing in the log.
+        let link: Popup? = pendingLink.map(Popup.link)
+        let invalid: Popup? = pendingInvalidLinkMessage.map { .error($0, stoppedRun: false) }
+        // B-1 (0.9.157): a cellular prompt that arrived while the run was
+        // finishing used to sit in `cellularDownloadRequest` while
+        // `finished` made `popups` return only this list — it never
+        // showed, and the next download sat at 0 with no explanation.
+        // It joins the finished popups now, after the success/trust
+        // steps (the 0.9.152 link fix's shape, one list over).
+        let cellular: Popup? = cellularDownloadRequest.map(Popup.cellularDownload)
+        return (leads ? [success, trust, certificate, link, invalid, cellular]
+                      : [trust, success, certificate, link, invalid, cellular])
             .compactMap { $0 }
     }
 
@@ -863,6 +1316,12 @@ final class Engine {
     func blocks(_ popup: Popup) -> Bool {
         switch popup {
         case .pairingCode, .guide, .appIDCost: return isWaitingOnUser
+        // F-G (0.9.156): the cellular prompt blocks while a run is in flight
+        // (prefetch or the download step); with no run it just declines.
+        case .cellularDownload:                return isRunning
+        // F-2 (0.9.159): the downgrade prompt blocks the same way — the run
+        // waits on its answer, and closing it stops the run.
+        case .downgrade:                       return isRunning
         default:                               return false
         }
     }
@@ -876,6 +1335,16 @@ final class Engine {
             cancelOneClick()
             pairingPIN = nil
             guide = nil
+            // F-G (0.9.156): answer the cellular prompt directly too — the
+            // waiter isn't always the pipeline (a source download can ask
+            // while a run is in flight), and only the pipeline's cancel
+            // reaches its `onCancel`. `answerCellularDownload` no-ops when
+            // the handler already answered, so this can't resume twice.
+            if case .cellularDownload = popup { answerCellularDownload(false) }
+            // F-2 (0.9.159): the downgrade prompt's waiter is always the
+            // pipeline, so its cancel reaches `onCancel` — but answering
+            // here too is the same no-op guard as the cellular one above.
+            if case .downgrade = popup { answerDowngrade(false) }
             return
         }
         switch popup {
@@ -883,13 +1352,17 @@ final class Engine {
         case .pairingCode:         pairingPIN = nil; guide = nil
         case .certConflict:        certConflict = false
         case .guide:               guide = nil
-        case .error:               lastError = nil
+        case .error:               lastError = nil; pendingInvalidLinkMessage = nil
         case .success:             successClosed = true
         case .liveContainerImport: liveContainerImportClosed = true
-        case .appIDCost:           appIDCost = nil
-        case .link:                answerLink(false)
+        case .appIDCost:             appIDCost = nil
+        case .pairingImportMismatch: answerPairingImportMismatch(false)
+        case .link:                  pendingLink = nil
+        case .cellularDownload:      answerCellularDownload(false)
+        case .downgrade:             answerDowngrade(false)
         }
     }
+
 
     /// Cancel whatever the run started early and never got to use.
     @MainActor
@@ -902,6 +1375,8 @@ final class Engine {
         devicePreparation = nil
         prestage?.cancel()
         prestage = nil
+        accountConfigTask?.cancel()
+        accountConfigTask = nil
         // A sign-in this run left running now declines any 2FA request.
         finishedRuns += 1
     }
@@ -926,12 +1401,14 @@ final class Engine {
             // Waits for a full-tunnel VPN's probe when there's no fresh answer.
             let (vpn, wifi, detail) = await readNetworkSettled()
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
-            // Only the tunnel is required. Without Wi-Fi, the steps that need
-            // a new connection offer Mobile Data Mode instead.
-            if vpn {
+            // Only a run that pairs needs Wi-Fi; the tunnel is always required.
+            let wifiSatisfied = wifi || !needsFreshPairing
+            if wifiSatisfied && vpn {
                 // Install checks this too, but only while a tunnel is up, and
                 // this run may have started it.
-                guard deviceIPIsUsable() else {
+                // 0.9.140: a stale own-address falls back to the default first
+                // (`deviceIPIsUsable` logs the same line below when it can't).
+                if !deviceIPIsUsable() {
                     setGuide(Guides.deviceIPMismatch)
                     throw EngineError.message(L("Wrong device IP"))
                 }
@@ -941,11 +1418,24 @@ final class Engine {
                 return
             }
             setStep(.network, .waiting)
-            if announced != "vpn" {
-                log("Waiting for the loopback tunnel… connect LocalDevVPN, ClashMi, or whichever VPN app you use.")
-                announced = "vpn"
+            if !wifiSatisfied {
+                // Wi-Fi is the prerequisite for pairing, so surface it first.
+                if announced != "wifi" {
+                    log("Waiting for Wi-Fi… pairing this iPhone needs it. Connect to a Wi-Fi network.")
+                    announced = "wifi"
+                }
+                setGuide(Guides.wifi)
+            } else {
+                if announced != "vpn" {
+                    log("Waiting for the loopback tunnel…")
+                    announced = "vpn"
+                }
+                // 签名能用内置隧道时不弹 LocalDevVPN 指引卡：隧道由
+                // tunnelUp() 和打开 App 时自动连接，弹卡只会误导。
+                if !BuiltinTunnel.useBuiltinDirectly {
+                    setGuide(Guides.vpn)
+                }
             }
-            setGuide(Guides.vpn)
             try await Task.sleep(nanoseconds: 1_500_000_000)
         }
     }
@@ -1063,7 +1553,6 @@ final class Engine {
         deviceSummary = device.summary
         deviceUDID = device.udid
         deviceName = device.name
-        pairingStatus = L("connected")
         setStep(.connect, .done)
     }
 
@@ -1111,17 +1600,59 @@ final class Engine {
         appleID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Frees the in-memory sign session and waits for it, so a following
+    /// signIn() really logs in as the newly activated account. The fire-and-
+    /// forget `forgetAppleSession()` below can't be awaited: a signIn() issued
+    /// right after it would still see the old session and skip (`signSession
+    /// != nil`), silently signing with the wrong account. Runs the free on
+    /// `signQueue`, which owns `signSession`, then clears the team on the
+    /// main actor. Does NOT delete the saved developer-session token on disk:
+    /// the next sign-in reuses it, so an account switch normally needs no
+    /// fresh Apple authentication (2FA stays possible as a safety valve).
+    @MainActor
+    func dropSignSession() async {
+        // A21-1：切账号时世代递增——等位中的登录靠它作废（同 forgetAppleSession）。
+        signInGeneration += 1
+        try? await onSignQueue {
+            if let session = self.signSession { si_sign_session_free(session) }
+            self.signSession = nil
+        }
+        signingTeamID = nil
+        UserDefaults.standard.removeObject(forKey: Self.savedTeamKey)
+        signInStatus = "signed out"
+        log("In-memory sign session dropped for an account switch.")
+    }
+
+    /// Signs in as the currently active account, for flows outside the Install
+    /// tab (e.g. a multi-account refresh switching groups). Thin wrapper over
+    /// the private signIn(): no checklist changes, same 2FA/lock/rate-limit
+    /// handling. Callers must have dropped the old session first, or this
+    /// skips on the existing session.
+    @MainActor
+    func signInForRefresh() async throws {
+        try await signIn(updatingChecklist: false)
+    }
+
     /// Frees the cached sign-in session so the next run signs in as the active
     /// account. Called when credentials change. Runs on `signQueue`, which owns
     /// `signSession`.
     func forgetAppleSession() {
+        // A21-1：世代递增放同步处——等位中的登录靠它作废；调用方是主线程的
+        // onChange（RootView），与 dropSignSession 同款。
+        signInGeneration += 1
+        // C19：抓调用时那一个指针——释放块排在登录块后面时，块内重读
+        // 当前 session 会把切账号后才登好的新 session 也释放掉（登录块
+        // 换 session 时已把旧的释放了，见 performSignIn）。
+        let freed = signSession
         signQueue.async { [weak self] in
-            guard let self, let session = self.signSession else { return }
-            si_sign_session_free(session)
+            guard let self, let freed = freed else { return }
+            guard self.signSession == freed else { return }
+            si_sign_session_free(freed)
             self.signSession = nil
             self.setMain {
                 self.signInStatus = "signed out"
                 self.signingTeamID = nil
+                UserDefaults.standard.removeObject(forKey: Self.savedTeamKey)
             }
             self.log("Apple ID or its team changed — signed out of the previous sign-in.")
         }
@@ -1188,8 +1719,14 @@ final class Engine {
         if updatingChecklist { setStep(.signIn, .active) }
 
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
+        // A21-1：世代在等位前抓（同 CertManager.signIn 的 A2）。
+        let generation = signInGeneration
         let ticket = try await appleSignIns.waitForTurn(purpose, appleID: id, run: run)
         defer { appleSignIns.finished(ticket) }
+        // A21-1：等位期间切账号，作废本次尝试——不在旧会话上继续。
+        // 放 signSession 检查之前：切账号后旧会话可能还没被释放块清掉，
+        // 先看世代，不看会话在不在。
+        guard generation == signInGeneration else { throw CancellationError() }
         // A sign-in that went first may have signed this session in.
         if signSession != nil {
             log("Already signed in this session — skipping.")
@@ -1202,16 +1739,17 @@ final class Engine {
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
-        var failures = AnisetteServer.SignInFailures()
+        var lastError = L("No anisette servers are configured.")
         var appleRefusals = AnisetteServer.AppleRefusals(servers: anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
+            // A21-1（A3 同款）：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             let name = anisetteName(for: ani)
             if appleRefusals.rulesOut(ani) {
                 log("Skipping anisette \(name): Apple has refused the device sign-in reports through it.")
-                failures.skip()
                 continue
             }
             signInStatus = servers.count > 1
@@ -1224,13 +1762,30 @@ final class Engine {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
+                // A21-1：切账号后完成的旧登录作废——刚登好的会话放掉、清掉
+                // performSignIn 已写回的旧团队，再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.signSession {
+                        self.signSession = nil
+                        signQueue.async { si_sign_session_free(stale) }
+                    }
+                    signingTeamID = nil
+                    UserDefaults.standard.removeObject(forKey: Self.savedTeamKey)
+                    signInStatus = "signed out"
+                    log("Apple ID changed — signed out of the previous account.")
+                    throw CancellationError()
+                }
+                // Stick with the server that worked.
+                anisetteURL = ani
                 anisetteSignedIn(ani)
                 AccountStore.shared.signedIn(id, withTeam: Self.teamID(inSummary: summary))
                 signInStatus = "signed in (\(summary))"
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
             } catch let error as EngineError {
-                let failure = error.errorDescription ?? "sign-in failed"
+                // A21-1（A3 同款）：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
+                lastError = error.errorDescription ?? L("Sign-in failed.")
 
                 // A cancelled 2FA prompt isn't the server's fault.
                 if ticket.twoFactorWasCancelled {
@@ -1245,71 +1800,42 @@ final class Engine {
                     throw EngineError.message(Self.noTeamPickedMessage)
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
-                if Self.isAccountLocked(failure) {
+                if Self.isAccountLocked(lastError) {
                     signInStatus = "sign-in failed"
-                    log("Apple has locked this Apple Account: \(failure)")
+                    log("Apple has locked this Apple Account: \(lastError)")
                     throw EngineError.accountLocked
                 }
                 // Apple turns the account down for its owner's age through
                 // every anisette server alike.
-                if Self.isUnderageError(failure) {
+                if Self.isUnderageError(lastError) {
                     signInStatus = "sign-in failed"
-                    log("Apple won't let this Apple Account use developer services: \(failure)")
+                    log("Apple won't let this Apple Account use developer services: \(lastError)")
                     throw EngineError.underage
                 }
                 // So does an email address Apple hasn't seen verified, and
                 // signing in again only meets the same refusal.
-                if Self.isEmailUnverifiedError(failure) {
+                if Self.isEmailUnverifiedError(lastError) {
                     signInStatus = "sign-in failed"
-                    log("Apple wants this Apple Account's email address verified first: \(failure)")
+                    log("Apple wants this Apple Account's email address verified first: \(lastError)")
                     throw EngineError.emailUnverified
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
-                if Self.isCredentialError(failure) {
+                if Self.isCredentialError(lastError) {
                     signInStatus = "sign-in failed"
-                    log("Apple ID credentials rejected: \(failure)")
+                    log("Apple ID credentials rejected: \(lastError)")
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
-                // Not logged in through a server on Apple's Android library
-                // (-80046): nothing reached Apple, and the server isn't at fault.
-                if Self.isAndroidADISkip(failure) {
-                    log("Skipping anisette \(name): Apple refuses the sign-in token for anisette from its Android library (-80046).")
-                    appleRefusals.recordTokenRefusal(ani)
-                    failures.skip()
-                    if failures.tried == 0, appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
-                        signInStatus = "sign-in failed"
-                        throw EngineError.message(androidADIRefusalMessage(server: ani))
-                    }
-                    continue
-                }
-                log("Anisette \(name) failed: \(failure)")
-                failures.failed(ani, error: failure)
-                anisetteFailed(ani, error: failure)
-                if Self.isAppleRateLimit(failure) {
+                log("Anisette \(name) failed: \(lastError)")
+                if Self.isAppleRateLimit(lastError) {
                     signInStatus = "sign-in failed"
                     log("Apple is rate-limiting sign-in (HTTP 429) — not trying more anisette servers.")
                     throw EngineError.message(Self.appleRateLimitMessage)
-                }
-                // Apple calling the reported Mac too old rules out the servers
-                // left that report it (`AnisetteServer.AppleRefusals`).
-                if Self.isAppleOutdatedMacRefusal(failure) {
-                    appleRefusals.recordOutdated(ani)
-                }
-                // So does Apple refusing the sign-in token for the anisette the
-                // servers of that library share.
-                if Self.isAppleTokenRefusal(failure) {
-                    appleRefusals.recordTokenRefusal(ani)
-                    if appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
-                        signInStatus = "sign-in failed"
-                        log("Apple refused the sign-in token (-80046) — no anisette server of another kind left to try.")
-                        throw EngineError.message(appleTokenRefusalMessage(through: ani))
-                    }
                 }
                 // Apple refusing the device sign-in reports looks the same
                 // through every server reporting it: after two refusals those
                 // are skipped, and the loop ends when no other server is left
                 // (`AnisetteServer.AppleRefusals`).
-                if Self.isAppleServiceRefusal(failure) {
+                if Self.isAppleServiceRefusal(lastError) {
                     appleRefusals.record(ani)
                     if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         signInStatus = "sign-in failed"
@@ -1319,7 +1845,7 @@ final class Engine {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Self.isAppleUnreachable(failure) {
+                if Self.isAppleUnreachable(lastError) {
                     appleUnreachable += 1
                     if let message = await appleUnreachableStop(failures: appleUnreachable) {
                         signInStatus = "sign-in failed"
@@ -1333,7 +1859,12 @@ final class Engine {
         }
 
         signInStatus = "sign-in failed"
-        throw EngineError.message(anisetteSignInFailure(failures))
+        let tried = servers.count == 1
+            ? L("the anisette server")
+            : L("all %d anisette servers", servers.count)
+        let detail = (lastError == L("No anisette servers are configured."))
+            ? lastError : friendlyRustError(lastError)
+        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
     /// One sign-in attempt against a specific anisette server. `team` is the
@@ -1358,7 +1889,14 @@ final class Engine {
             let s = summary.map { String(cString: $0) } ?? ""
             summary.map { si_string_free($0) }
             let team = Self.teamID(inSummary: s)
-            setMain { self.signingTeamID = team }
+            setMain {
+                self.signingTeamID = team
+                // Remember which account owns this team, so a later
+                // multi-account refresh can map an app's team back to the
+                // Apple ID that can renew it without signing in first.
+                if let team { AccountStore.shared.noteTeamID(team) }
+            }
+            if let team { UserDefaults.standard.set(team, forKey: Self.savedTeamKey) }
             log("Sign-in OK. \(s)")
             return s
         } else {
@@ -1385,53 +1923,10 @@ final class Engine {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// Anisette addresses a sign-in tries. With Auto on, every server, most
-    /// likely to work first (`AnisetteServer.candidates`): the last one that
-    /// signed in, then the Windows-ADI servers, then the rest, macOS-ADI last,
-    /// each group's recent failures after the others. Off, only the server
-    /// picked in Settings.
+    /// Anisette addresses to try (`AnisetteServer.candidates`): the current
+    /// pick first, then the Windows-ADI servers, then the rest, macOS-ADI last.
     func anisetteCandidates() -> [String] {
-        guard anisetteAuto else {
-            let pick = anisetteURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            return pick.isEmpty ? [] : [pick]
-        }
-        return AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers,
-                                         failing: AnisetteServer.RecentFailures.addresses())
-    }
-
-    /// Notes that a sign-in through `address` worked. With Auto on, it's the
-    /// one tried first from now on, since it keeps the anisette identity, and
-    /// with it the saved developer token.
-    func anisetteSignedIn(_ address: String) {
-        if anisetteAuto { anisetteURL = address }
-        AnisetteServer.RecentFailures.clear(address)
-    }
-
-    /// Notes that a sign-in through `address` failed with `error`, so that
-    /// Auto tries it after the others for a while if the server was at fault.
-    func anisetteFailed(_ address: String, error: String) {
-        AnisetteServer.RecentFailures.record(address, error: error)
-    }
-
-    /// The error for a sign-in that failed on every server it tried. It shows
-    /// the error saying most about why (`AnisetteServer.SignInFailures`), and
-    /// with several servers tried, the one it came through. It counts the
-    /// servers tried, apart from those skipped. With a server picked in
-    /// Settings, the only one tried, it names that server and points to Auto,
-    /// which would have tried the others.
-    func anisetteSignInFailure(_ failures: AnisetteServer.SignInFailures) -> String {
-        let error = failures.shown?.error ?? "no anisette servers configured"
-        guard anisetteAuto else {
-            return L("Apple ID sign-in failed on %@. Error: %@", anisetteName(for: anisetteURL), error)
-                + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")
-        }
-        guard let shown = failures.shown, failures.tried > 1 else {
-            return L("Apple ID sign-in failed on %@. Error: %@", L("the anisette server"), error)
-        }
-        let servers = failures.skipped == 0
-            ? L("all %d anisette servers", failures.tried)
-            : L("%d anisette servers (%d skipped)", failures.tried, failures.skipped)
-        return L("Apple ID sign-in failed on %@. Error via %@: %@", servers, anisetteName(for: shown.server), shown.error)
+        AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers)
     }
 
     /// Friendly name for an anisette address (falls back to the address itself).
@@ -1500,50 +1995,6 @@ final class Engine {
         return m.contains("gsa.apple.com") && m.contains("503")
     }
 
-    /// Detects GrandSlam -23782, "A Mac with macOS version 10.13 or later is
-    /// required to sign in with this Apple Account": Apple turning down the
-    /// macOS 10.12.6 the macOS-ADI servers report (issue #89, 2026-10). Every
-    /// one of them reports it, so the rest are skipped
-    /// (`AnisetteServer.AppleRefusals`); the other servers report a Windows PC.
-    static func isAppleOutdatedMacRefusal(_ raw: String) -> Bool {
-        let m = raw.lowercased()
-        return m.contains("-23782") || m.contains("a mac with macos version")
-    }
-
-    /// Detects GrandSlam -80046, "This action cannot be completed at this
-    /// time", at the sign-in token request: Apple took the password and the
-    /// code, then turned down the anisette (from its Android library, since
-    /// 2026-10-21). Also isideload's skip of a sign-in through such a server
-    /// (`isAndroidADISkip`), which names the code. Every server on that
-    /// library shares the identity, so the rest of them are skipped
-    /// (`AnisetteServer.AppleRefusals`).
-    static func isAppleTokenRefusal(_ raw: String) -> Bool {
-        raw.contains("-80046")
-    }
-
-    /// Detects isideload's `ANDROID_ADI_SKIP`: a sign-in through a server on
-    /// Apple's Android ADI library wasn't started, so nothing reached Apple.
-    static func isAndroidADISkip(_ raw: String) -> Bool {
-        raw.hasPrefix("login skipped") && raw.contains("-80046")
-    }
-
-    /// The error when the anisette server picked in Settings, the only one
-    /// tried, runs Apple's Android library.
-    func androidADIRefusalMessage(server: String) -> String {
-        L("“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
-          anisetteName(for: server))
-    }
-
-    /// The error when Apple refused the sign-in token through `server` and no
-    /// server of another kind is left.
-    func appleTokenRefusalMessage(through server: String) -> String {
-        if AnisetteServer.library(of: server, in: anisetteServers) == .mac {
-            return L("Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.")
-        }
-        return L("Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
-                 anisetteName(for: server))
-    }
-
     /// Detects a sign-in that never reached Apple: sending GrandSlam's URL-bag
     /// request to gsa.apple.com failed. It's the first request of a sign-in and
     /// uses no anisette data, so every anisette server would fail it the same way.
@@ -1598,7 +2049,8 @@ final class Engine {
         let version = src == .custom ? nil : selectedVersion
         // Keyed on source, channel and version, so changing any re-fetches.
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p),
+           DownloadLedger.isManaged(URL(fileURLWithPath: p)) {
             log("\(buildName(src, channel, version)) IPA already downloaded — skipping.")
             setStep(.download, .done)
             return
@@ -1639,9 +2091,17 @@ final class Engine {
             if let version {
                 cached = IPALibrary.pickedDownload(version.tag, source: src, channel: channel)
             } else {
-                cached = onDisk?.url
+                cached = (onDisk?.url).flatMap { IPALibrary.looksLikeIPA($0) ? $0 : nil }
             }
             if let cached {
+                // C7: the install goes on with the older local copy — say so
+                // under the progress card instead of silently succeeding.
+                let when = (try? FileManager.default.attributesOfItem(atPath: cached.path))?[.modificationDate] as? Date
+                let dateText = when?.formatted(
+                    Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale)) ?? ""
+                downloadFallbackNotice = L("Couldn't download %@: %@", src.displayName, short(error))
+                    + " — " + cached.lastPathComponent
+                    + (dateText.isEmpty ? "" : " (" + L("Downloaded %@", dateText) + ")")
                 log("⚠️ Download failed (\(short(error))) — using \(cached.lastPathComponent) already in Documents instead.")
                 adopt(cached, source: src, channel: channel, version: version?.tag)
                 setStep(.download, .done)
@@ -1712,10 +2172,93 @@ final class Engine {
     private func downloadBuild(source: InstallSource, channel: ReleaseChannel,
                                version: ReleaseVersion?) async throws -> String {
         let log: (String) -> Void = { line in self.log(line) }
-        guard let version else {
-            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+        // C6: stream the transfer into downloadProgress, exactly as
+        // SideBySideView does for its own downloads.
+        let report: @Sendable (Double) -> Void = { [weak self] fraction in
+            Task { @MainActor in self?.downloadProgress = fraction }
         }
-        return try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+        // B1 (0.9.155): the byte count for a transfer whose total the
+        // server never stated — the downloader only calls this then, so a
+        // non-nil value is itself the "total unknown" signal.
+        downloadBytesWritten = nil
+        let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
+            Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
+        }
+        // F-2 (0.9.157): the (bytes, total) sample for the speed and the
+        // time left — the fraction has no bytes, the byte count has no
+        // total, so neither report above can sample it.
+        clearDownloadSpeed()
+        let detailReport: @Sendable (Int, Int) -> Void = { [weak self] bytes, total in
+            Task { @MainActor in self?.noteDownloadDetail(bytes: bytes, total: total) }
+        }
+        // B1 (0.9.156): one exit, so the byte count is cleared on every
+        // way out — the three `return try await …` sites this replaces used
+        // to leave it set, and the progress card reads non-nil as "total
+        // unknown", so signing/install kept showing the old byte count
+        // plus a spinner and the % never came back until the next run.
+        do {
+            let path: String
+            if let version {
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.$reportProgressDetail.withValue(detailReport) {
+                            try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+                        }
+                    }
+                }
+            } else if let catalog = releaseCatalogs[source],
+                      Date().timeIntervalSince(catalog.fetched) < 15 * 60,
+                      let latest = catalog.latest[channel],
+                      source.feed != nil || source.actionsBuild(channel) != nil {
+                // A5：开过版本选择器、内存目录新鲜时，直接取目录里“最新”那一项，
+                // 不再为同一份目录多拉一次 feed JSON / artifacts 列表。只复用与
+                // downloadLatest 同口径的两种情形（feed 源、Madeira nightly）；
+                // GitHub 直链源（latestAsset 路）仍走 downloadLatest，不复用。
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.$reportProgressDetail.withValue(detailReport) {
+                            try await SideStoreDownloader.download(latest, source: source, channel: channel, log: log)
+                        }
+                    }
+                }
+            } else {
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.$reportProgressDetail.withValue(detailReport) {
+                            try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+                        }
+                    }
+                }
+            }
+            downloadBytesWritten = nil
+            clearDownloadSpeed()
+            return path
+        } catch {
+            // A failed or cancelled download leaves no byte count behind either.
+            downloadBytesWritten = nil
+            clearDownloadSpeed()
+            throw error
+        }
+    }
+
+    /// F-2 (0.9.157): folds one (bytes, total) sample into the speed and
+    /// the time left. Called on the main actor from the publish hop, so
+    /// the sample state is never touched from the download's own queue.
+    /// Same EMA as `IPADownloader.noteProgress`, via the shared sampler.
+    private func noteDownloadDetail(bytes: Int, total: Int) {
+        downloadSpeedSampler.note(bytes: Int64(bytes), total: Int64(total))
+        downloadSpeed = downloadSpeedSampler.speed
+        estimatedTimeRemaining = downloadSpeedSampler.estimatedTimeRemaining
+        downloadTotalBytes = Int64(total)
+    }
+
+    /// F-2 (0.9.157): forget the last download's speed, estimate and
+    /// total, for the next one.
+    private func clearDownloadSpeed() {
+        downloadSpeedSampler.reset()
+        downloadSpeed = 0
+        estimatedTimeRemaining = nil
+        downloadTotalBytes = -1
     }
 
     /// A build as the log names it: "Nightly SideStore", or "SideStore 0.6.3".
@@ -1723,6 +2266,45 @@ final class Engine {
                            _ version: ReleaseVersion?) -> String {
         guard let version else { return "\(channel.displayName) \(source.displayName)" }
         return "\(source.displayName) \(version.title)"
+    }
+
+    /// B-8（SIDE-36）：这个路径（或它的祖先目录）是不是正在安装的源文件——
+    /// 文件页删 / 改名 / 移走它会打断签名步。判据：
+    /// downloadedIPAPath 是管线记下的源路径；下载步还没跑到的窗口
+    /// （配对 / 登录阶段）用自定义源兜底：仅 installSource == .custom
+    /// 时比对当前导入文件。没在跑就不拦；祖先目录用 path + "/" 前缀，
+    /// 不用裸 hasPrefix（Foo.ipa 与 Foo.ipa2 会撞车）。
+    func isInstallingSource(path: String) -> Bool {
+        guard isRunning else { return false }
+        // B2：配对窗口期的源（downloadedIPAPath 还没置位那段）。
+        if let installing = installingSourcePath,
+           installing == path || installing.hasPrefix(path + "/") {
+            return true
+        }
+        if let installing = downloadedIPAPath,
+           installing == path || installing.hasPrefix(path + "/") {
+            return true
+        }
+        guard installSource == .custom,
+              let custom = IPALibrary.customImport()?.url.path,
+              custom == path || custom.hasPrefix(path + "/") else { return false }
+        return true
+    }
+
+    /// B1：正在签名的源文件路径集——ECV 单签（executeSign）与文件页批量签名
+    /// （runBatchSign）在跑时登记，跑完注销。B5：正在续签的源文件路径集——
+    /// 续签循环 .working 的那项登记，.done/.failed 注销。文件页/LAN/WebDAV
+    /// 的删/移/改名入口只拦集里的路径，不拦无关文件；祖先目录语义同
+    /// isInstallingSource（path + "/" 前缀），不用裸 hasPrefix。
+    var signingSourcePaths: Set<String> = []
+    var renewingSourcePaths: Set<String> = []
+
+    func isSigningSource(path: String) -> Bool {
+        signingSourcePaths.contains { $0 == path || $0.hasPrefix(path + "/") }
+    }
+
+    func isRenewingSource(path: String) -> Bool {
+        renewingSourcePaths.contains { $0 == path || $0.hasPrefix(path + "/") }
     }
 
     /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
@@ -1738,15 +2320,58 @@ final class Engine {
 
     // MARK: Versions to pick from (Advanced)
 
+    /// Disk cache for release catalogs, in SignedIPAStore's tolerant
+    /// JSON-file shape: a missing or unreadable file just means "fetch
+    /// fresh". Lets a catalog survive an app restart, so reopening the
+    /// version picker within 15 minutes doesn't cost another GitHub call.
+    private static var catalogCacheURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base.appendingPathComponent("releaseCatalogs.json")
+    }
+
+    /// A3+A4：与 SourcesStore 的源缓存同一条道理——磁盘缓存的编解码移出主
+    /// 线程，读写走同一条串行队列（队列内 helper 后缀 Locked）。Engine 本
+    /// 身不是 @MainActor，这两个 static func 天生非隔离，async 就能跳出
+    /// 主线程（不必再标 nonisolated）。
+    private static let catalogCacheQueue = DispatchQueue(label: "sideinstaller.catalog-cache")
+
+    private static func loadCatalogCacheLocked() -> [InstallSource: ReleaseCatalog] {
+        guard let data = try? Data(contentsOf: catalogCacheURL),
+              let cached = try? JSONDecoder().decode([InstallSource: ReleaseCatalog].self, from: data)
+        else { return [:] }
+        return cached
+    }
+
+    private static func writeCatalogCacheLocked(_ catalogs: [InstallSource: ReleaseCatalog]) {
+        if let data = try? JSONEncoder().encode(catalogs) {
+            try? data.write(to: catalogCacheURL, options: .atomic)
+        }
+    }
+
+    private static func loadCatalogCache() async -> [InstallSource: ReleaseCatalog] {
+        catalogCacheQueue.sync { loadCatalogCacheLocked() }
+    }
+
+    private static func saveCatalogCache(_ catalogs: [InstallSource: ReleaseCatalog]) async {
+        catalogCacheQueue.sync { writeCatalogCacheLocked(catalogs) }
+    }
+
+    // 上游 Madeira 稳定版检查（与 fork 目录缓存双留）。
     /// Asks GitHub whether `source`'s stable channel has its first release yet,
     /// for a build whose stable channel waits for one (Madeira). One request
     /// to the website, which has no hourly limit; no answer keeps what was
     /// known. Not applied during a run, which has already picked its channel.
     @MainActor
     func checkStableRelease(for source: InstallSource) async {
-        guard source.firstStableVersion != nil,
-              let released = await SideStoreDownloader.hasStableRelease(source),
-              released != stableReleased.contains(source), !isRunning else { return }
+        guard source.firstStableVersion != nil else { return }
+        // 15-minute TTL, same as loadReleaseCatalog: switching to Madeira
+        // and back must not HEAD GitHub every time.
+        if let last = lastStableCheck[source], Date().timeIntervalSince(last) < 15 * 60 { return }
+        guard let released = await SideStoreDownloader.hasStableRelease(source) else { return }
+        // A failed check leaves the timestamp alone, so the next pick retries.
+        lastStableCheck[source] = Date()
+        guard released != stableReleased.contains(source), !isRunning else { return }
         if released { stableReleased.insert(source) } else { stableReleased.remove(source) }
         UserDefaults.standard.set(stableReleased.map(\.rawValue).sorted(), forKey: Self.stableReleasedKey)
         log(released
@@ -1762,6 +2387,14 @@ final class Engine {
         guard source != .custom, loadingCatalog != source else { return }
         if !force, let cached = releaseCatalogs[source],
            Date().timeIntervalSince(cached.fetched) < 15 * 60 { return }
+        // Disk cache, same 15-minute rule: a catalog saved by an earlier
+        // launch still counts, so reopening the picker doesn't refetch.
+        if !force, let disk = await Self.loadCatalogCache()[source],
+           Date().timeIntervalSince(disk.fetched) < 15 * 60 {
+            releaseCatalogs[source] = disk
+            log("Versions: using saved \(source.displayName) catalog.")
+            return
+        }
         loadingCatalog = source
         catalogErrors[source] = nil
         // Checked, since a newer load for another build may have started since.
@@ -1769,7 +2402,9 @@ final class Engine {
         do {
             let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
             releaseCatalogs[source] = catalog
-            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) nightly builds besides the latest.")
+            // Persist for the next launch (same 15-minute rule applies on read).
+            await Self.saveCatalogCache(releaseCatalogs)
+            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
         } catch is CancellationError {
             // The picker closed mid-fetch; opening it again retries.
         } catch {
@@ -1797,9 +2432,45 @@ final class Engine {
     }
 
     /// Copy a picked IPA in as the custom import, replacing any previous one.
+    /// Returns true only when this call really imported (C12): a call that
+    /// finds an import already running returns false, so a chained caller
+    /// can't mistake the previous import for this one.
     @MainActor
-    func importCustomIPA(from url: URL) async {
-        guard !isImportingIPA else { return }
+    func importCustomIPA(from url: URL) async -> Bool {
+        // B3：安装进行中不换 custom 槽——replaceCustomImport 会清空 custom
+        // 目录、置空 downloadedIPAPath，在途安装的源就没了。入口拒掉，
+        // 调用方凭返回值不启动管线（C12）；inbox 拷贝照 N3(C) 同款删掉。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
+        // B-38-B2：续签进行中不换 custom 槽——replaceCustomImport 会清空
+        // Custom/ 、断掉在途续签的源。拒绝路照 B3 同款（丢 inbox 拷贝）。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
+        guard !isImportingIPA else {
+            lastError = L("An import is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            // N3(C)：defer 还没装上，竞态撞进来的这份 picker 拷贝不会被删，
+            // 在这里显式删掉，不然整只 IPA 留在 tmp 里。
+            Self.discardInboxCopy(url)
+            return false
+        }
+        // B-50-B3: the import would delete the current custom import —
+        // refuse while it's being signed (batch signing re-extracts it
+        // per file, so the whole rest of the batch would fail).
+        if let old = IPALibrary.customImport(), isSigningSource(path: old.url.path) {
+            lastError = L("A signing is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
         isImportingIPA = true
         // Delete the picker's temporary copy once the import is done.
         defer { isImportingIPA = false; Self.discardInboxCopy(url) }
@@ -1812,40 +2483,425 @@ final class Engine {
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+            return true
         } catch IPALibrary.ImportError.notAnIPA {
             // The picker accepts any file. Validation runs on a staged copy, so
             // the previous import is kept.
             refreshCustomIPA()
-            lastError = ErrorHelp.explained(L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
-                                              url.lastPathComponent))
+            lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
+                          url.lastPathComponent)
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         } catch {
             // Re-read the import from disk to update the button label.
             refreshCustomIPA()
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         }
     }
 
-    /// Downloads an IPA from a pasted link and stores it as the custom import.
-    /// Returns true once it's in.
+    /// F-3 (0.9.160): the newest IPA in Downloads matching a history
+    /// entry, or nil when there is none to reinstall from. The
+    /// candidate search `reinstallFromHistory` used to inline; the
+    /// reinstall-all loop needs the same answer up front to tell "skip,
+    /// no IPA" apart from "tried and failed", so both call this one
+    /// matcher — a file the single path finds is one the loop counts
+    /// as present, and vice versa.
+    /// F-1 (0.9.168): when the entry records a bundle ID, matching is
+    /// by bundle ID first — two same-name clones (multi-open) share a
+    /// name but never an ID. The recorded ID is the signed one:
+    /// personal-ID signing appends `.<teamID>` to the installed ID
+    /// (AppInfo 同款注释）, so a candidate IPA matches when it is the
+    /// recorded ID itself, or the recorded ID is its ID plus that one
+    /// team suffix — `ProfileMatcher.installed` encodes exactly that
+    /// (the suffix after the base ID must be one 10-character team ID,
+    /// upper-case letters and digits only). A clone segment (`.2`) is
+    /// not a team suffix, so a clone row never matches the original
+    /// IPA and an original row never matches a clone IPA: the old
+    /// two-way `hasPrefix` did both, silently reinstalling the wrong
+    /// clone (B-1, 0.9.169). Enterprise signing rewrites nothing, so
+    /// the exact match covers it. A recorded ID with no bundle-ID
+    /// match returns nil — falling back to name matching here could
+    /// reinstall the wrong clone, which is the bug this fixes. Entries
+    /// with no bundle ID (written before 0.9.168, or failed runs that
+    /// never reached signing) keep the old name matching, behaviour
+    /// unchanged.
     @MainActor
-    @discardableResult
+    func historyIPAURL(for entry: InstallHistoryEntry) -> URL? {
+        let candidates = historyCandidates(for: entry)
+        if let wanted = entry.bundleID, !wanted.isEmpty {
+            let byID = candidates.filter { candidate in
+                guard let id = candidate.bundleID else { return false }
+                return ProfileMatcher.installed(wanted, isBuiltFrom: id, teamID: nil)
+            }
+            return byID.sorted(by: { a, b in
+                if a.rank != b.rank { return a.rank < b.rank }
+                return a.modified > b.modified
+            }).first?.url
+        }
+        return candidates.sorted(by: { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            return a.modified > b.modified
+        }).first?.url
+    }
+
+    /// B-1 (0.9.169): why `historyIPAURL` returned nil for an entry
+    /// that recorded a bundle ID — true when Downloads holds a
+    /// same-name IPA but none whose bundle ID matches the recorded
+    /// one, i.e. the library copy is another clone (multi-open), not
+    /// a missing download. False when there is no same-name IPA at
+    /// all, or the entry recorded no bundle ID.
+    @MainActor
+    func historyMissIsCloneMismatch(for entry: InstallHistoryEntry) -> Bool {
+        guard let wanted = entry.bundleID, !wanted.isEmpty else { return false }
+        // Only a candidate with a readable bundle ID can be called a
+        // mismatch: an IPA that won't parse (nil ID) is neither a match
+        // nor another clone, so it falls back to the generic prompt.
+        var sawID = false
+        for candidate in historyCandidates(for: entry) {
+            guard let id = candidate.bundleID else { continue }
+            sawID = true
+            if ProfileMatcher.installed(wanted, isBuiltFrom: id, teamID: nil) { return false }
+        }
+        return sawID
+    }
+
+    /// The name-matched IPA candidates `historyIPAURL` chooses from:
+    /// the library scan (known builds + the custom import) plus any
+    /// unrecognized IPA in Documents, whose filename is the only name
+    /// a hand-saved custom IPA has. Each candidate carries the bundle
+    /// ID its IPA declares (nil when it won't parse). Empty when the
+    /// entry has no app name — `historyIPAURL` then returns nil.
+    private func historyCandidates(for entry: InstallHistoryEntry) -> [(url: URL, modified: Date, rank: Int, bundleID: String?)] {
+        let needle = entry.appName.lowercased()
+        guard !needle.isEmpty else { return [] }
+        var candidates: [(url: URL, modified: Date, rank: Int, bundleID: String?)] = []
+        for item in IPALibrary.scan() {
+            if let rank = Self.historyMatchRank(fileStem: item.url.deletingPathExtension().lastPathComponent.lowercased(),
+                                                sourceName: item.source.displayName.lowercased(), needle: needle) {
+                candidates.append((item.url, item.modified ?? .distantPast, rank,
+                                   IPALibrary.appInfo(at: item.url)?.bundleID))
+            }
+        }
+        for name in IPALibrary.unrecognized() {
+            let url = IPALibrary.documentsDir.appendingPathComponent(name)
+            let modified = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
+            if let rank = Self.historyMatchRank(fileStem: url.deletingPathExtension().lastPathComponent.lowercased(),
+                                                sourceName: "", needle: needle) {
+                candidates.append((url, modified, rank, IPALibrary.appInfo(at: url)?.bundleID))
+            }
+        }
+        return candidates
+    }
+
+    /// F1 (0.9.148): reinstall a history entry — find the newest IPA in the
+    /// Downloads library whose filename names the same app, import it as the
+    /// custom IPA and run the one-click pipeline. Returns false with
+    /// `lastError` set when no IPA matches (the user has to download it
+    /// again first) or the import refuses; a started run returns true.
+    /// The history entry keeps no IPA path, so matching is by name only:
+    /// the filename stem (or the build's display name) against the recorded
+    /// app name, best rank first, newest within a rank. `installSource` is
+    /// set to `.custom` only after the import succeeds (B-39-B2 同款）。
+    @MainActor
+    func reinstallFromHistory(_ entry: InstallHistoryEntry) async -> Bool {
+        guard let matchURL = historyIPAURL(for: entry) else {
+            // B-1 (0.9.169): say which it is — no same-name IPA at all,
+            // or the library copy is another clone (same name, different
+            // bundle ID), so re-downloading the same file won't help.
+            if historyMissIsCloneMismatch(for: entry) {
+                lastError = L("The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.", entry.appName)
+            } else {
+                lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            }
+            log("⛔️ History reinstall: no IPA for \(entry.appName) in Downloads.")
+            return false
+        }
+        guard await importCustomIPA(from: matchURL) else { return false }
+        // B-1 (0.9.162): installOneCustomIPA 同款起跑前 guard — import
+        // 期间另一路安装可能已起跑：这时 runOneClick 会因 isRunning 静默
+        // 返回，而下面的等待循环会把别人的跑当成自己的等完、再拿它的
+        // 成败当本次结果。守卫必须在 installSource = .custom 之前——
+        // 别先改源再拦，管线中途读 installSource，改了就可能串源。
+        // 两道检查到 runOneClick 之间没有 suspension 点，主 actor 上
+        // 是原子的，拦完不可能再有人插进来。
+        if Task.isCancelled {
+            lastError = L("Install stopped")
+            return false
+        }
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            return false
+        }
+        // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
+        // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+        installSource = .custom
+        runOneClick()
+        // B2 (0.9.156): installOneCustomIPA 同款——等管线起跑（全隧道探针
+        // 最多拖半秒），3 秒还不起跑就是起跑守卫拦住了（无账号/无配对
+        // 文件/系统版本过低），不是起跑慢。旧代码直接 return true，历史页
+        // 毫无反馈：行内 spinner 停了，指引卡在用户没看的安装页。
+        // B-2 (0.9.161): whether this call's run ever started — the wait
+        // below also records a run that started and stopped inside one
+        // 100 ms tick, so the downgrade check after it can tell this
+        // run's decline from a stale one.
+        var waited = 0.0
+        var started = false
+        while !isRunning, !Task.isCancelled, waited < 3.0 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 0.1
+            started = started || isRunning
+        }
+        if isRunning { started = true }
+        if Task.isCancelled {
+            lastError = L("Install stopped")
+            return false
+        }
+        // F-2 (0.9.159): the user declined this entry's downgrade — the run
+        // never started, so say why instead of the generic "didn't start".
+        // B-2 (0.9.161): only when this call's run actually started — the
+        // flag is cleared in resetRun, which a run stopped by an early
+        // guard never reaches, so a decline left over from an earlier run
+        // would otherwise mask the guard's real reason (no account / no
+        // pairing file) in the branch below.
+        if started, downgradeDeclined {
+            lastError = downgradeDeclinedMessage ?? L("Install stopped")
+            return false
+        }
+        guard isRunning else {
+            // B-1 (0.9.163): runOneClick 入口已清掉上一跑的 lastError/
+            // guide，所以这里剩下的向导或错误就是这次起跑守卫拦住的
+            // 原因——向导优先于 lastError，不再拿 guideBefore 比对
+            // （旧向导与新向导相同时比对会漏掉真原因）。
+            if let guide {
+                lastError = ([guide.title] + guide.steps).joined(separator: "\n")
+            } else if lastError == nil {
+                lastError = L("The install didn't start. Open SideInstaller to see why.")
+            }
+            return false
+        }
+        return true
+    }
+
+    /// How well a library IPA's name matches a history entry's app name:
+    /// exact filename stem, then a stem that starts with it or a build name
+    /// that equals it, then a name that merely contains it. Nil means no
+    /// match at all.
+    private static func historyMatchRank(fileStem: String, sourceName: String, needle: String) -> Int? {
+        if fileStem == needle { return 0 }
+        if fileStem.hasPrefix(needle) { return 1 }
+        if sourceName == needle { return 1 }
+        if fileStem.contains(needle) { return 2 }
+        if !sourceName.isEmpty, sourceName.contains(needle) { return 2 }
+        return nil
+    }
+
+    /// One item of a batch install (`installOneCustomIPA`): `error` is nil
+    /// when the IPA installed, otherwise the user-facing reason it didn't.
+    /// `stopped` is true when the batch must not continue: the run never
+    /// started (a systemic cause — account, pairing, tunnel — that would
+    /// hit every remaining item the same way) or the run was stopped with
+    /// no error (a cancel). A failed import or a failed run leaves
+    /// `stopped` false: the batch skips that item and moves on.
+    /// `declined` (B-3, 0.9.166) is true when the user declined this item's
+    /// downgrade prompt — a skip, not a failure; the summary counts it
+    /// apart from failures. It defaults to false in the initializer below
+    /// (a property default alone doesn't give the memberwise initializer a
+    /// default argument — the 0.9.166 first push went red on exactly that),
+    /// so the other call sites keep their meaning.
+    struct BatchInstallOutcome {
+        let name: String
+        let error: String?
+        let stopped: Bool
+        let declined: Bool
+
+        init(name: String, error: String?, stopped: Bool, declined: Bool = false) {
+            self.name = name
+            self.error = error
+            self.stopped = stopped
+            self.declined = declined
+        }
+    }
+
+    /// F2 (0.9.151): install one IPA through the single-install path
+    /// (`importCustomIPA` + `installSource = .custom` + `runOneClick`,
+    /// B-39-B2 同款：源只在导入成功后切）. The waits copy
+    /// `Shortcuts.install` / AboutView's self-update: up to 3 s for the
+    /// run to start, then until `isRunning` falls; `finished` decides
+    /// success, `lastError` (or the changed guide) the reason. The
+    /// batch's own Task is the cancel handle: cancelling it stops the
+    /// wait after the current item (the run itself keeps going —
+    /// Shortcuts.install 同款，停掉等待不等停掉安装）; cancelling the
+    /// run as well (the view's Cancel button does both) stops it now.
+    /// Renewal untouched: this only installs, never refreshes.
+    @MainActor
+    func installOneCustomIPA(_ url: URL) async -> BatchInstallOutcome {
+        let name = url.deletingPathExtension().lastPathComponent
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard await importCustomIPA(from: url) else {
+            return BatchInstallOutcome(name: name, error: lastError ?? L("Install stopped"), stopped: false)
+        }
+        // 取消可能正落在 import 的等待里：import 本身不停，跑完才
+        // 在这里刹住，不然取消后还会新起一跑。另一路安装也可能在
+        // import 期间起跑：这时 runOneClick 会因 isRunning 直接返回，
+        // 而下面的等待循环会把别人的跑当成自己的等完、再拿它的成败
+        // 当这一项的成败——起跑前先拦一道。两道检查到 runOneClick
+        // 之间没有 suspension 点，主 actor 上是原子的，拦完不可能
+        // 再有人插进来。
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard !isRunning else {
+            return BatchInstallOutcome(name: name, error: L("An install is already running. Wait for it to finish, then try again."), stopped: true)
+        }
+        // F-1 (0.9.158): the IPA's own minimum — checked here, not left to
+        // runOneClick's guard, so one too-new item skips (stopped: false)
+        // instead of aborting the whole batch as a systemic failure.
+        if let info = IPALibrary.appInfo(at: url),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            return BatchInstallOutcome(name: name, error: reason, stopped: false)
+        }
+        installSource = .custom
+        runOneClick()
+        // Shortcuts.install 同款：等管线起跑（全隧道探针最多拖半秒），
+        // 3 秒还不起跑就是起跑守卫拦住了，不是起跑慢。
+        var waited = 0.0
+        while !isRunning, !Task.isCancelled, waited < 3.0 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 0.1
+        }
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard isRunning else {
+            // 没起跑：守卫原因（账号/配对/隧道/向导）对剩下每项都一样，
+            // 逐个重跑只会重复同一失败，整批到此为止。向导优先于
+            // lastError——B-1 (0.9.163)：runOneClick 入口已清掉上一跑
+            // 的 lastError/guide，所以这里剩下的就是这次的原因，不再
+            // 拿 guideBefore 比对（旧向导与新向导相同时比对会漏掉
+            // 真原因）。
+            let reason: String
+            if let guide {
+                reason = ([guide.title] + guide.steps).joined(separator: "\n")
+            } else if let lastError {
+                reason = lastError
+            } else {
+                reason = L("The install didn't start. Open SideInstaller to see why.")
+            }
+            return BatchInstallOutcome(name: name, error: reason, stopped: true)
+        }
+        while isRunning, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        // F-2 (0.9.159): the user declined this item's downgrade — one item
+        // skips, the batch goes on. The run itself ended as a cancel, so
+        // without this the item would read as a systemic stop.
+        if downgradeDeclined {
+            return BatchInstallOutcome(name: name,
+                                       error: downgradeDeclinedMessage ?? L("Install stopped"),
+                                       stopped: false, declined: true)
+        }
+        if finished {
+            return BatchInstallOutcome(name: name, error: nil, stopped: false)
+        }
+        if let error = lastError {
+            return BatchInstallOutcome(name: name, error: error, stopped: false)
+        }
+        // 跑完了、没成功、没留错：只有取消走这条路（取消分支只记
+        // 日志不置 lastError）——用户停了这跑，剩下的别再起。
+        return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+    }
+
+    /// Starts a link import as a task the link row can cancel, instead of
+    /// the fire-and-forget `Task` the view used to own (B1, 0.9.147).
+    /// Returns immediately; the import itself runs in `importCustomIPA`.
+    /// Returns whether the import really started (F-3, 0.9.182: the
+    /// Install page only records a recent link on a real start, not on
+    /// a refusal).
+    @MainActor
+    func startLinkImport(_ text: String) -> Bool {
+        guard linkImportTask == nil else { return false }
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // refuse up front with a reason on the Install page, instead of
+        // letting the link's import fail silently mid-batch.
+        guard !batchUpdateRunning else {
+            lastError = L("An update-all batch is running. Wait for it to finish, then try again.")
+            return false
+        }
+        linkImportTask = Task { @MainActor in
+            defer { linkImportTask = nil }
+            return await importCustomIPA(fromLink: text)
+        }
+        return true
+    }
+
+    /// Cancels a link import in progress. The download stops in
+    /// `fetchDirect`; the import's `defer` clears `isImportingIPA`.
+    @MainActor
+    func cancelLinkImport() {
+        linkImportTask?.cancel()
+    }
+
+    /// Downloads an IPA from a pasted link and stores it as the custom import.
+    /// Returns true only when this call really imported (C12); see the `from:`
+    /// overload.
+    @MainActor
     func importCustomIPA(fromLink text: String) async -> Bool {
-        guard !isImportingIPA else { return false }
+        // B3：同 from: ——安装进行中不换 custom 槽（链接下载那路同理）。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
+        // B-38-B2：同 from: ——续签进行中不导入自定义 IPA。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
+        guard !isImportingIPA else {
+            lastError = L("An import is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
+        // B-50-B3: same as from: — check before downloading, so a refused
+        // import doesn't waste a download.
+        if let old = IPALibrary.customImport(), isSigningSource(path: old.url.path) {
+            lastError = L("A signing is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
         guard let url = Self.downloadLink(text) else {
-            lastError = ErrorHelp.explained(L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from."))
+            lastError = L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.")
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }
         isImportingIPA = true
         importProgress = 0
-        defer { isImportingIPA = false; importProgress = nil }
+        importBytes = nil
+        defer { isImportingIPA = false; importProgress = nil; importBytes = nil }
         lastError = nil
         log("Downloading \(url.absoluteString) …")
         do {
             let downloaded = try await SideStoreDownloader.fetchDirect(
-                url, named: Self.importFileName(for: url)) { fraction in
+                url, named: Self.importFileName(for: url),
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, and the fraction is cleared so the
+                // link row goes indeterminate instead of sitting at 0%.
+                onBytes: { bytes in
+                    Task { @MainActor in
+                        self.importBytes = bytes
+                        self.importProgress = nil
+                    }
+                }) { fraction in
                     Task { @MainActor in self.importProgress = fraction }
                 }
             // The download lives in its own staging directory; remove all of it.
@@ -1859,17 +2915,19 @@ final class Engine {
             return true
         } catch IPALibrary.ImportError.notAnIPA {
             refreshCustomIPA()
-            lastError = ErrorHelp.explained(L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page."))
+            lastError = L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.")
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         } catch is CancellationError {
             refreshCustomIPA()
             log("Import cancelled.")
+            return false
         } catch {
             refreshCustomIPA()
             lastError = L("Couldn't download that link: %@", short(error))
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         }
-        return false
     }
 
     /// Turns pasted text into a download URL: trims whitespace and adds `https://`
@@ -1904,21 +2962,50 @@ final class Engine {
 
     /// Deletes a picked file only if it's in this app's temp directory (the
     /// picker's copy). Files opened in place are left alone.
-    private static func discardInboxCopy(_ url: URL) {
+    /// B-2 (0.9.177): no longer private — `DownloadsListView`'s landed
+    /// retry drops its temp file through this same disposal when its slot
+    /// wait is cancelled or times out.
+    static func discardInboxCopy(_ url: URL) {
         let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
         guard url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else { return }
         try? FileManager.default.removeItem(at: url)
+        // N3(C)：源页下载的 IPA 住在 ipa-source-<UUID>/ 里，只删文件会留
+        // 一个空目录；顺手删掉空的父目录（前缀限定，配对导入等别的
+        // picker 拷贝不受影响；非空目录 removeItem 会抛错，try? 天然只删空的）。
+        let parent = url.deletingLastPathComponent()
+        if parent.lastPathComponent.hasPrefix("ipa-source-") {
+            try? FileManager.default.removeItem(at: parent)
+        }
     }
 
     /// Copies a picked IPA into the custom import slot on a background queue.
     private static func copyImport(from url: URL) async throws -> URL {
-        try await withCheckedThrowingContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                do { cont.resume(returning: try IPALibrary.replaceCustomImport(with: url)) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<URL>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    do {
+                        let dest = try IPALibrary.replaceCustomImport(with: url)
+                        // 0.9.150: keep a library copy of the import in
+                        // Documents, so the next import — which evicts this
+                        // Custom/ slot — doesn't take the app's renewal
+                        // source with it. Runs here, on the import's own
+                        // background queue while isImportingIPA still bars
+                        // the next import, so the source can't vanish
+                        // mid-copy; it never fails the import.
+                        IPALibrary.archiveImportedIPA(dest)
+                        box.resume(returning: dest)
+                    } catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
@@ -1930,9 +3017,11 @@ final class Engine {
 
     /// Shows the custom import at `url`, or none, on the Install tab: its name,
     /// and the build of SideInstaller's own it is.
-    private func showCustomImport(_ url: URL?) {
+    /// A-11：build 参数接启动时预计算的源识别值；不传时照旧现算
+    /// （导入完成 / 刷新走的老路，不动）。
+    private func showCustomImport(_ url: URL?, build: InstallSource? = nil) {
         customIPAName = url?.lastPathComponent
-        customIPABuild = url.flatMap(IPALibrary.knownSource(ofIPAAt:))
+        customIPABuild = build ?? url.flatMap(IPALibrary.knownSource(ofIPAAt:))
     }
 
     /// Log the way past a failed download: rename a stray IPA, or fetch one
@@ -1968,12 +3057,11 @@ final class Engine {
 
     // MARK: Step 6 — sign the IPA
 
-    /// Shows what signing the imported IPA costs in App IDs and how many the
-    /// Apple ID has left, and waits for the go-ahead. Signing registers one for
-    /// the app if the Apple ID doesn't have it yet (its extensions are signed
-    /// with the app's profile and need none), and a free Apple ID gets 10 a
-    /// week. If Apple can't be asked, signing goes ahead: it asks the same
-    /// thing first and stops on a shortfall itself.
+    /// Asks what signing this IPA costs in App IDs, before signing it.
+    /// Copied from upstream (FrizzleM/SideInstaller @ 7d1cb04): the fork's
+    /// popup and answer were restored in merge recovery, but this setter
+    /// never was, so custom installs signed with no warning. A check that
+    /// fails, or an IPA whose bundle ID can't be read, signs ahead anyway.
     @MainActor
     private func confirmAppIDCost() async throws {
         guard let session = signSession, let ipa = downloadedIPAPath else { return }
@@ -1990,34 +3078,188 @@ final class Engine {
             return
         }
         try Task.checkCancellation()
+        // P0-4 (0.9.185): keep the quota for the install page's row —
+        // display-only, no popup (see `lastAppIDCost`).
+        lastAppIDCost = cost
         let left = cost.available.map(String.init) ?? "unknown"
-        log("App IDs: this app needs \(cost.cost) new (\(cost.newIDs.joined(separator: ", "))); \(left) left. Waiting for the go-ahead.")
-        appIDCost = cost
-        setStep(.sign, .waiting)
-        let proceed = await withTaskCancellationHandler {
-            await withCheckedContinuation { appIDCostReply = $0 }
-        } onCancel: {
-            Task { @MainActor in self.answerAppIDCost(false) }
-        }
-        appIDCost = nil
-        guard proceed else { throw CancellationError() }
-        log("App IDs: going ahead.")
-        setStep(.sign, .active)
+        log("App IDs: this app needs \(cost.cost) new (\(cost.newIDs.joined(separator: ", "))); \(left) left. Installing directly, no confirmation popup.")
+        // 2026-11-08：用户亲定去掉 App ID 确认弹窗，直接安装。
+        // 之前这里置 appIDCost 弹确认框、等用户点安装才继续；
+        // 现在只记账不等待，直接进签名安装。
     }
 
-    /// Answers the App ID cost popup: true signs and installs, false stops the
-    /// run. Does nothing once answered.
+    /// Asks whether to replace the pairing file in use with one made for
+    /// another iPhone. Suspends until the user answers the popup.
     @MainActor
-    func answerAppIDCost(_ proceed: Bool) {
-        guard let reply = appIDCostReply else { return }
-        appIDCostReply = nil
-        if proceed {
-            reply.resume(returning: true)
-        } else {
-            // The run ends cancelled, the same as closing the popup.
-            reply.resume(returning: false)
-            cancelOneClick()
+    private func confirmPairingImportMismatch(_ mismatch: PairingImportMismatch) async -> Bool {
+        pairingImportMismatch = mismatch
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                pairingImportMismatchReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文：直接调 @MainActor 的 answer 只在 Swift 5 模式下
+            // 报警告、且不跳回主线程（真竞态，见 AGENTS.md L413 教训）。必须经 Task 跳过去。
+            Task { @MainActor in answerPairingImportMismatch(false) }
         }
+    }
+
+    /// F-G (0.9.156): asks before a big download runs on cellular data, when
+    /// the "Wi-Fi only downloads" switch is on. Returns true to go ahead.
+    /// No prompt on Wi-Fi, or with the switch off; a download that reuses
+    /// the copy already on disk never reaches here, so no prompt for it.
+    /// Suspends until the user answers the popup, like
+    /// `confirmPairingImportMismatch`.
+    @MainActor
+    func confirmCellularDownload(size: Int64?, what: String) async -> Bool {
+        guard Self.wifiOnlyDownloads else { return true }
+        guard await NetworkStatus.internetPath().isExpensive else { return true }
+        // B-1 (0.9.166): one prompt on screen at a time, but a second
+        // download asking while one waits queues behind it instead of
+        // declining silently — since 0.9.163 several rows can each start a
+        // download task, so the old "the UI only ever starts one download
+        // at a time anyway" premise no longer holds, and the declined row
+        // just went idle with no word at all.
+        if cellularDownloadReply != nil {
+            log("Cellular data: \(what) is waiting behind the download confirmation already on screen.")
+            let id = UUID()
+            return await withTaskCancellationHandler {
+                if Task.isCancelled { return false }
+                return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                    cellularDownloadQueue.append(QueuedCellularDownload(id: id, size: size, what: what, reply: cont))
+                }
+            } onCancel: {
+                // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+                // 必须经 Task 跳回主线程再处理。
+                Task { @MainActor in cancelQueuedCellularDownload(id) }
+            }
+        }
+        log("Cellular data: \(what) needs confirmation before downloading.")
+        cellularDownloadRequest = CellularDownloadRequest(what: what, size: size)
+        return await withTaskCancellationHandler {
+            // Cancelled between the checks above and here: the handler
+            // already ran with no continuation to resume, so don't suspend
+            // — clear the request and decline instead of hanging.
+            if Task.isCancelled {
+                cellularDownloadRequest = nil
+                return false
+            }
+            return await withCheckedContinuation { cont in
+                cellularDownloadReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+            // 必须经 Task 跳回主线程再 answer。
+            Task { @MainActor in answerCellularDownload(false) }
+        }
+    }
+
+    /// Answer the cellular-download popup: true downloads, false stops it.
+    /// B-1 (0.9.166): answering presents the next queued download's prompt,
+    /// if one waited behind this one.
+    @MainActor
+    func answerCellularDownload(_ proceed: Bool) {
+        guard let reply = cellularDownloadReply else { return }
+        cellularDownloadReply = nil
+        presentedQueuedCellularDownloadID = nil
+        reply.resume(returning: proceed)
+        cellularDownloadRequest = nil
+        presentNextCellularDownload()
+    }
+
+    /// B-1 (0.9.166): puts the next queued download's prompt on screen.
+    /// Only runs when no prompt is up — the waiter keeps suspending on its
+    /// own continuation until this prompt is answered.
+    @MainActor
+    private func presentNextCellularDownload() {
+        guard cellularDownloadReply == nil, !cellularDownloadQueue.isEmpty else { return }
+        let next = cellularDownloadQueue.removeFirst()
+        presentedQueuedCellularDownloadID = next.id
+        cellularDownloadRequest = CellularDownloadRequest(what: next.what, size: next.size)
+        cellularDownloadReply = next.reply
+    }
+
+    /// B-1 (0.9.166): takes a queued waiter out of the queue and declines
+    /// it — its download task was cancelled while it waited. When the waiter
+    /// is already the prompt on screen, answering it declines it the same
+    /// way; when it never queued at all (cancelled before suspending),
+    /// nothing happens — its prompt was never this one.
+    @MainActor
+    private func cancelQueuedCellularDownload(_ id: UUID) {
+        if let index = cellularDownloadQueue.firstIndex(where: { $0.id == id }) {
+            let waiter = cellularDownloadQueue.remove(at: index)
+            waiter.reply.resume(returning: false)
+            return
+        }
+        if presentedQueuedCellularDownloadID == id {
+            answerCellularDownload(false)
+        }
+    }
+
+    /// F-2 (0.9.159): asks before a custom IPA older than the copy on this
+    /// iPhone installs over it. Returns true to go ahead. No prompt when the
+    /// IPA is newer, the same version, or the app isn't installed; the
+    /// pipeline asks before it takes the tunnel, so a no burns nothing.
+    /// Suspends until the user answers the popup, like
+    /// `confirmCellularDownload`.
+    @MainActor
+    func confirmDowngrade(_ request: DowngradeRequest) async -> Bool {
+        // One prompt at a time: a second run asking while one waits declines
+        // instead of stacking a popup on top of it — the app only ever runs
+        // one install at a time anyway.
+        guard downgradeReply == nil else { return false }
+        log("Downgrade: \\(request.appName) \\(request.ipaVersion) is older than the installed \\(request.installedVersion); asking first.")
+        downgradeRequest = request
+        return await withTaskCancellationHandler {
+            if Task.isCancelled {
+                downgradeRequest = nil
+                return false
+            }
+            return await withCheckedContinuation { cont in
+                downgradeReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+            // 必须经 Task 跳回主线程再 answer。
+            Task { @MainActor in answerDowngrade(false) }
+        }
+    }
+
+    /// Answer the downgrade popup: true installs the older version, false
+    /// stops this run. A no is a decline, not a failure — the pipeline
+    /// throws `CancellationError` for it, so no failure history is written;
+    /// the flag lets the batch and history paths tell a decline apart from
+    /// a cancel and skip the item instead of stopping.
+    @MainActor
+    func answerDowngrade(_ proceed: Bool) {
+        guard let reply = downgradeReply else { return }
+        downgradeReply = nil
+        reply.resume(returning: proceed)
+        if !proceed, let request = downgradeRequest {
+            downgradeDeclined = true
+            downgradeDeclinedMessage = L("This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.", request.installedVersion)
+        }
+        downgradeRequest = nil
+    }
+
+    /// F-2 (0.9.159): the downgrade prompt for the custom IPA this run is
+    /// about to install, or nil when there is nothing to ask about. The
+    /// installed version comes from the Apps tab's device read, matched the
+    /// Sources page's way (`ProfileMatcher.installed` — SideInstaller signs
+    /// as `<bundle id>.<team id>`, so that counts as the same app).
+    /// Unreadable IPA, missing version, or no installed copy all mean nil:
+    /// nothing known, nothing to ask.
+    @MainActor
+    private func downgradeCheckForCurrentRun() -> DowngradeRequest? {
+        guard installSource == .custom,
+              let url = IPALibrary.customImport()?.url,
+              let info = IPALibrary.appInfo(at: url),
+              let ipaVersion = info.version, !ipaVersion.isEmpty,
+              let installed = SideloadedAppsManager.shared.entries.first(where: {
+                  ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: info.bundleID, teamID: nil)
+              })?.app.version,
+              UpdateChecker.isNewer(installed, than: ipaVersion) else { return nil }
+        return DowngradeRequest(appName: info.name, installedVersion: installed, ipaVersion: ipaVersion)
     }
 
     private func performAppIDQuota(session: OpaquePointer, bundleID: String) throws -> AppIDCost {
@@ -2070,6 +3312,8 @@ final class Engine {
             signedDisplayName = signedAppName()
             setStep(.sign, .done)
         } catch {
+            // A21-2：签名失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
+            Self.discardExtraction(forIPA: ipa)
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
             if case EngineError.certExists = error {
@@ -2131,8 +3375,402 @@ final class Engine {
             if Self.isDeviceRegistrationError(msg) {
                 throw EngineError.deviceRegistration(udid: udid, raw: msg)
             }
-            throw EngineError.message(L("Signing failed: %@", msg))
+            throw EngineError.message(L("Signing failed: %@", friendlyRustError(msg)))
         }
+    }
+
+    // MARK: - 企业证书签名安装（本地证书，不用 Apple ID）
+
+    /// 用导入的企业证书（.p12 + 描述文件）给已导入的 IPA 本地
+    /// 签名并安装：跳过登录/下载/苹果那套，配对、隧道、安装与
+    /// 一键安装共用同一套。装完同样要去系统设置里信任该企业证书。
+    @MainActor
+    func runEnterpriseCertInstall() {
+        guard let entry = IPALibrary.customImport() else {
+            guard !isRunning else { return }
+            // B-1 (0.9.163): runOneClick 同款——没起跑的路不经过
+            // resetRun，旧 lastError 不能留给这次的调用方。
+            lastError = nil
+            setGuide(Guides.customIPA)
+            log("⛔️ No IPA imported yet. Import an .ipa above first, then sign it with the enterprise certificate.")
+            return
+        }
+        runEnterpriseCertInstall(ipaURL: entry.url, mods: CertSignMods())
+    }
+
+    /// 证书页入口：对指定 IPA 用企业证书签名（可带修改项）并安装。
+    /// B-3 (0.9.164): @MainActor — the `isGenerating` guard below reads
+    /// PairingManager's main-actor state, as runOneClick does. The only
+    /// caller is the @MainActor no-arg entry above (which the cert page
+    /// calls), so no call site changes.
+    @MainActor
+    func runEnterpriseCertInstall(ipaURL: URL, mods: CertSignMods) {
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            return
+        }
+        // B-1 (0.9.163): runOneClick 同款——起跑守卫前先清掉上一跑
+        // 的 lastError/guide，否则被拦住的这次会报上一次的错。
+        lastError = nil
+        guide = nil
+        // B-3 (0.9.164): runOneClick refuses while a pairing file is being
+        // generated, but this entry didn't — starting now would lose the
+        // device link when generation disconnects at the end.
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — enterprise-cert install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
+        guard osSupported else {
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
+            log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
+            return
+        }
+        guard canSelfPair || hasPairingFile else {
+            setGuide(Guides.importPairing)
+            log("⛔️ A pairing file is needed: import a pairing file first, then sign with the enterprise certificate.")
+            return
+        }
+        guard EnterpriseCertStore.ready else {
+            lastError = L("企业证书材料不齐：需要 .p12、描述文件和证书密码。")
+            log("⛔️ Enterprise certificate materials are incomplete: a .p12, a provisioning profile and the certificate password are needed.")
+            return
+        }
+        refreshNetworkStatus()
+        guard tunnelAvailable else {
+            if BuiltinTunnel.useBuiltinDirectly {
+                // B-1 (0.9.163): runOneClick 同款——只写日志不留原因，
+                // 调用方会报上一跑的旧错。
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+                log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+            } else {
+                setGuide(Guides.vpn)
+                log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
+            }
+            return
+        }
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
+            setGuide(Guides.deviceIPMismatch)
+            return
+        }
+        resetRun()
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
+        installSessionID = UUID()
+        isRunning = true
+        // B4 (0.9.158): this run never signs in — the history records the
+        // enterprise profile's name, not the Apple ID from Settings.
+        historyIdentityOverride = Self.enterpriseCertHistoryIdentity()
+        // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
+        installingSourcePath = ipaURL.path
+        log("=== Starting enterprise-cert install ===")
+
+        pipelineTask = Task { @MainActor in
+            // runStarted() 是 @MainActor（InstallActivity 类级隔离），
+            // 本入口现也带 @MainActor（B-3，0.9.164）；Task 头一句仍在
+            // 任何管线工作之前，写法不动。
+            InstallActivity.shared.runStarted()
+            var outcome: InstallActivity.Outcome = .stopped
+            var tunnelAcquired = false
+            do {
+                // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
+                guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
+                try await ensureNetwork()
+                try await pairAndConnect()
+                // SIDE-33 B-1：配对边界复核取消——取消落在配对等待期间时，
+                // onDeviceQueue 跑完才返回，这里拦住，不再继续签名/安装。
+                try Task.checkCancellation()
+                downloadedIPAPath = ipaURL.path
+                downloadedSource = .custom
+                try await signAppWithCert(mods: mods)
+                // SIDE-33 B-1：签名边界复核取消。
+                try Task.checkCancellation()
+                try await install(prestaged: nil)
+                // SIDE-33 B-1：安装边界复核取消——拦在 finishSuccess() 之前，不谎报成功。
+                try Task.checkCancellation()
+                finishSuccess()
+                outcome = .installed
+            } catch is CancellationError {
+                outcome = .cancelled
+                log("Install cancelled.")
+                for s in Step.allCases { stepStates[s] = .pending }
+                installProgress = 0
+                // B-1：照抄 runOneClick 取消分支——清掉设备摘要，
+                // 否则状态 pill 还显示上一轮设备，盖住隧道状态。
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
+                setGuide(nil)
+            } catch {
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
+                lastError = msg
+                log("⛔️ Stopped: \(raw)")
+                failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 runOneClick——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): `ipaURL` 是本入口的参数，签名前失败时
+                // `signedAppBundleID()` 还是 nil，就读它的包名。
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: historyIdentityOverride ?? normalizedAppleID,
+                                                  reason: msg,
+                                                  bundleID: failureRecordBundleID(ipaURL: ipaURL))
+            }
+            InstallActivity.shared.runEnded(outcome)
+            if tunnelAcquired { releaseTunnel() }
+            stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
+            isRunning = false
+            isCancelling = false
+            pairingPIN = nil
+        }
+    }
+
+    private func signAppWithCert(mods: CertSignMods = CertSignMods()) async throws {
+        guard let ipa = downloadedIPAPath else { throw EngineError.message(L("No IPA imported.")) }
+        setStep(.sign, .active)
+        let path: String
+        do {
+            path = try await onSignQueue { try self.performCertSign(ipa: ipa, mods: mods) }
+        } catch {
+            // A21-2：企业签名失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
+            Self.discardExtraction(forIPA: ipa)
+            throw error
+        }
+        signedAppPath = path
+        signedDisplayName = signedAppName()
+        setStep(.sign, .done)
+    }
+
+    /// 在 Swift 侧用 Security 解开 .p12（证书 + 私钥 DER），交给
+    /// Rust 侧 si_sign_ipa_with_cert_ex 本地签名（可带修改项）。
+    private func performCertSign(ipa: String, mods: CertSignMods = CertSignMods()) throws -> String {
+        try EnterpriseCertStore.validateForSigning()
+        let (certDER, keyDER) = try EnterpriseCertStore.identityDERs()
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EnterpriseSign-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let certPath = tmp.appendingPathComponent("cert.der")
+        let keyPath = tmp.appendingPathComponent("key.der")
+        try certDER.write(to: certPath)
+        try keyDER.write(to: keyPath)
+        var iconPath: String? = nil
+        if let icon = mods.pngIconData() {
+            let path = tmp.appendingPathComponent("icon.png")
+            try icon.write(to: path)
+            iconPath = path.path
+        }
+        let json = mods.json(iconPath: iconPath, outIpaPath: nil)
+        log("Signing \(ipa) with enterprise cert …")
+        var signed: UnsafeMutablePointer<CChar>?
+        var error: UnsafeMutablePointer<CChar>?
+        let rc = si_sign_ipa_with_cert_ex(ipa, certPath.path, keyPath.path,
+                                          EnterpriseCertStore.provisionURL.path,
+                                          json, &signed, &error)
+        if rc == 0 {
+            let path = signed.map { String(cString: $0) } ?? ""
+            signed.map { si_string_free($0) }
+            log("Signed bundle at \(path)")
+            return path
+        }
+        let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+        error.map { si_string_free($0) }
+        log("Enterprise cert sign FAILED: \(msg)")
+        throw EngineError.message(L("企业证书签名失败：%@", friendlyRustError(msg)))
+    }
+
+    /// 已签名页入口：解包一个已签好的 IPA 直接安装（不再签一次）。
+    /// B-3 (0.9.164): @MainActor — the `isGenerating` guard below reads
+    /// PairingManager's main-actor state, as runOneClick does. All callers
+    /// are main-actor (Files tab, signed-IPAs page), so no call site changes.
+    @MainActor
+    func runInstallSignedIPA(ipaURL: URL) {
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            return
+        }
+        // B-1 (0.9.163): runOneClick 同款——起跑守卫前先清掉上一跑
+        // 的 lastError/guide，否则被拦住的这次会报上一次的错。
+        lastError = nil
+        guide = nil
+        // B-3 (0.9.164): runOneClick refuses while a pairing file is being
+        // generated, but this entry didn't — starting now would lose the
+        // device link when generation disconnects at the end.
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — signed-IPA install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
+        guard osSupported else {
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
+            log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
+            return
+        }
+        // B-1 (0.9.170): the signed IPA's own minimum — runOneClick's
+        // custom path (:959) and installOneCustomIPA (:2692) both refuse
+        // up front; this entry didn't, so a too-new IPA burned pairing,
+        // unpack and upload before failing at install/start time. Same
+        // check, same wording; an IPA that won't parse never blocks
+        // (`minOSBlockReason`'s `guard let minOS`).
+        if let info = IPALibrary.appInfo(at: ipaURL),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            lastError = reason
+            log("⛔️ \(reason)")
+            return
+        }
+        guard canSelfPair || hasPairingFile else {
+            setGuide(Guides.importPairing)
+            log("⛔️ A pairing file is needed: import a pairing file first, then install.")
+            return
+        }
+        refreshNetworkStatus()
+        guard tunnelAvailable else {
+            if BuiltinTunnel.useBuiltinDirectly {
+                // B-1 (0.9.163): runOneClick 同款——只写日志不留原因，
+                // 调用方会报上一跑的旧错。
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+                log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
+            } else {
+                setGuide(Guides.vpn)
+                log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
+            }
+            return
+        }
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
+            setGuide(Guides.deviceIPMismatch)
+            return
+        }
+        resetRun()
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值；
+        // 原先这句在 isRunning = true 之后，现并入统一 mint 点）。
+        installSessionID = UUID()
+        isRunning = true
+        // B4 (0.9.158): this run installs an already-signed IPA and never
+        // signs in — the history records the enterprise profile's name,
+        // not the Apple ID from Settings.
+        historyIdentityOverride = Self.enterpriseCertHistoryIdentity()
+        // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
+        installingSourcePath = ipaURL.path
+        log("=== Installing already-signed IPA ===")
+
+        pipelineTask = Task { @MainActor in
+            // 修法：同企业路——runStarted() 是 @MainActor，本入口现也带
+            // @MainActor（B-3，0.9.164）；放进 Task 头一句，仍在任何管线
+            // 工作之前，写法不动。
+            InstallActivity.shared.runStarted()
+            var outcome: InstallActivity.Outcome = .stopped
+            var tunnelAcquired = false
+            do {
+                // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
+                guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
+                try await ensureNetwork()
+                try await pairAndConnect()
+                // SIDE-33 B-1：配对边界复核取消——取消落在配对等待期间时，
+                // onDeviceQueue 跑完才返回，这里拦住，不再继续解包/安装。
+                try Task.checkCancellation()
+                downloadedIPAPath = ipaURL.path
+                downloadedSource = .custom
+                setStep(.sign, .active)
+                let bundle: String
+                do {
+                    bundle = try await onSignQueue { try self.performExtract(ipa: ipaURL.path) }
+                } catch {
+                    // A21-2：解包失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
+                    Self.discardExtraction(forIPA: ipaURL.path)
+                    throw error
+                }
+                signedAppPath = bundle
+                signedDisplayName = signedAppName()
+                setStep(.sign, .done)
+                // SIDE-33 B-1：解包边界复核取消。
+                try Task.checkCancellation()
+                try await install(prestaged: nil)
+                // SIDE-33 B-1：安装边界复核取消——拦在 finishSuccess() 之前，不谎报成功。
+                try Task.checkCancellation()
+                finishSuccess()
+                outcome = .installed
+            } catch is CancellationError {
+                outcome = .cancelled
+                log("Install cancelled.")
+                for s in Step.allCases { stepStates[s] = .pending }
+                installProgress = 0
+                // B-1：照抄 runOneClick 取消分支——清掉设备摘要，
+                // 否则状态 pill 还显示上一轮设备，盖住隧道状态。
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
+                setGuide(nil)
+            } catch {
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
+                lastError = msg
+                log("⛔️ Stopped: \(raw)")
+                failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 runOneClick——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): `ipaURL` 是本入口的参数，签名前失败时
+                // `signedAppBundleID()` 还是 nil，就读它的包名。
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: historyIdentityOverride ?? normalizedAppleID,
+                                                  reason: msg,
+                                                  bundleID: failureRecordBundleID(ipaURL: ipaURL))
+            }
+            InstallActivity.shared.runEnded(outcome)
+            if tunnelAcquired { releaseTunnel() }
+            stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
+            isRunning = false
+            isCancelling = false
+            pairingPIN = nil
+        }
+    }
+
+    /// 用 Rust 侧解包 IPA，返回 .app 包目录。
+    private func performExtract(ipa: String) throws -> String {
+        var bundle: UnsafeMutablePointer<CChar>?
+        var error: UnsafeMutablePointer<CChar>?
+        let rc = si_extract_ipa(ipa, &bundle, &error)
+        if rc == 0 {
+            let path = bundle.map { String(cString: $0) } ?? ""
+            bundle.map { si_string_free($0) }
+            return path
+        }
+        let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+        error.map { si_string_free($0) }
+        log("Extract IPA FAILED: \(msg)")
+        throw EngineError.message(L("IPA 解包失败：%@", friendlyRustError(msg)))
     }
 
     /// True when the IPA at `ipaPath` is Madeira, whichever way it got here: the
@@ -2329,10 +3967,17 @@ final class Engine {
         // device-queue write below; a run starts it during the install.
         let accountConfig: String?
         if let handOff {
+            // B-C1：取消发生在等待之前时直接抛，不等交接任务跑完。
+            // （取消发生在等待期间时仍等那次短 FFI 跑完——接受的残留，
+            // onSignQueue 内不检查取消，Task 取消拦不住它。）
+            try Task.checkCancellation()
             accountConfig = await handOff.value
         } else {
             accountConfig = await accountConfigJSON(source: source)
         }
+        // SIDE-33 B-2：交接落定后复核取消——覆盖 handOff 与 accountConfigJSON
+        // 两个分支；拦住时配对文件不写入。
+        try Task.checkCancellation()
         let udid = deviceUDID
         do {
             let handed = try await onDeviceQueue {
@@ -2354,6 +3999,9 @@ final class Engine {
                 log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
             }
         }
+        // SIDE-33 B-2：写盘返回后复核取消——拦在 setStep(.done) 与
+        // finishSuccess() 之前；已发生的写盘保留，只是不再谎报成功。
+        try Task.checkCancellation()
         setStep(.writePairing, .done)
     }
 
@@ -2430,11 +4078,10 @@ final class Engine {
         if let home = source.sideStoreHome ?? (signedSideStore ? .standalone : nil) {
             handOffSplitPairing(placementPath: placement, bundleID: bundleID,
                                 appName: appName, home: home, udid: udid)
-            handOffSideStoreAnisette(bundleID: bundleID, appName: appName, home: home)
         }
 
         // Give SideStore the signing certificate so its first sign-in reuses it
-        // instead of creating a new one and asking to resign. Failures only log.
+        // instead of creating a new one and asking to resign. Failures log and leave a notice under the progress card (C25).
         if let accountConfig, let remoteRel = accountConfigRemoteRelativePath(source: source) {
             do {
                 let handed = try connection.writeFile(intoBundleID: bundleID,
@@ -2442,6 +4089,10 @@ final class Engine {
                                                       data: Data(accountConfig.utf8))
                 log("Certificate handed to \(appName): /Documents/\(remoteRel) written and read-back VERIFIED (\(handed) bytes). SideStore imports and deletes it on first launch.")
             } catch {
+                // C25：同上，证书交接失败也在进度卡下方留一句（新 key 1 个）。
+                Task { @MainActor in
+                    self.handOffNotice = [self.handOffNotice, L("The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.")].compactMap { $0 }.joined(separator: "\n")
+                }
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
@@ -2658,7 +4309,7 @@ final class Engine {
         }
         let payload = json.map { String(cString: $0) } ?? ""
         json.map { si_string_free($0) }
-        guard !payload.isEmpty else { throw EngineError.message("empty account config") }
+        guard !payload.isEmpty else { throw EngineError.message(L("empty account config")) }
         return payload
     }
 
@@ -2667,6 +4318,12 @@ final class Engine {
     @MainActor
     private func finishSuccess() {
         finished = true
+        // F5 (0.9.143): one line in the install history — successes only;
+        // a failed run never reaches here, so it leaves no entry.
+        InstallHistoryStore.record(appName: installedAppName,
+                                   version: signedAppVersion() ?? downloadedVersion,
+                                   identity: historyIdentityOverride ?? normalizedAppleID,
+                                   bundleID: signedAppBundleID())
         let source = installedBuild
         if signedAppIsMadeira(source) {
             setGuide(Guides.trustMadeira(holding: madeiraHandoff))
@@ -2676,6 +4333,61 @@ final class Engine {
             setGuide(Guides.trust(appName: installedAppName))
         }
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
+        // F-1 (0.9.159): with the Settings switch on, the source IPA goes
+        // away now that the install is done — renewal sources never do.
+        deleteInstalledSourceIPAIfEnabled()
+    }
+
+    /// F-1 (0.9.159): deletes the IPA this run installed from, when the
+    /// Settings switch is on. Runs at the end of `finishSuccess`, when
+    /// signing and installing no longer read the file. A renewal source is
+    /// never deleted — losing it would leave the next renewal with nothing
+    /// to re-sign from — so the file is checked against
+    /// `RenewalSourceStore` by path and by bundle ID first, and skipped
+    /// when it matches. The ledger entry goes with the file, the cached
+    /// path is cleared so the next run re-fetches, and the Downloads and
+    /// Files lists rescan on the notification instead of waiting to be
+    /// reopened. A delete that fails only logs; the install already
+    /// succeeded, so it must not turn into a failure.
+    @MainActor
+    private func deleteInstalledSourceIPAIfEnabled() {
+        guard Self.deleteAfterInstall else { return }
+        let url: URL?
+        if let path = downloadedIPAPath {
+            url = URL(fileURLWithPath: path)
+        } else {
+            url = IPALibrary.customImport()?.url
+        }
+        guard let url else { return }
+        let bundleID = IPALibrary.appInfo(at: url)?.bundleID
+        if RenewalSourceStore.source(forFileURL: url, bundleID: bundleID) != nil {
+            log("Keeping \(url.lastPathComponent): it is a renewal source.")
+            return
+        }
+        // B-2 (0.9.170): a signed finished product is never the switch's
+        // target — the switch deletes the source IPA the run installed
+        // from, and a Signed/ file going away also drops its
+        // SignedIPAStore record (`load()` filters on file existence), so
+        // "sign and install" used to mean "sign, then delete". Only
+        // Downloads/Custom source IPAs are deleted; the Signed/ subtree
+        // check is `SignedIPAStore.relativePath(of:)`'s own prefix test.
+        let signedDir = SignedIPAStore.dir.standardized.path
+        if url.standardized.path == signedDir || url.standardized.path.hasPrefix(signedDir + "/") {
+            log("Keeping \(url.lastPathComponent): it is a signed IPA in Signed/ — the delete-after-install switch only removes source IPAs.")
+            return
+        }
+        do {
+            try FileManager.default.removeItem(at: url)
+            DownloadLedger.forget(url)
+            if downloadedIPAPath == url.path {
+                downloadedIPAPath = nil
+            }
+            if installSource == .custom { refreshCustomIPA() }
+            log("Deleted \(url.lastPathComponent) after installing (Settings › Delete the IPA after installing).")
+            NotificationCenter.default.post(name: Self.downloadsChanged, object: nil)
+        } catch {
+            log("⚠️ Couldn't delete \(url.lastPathComponent) after installing: \(short(error))")
+        }
     }
 
     // MARK: - FFI liveness check
@@ -2708,13 +4420,23 @@ final class Engine {
 
     /// Poll the interface list so the readouts track the tunnel while the app is
     /// open. Runs in `.common` mode so it keeps firing during scrolling.
-    private func startStatusMonitor() {
+    /// SIDE-2 S1：以前 2 秒一次、从启动跑到进程死、进后台也不停；自动续签保活
+    /// 常驻后台时等于拿着保活换来的后台时间空转系统调用。现在前台 5 秒一次，
+    /// 进后台由 SideInstallerApp 停掉、回前台重起（见 stopStatusMonitor）。
+    func startStatusMonitor() {
         statusTimer?.invalidate()
-        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.refreshNetworkStatus()
         }
         RunLoop.main.add(timer, forMode: .common)
         statusTimer = timer
+        refreshNetworkStatus()
+    }
+
+    /// 停掉状态轮询（进后台时调用；回前台由 startStatusMonitor 重起）。
+    func stopStatusMonitor() {
+        statusTimer?.invalidate()
+        statusTimer = nil
     }
 
     /// One quiet re-scan of the tunnel and Wi-Fi state. A full-tunnel VPN gets
@@ -2739,10 +4461,17 @@ final class Engine {
     //
     // A full-tunnel VPN (case (c) in `NetworkStatus`) is judged by a TCP probe
     // of Device IP. It runs off the main thread, one at a time, and its answer
-    // is kept for `fullTunnelProbeLifetime` per Device IP and tunnel address.
+    // is kept per Device IP and tunnel address: a success for
+    // `fullTunnelProbeSuccessLifetime`, a failure for `fullTunnelProbeLifetime`.
     // LocalDevVPN, and no VPN at all, never get here.
+    // Restored from 2df7e76 ("Tunnel: accept full-tunnel proxy VPNs that loop
+    // Device IP back"); the scan family it reuses was never dropped.
 
     private static let fullTunnelProbeLifetime: TimeInterval = 5
+
+    /// 成功答案的寿命（B-1，O-29 Side 版）：探通一次后 60 秒内不再重探。
+    /// 失败/超时答案仍只活 `fullTunnelProbeLifetime`——VPN 恢复后 5 秒内即知。
+    private static let fullTunnelProbeSuccessLifetime: TimeInterval = 60
 
     private typealias NetworkReading = (vpn: Bool, wifi: Bool, detail: String)
 
@@ -2782,10 +4511,14 @@ final class Engine {
         return freshFullTunnelAnswer(for: target) == nil
     }
 
-    /// The last answer for `target`, if it's recent.
+    /// The last answer for `target`, if it's recent. A success answer
+    /// (`answered`: connected or refused) lives 60 seconds; a failure or
+    /// timeout lives only `fullTunnelProbeLifetime`, so a recovered VPN is
+    /// noticed within 5 seconds (B-1).
     private func freshFullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
-        guard let last = lastFullTunnelProbe, last.key == target.key,
-              Date().timeIntervalSince(last.date) < Self.fullTunnelProbeLifetime
+        guard let last = lastFullTunnelProbe, last.key == target.key else { return nil }
+        let lifetime = last.result.answered ? Self.fullTunnelProbeSuccessLifetime : Self.fullTunnelProbeLifetime
+        guard Date().timeIntervalSince(last.date) < lifetime
         else { return nil }
         return last.result
     }
@@ -2848,11 +4581,10 @@ final class Engine {
 
     private static let localDevVPNScheme = "localdevvpn"
     /// The scheme LocalDevVPN is asked to return to, registered in Info.plist.
-    private static let callbackScheme = DeepLink.scheme
+    private static let callbackScheme = "sideinstaller"
 
-    /// True unless LocalDevVPN is known to be missing. Inside LiveContainer
-    /// `canOpenURL` can't see it (see `appPresence`), so it counts as
-    /// installed there and opening it is what tells.
+    /// True when LocalDevVPN is installed. Only answerable because Info.plist
+    /// lists its scheme under `LSApplicationQueriesSchemes`.
     var localDevVPNInstalled: Bool {
         mayBeInstalled(scheme: Self.localDevVPNScheme)
     }
@@ -2861,12 +4593,11 @@ final class Engine {
     /// opening LocalDevVPN again.
     @ObservationIgnored private var lastVPNStartAttempt: Date?
 
-    /// Opens LocalDevVPN to connect its tunnel and return. Returns false if
-    /// nothing opened, so it isn't installed; whether the tunnel connects
-    /// isn't visible from here.
+    /// Opens LocalDevVPN to connect its tunnel and return. Returns false if it
+    /// isn't installed; whether the tunnel connects isn't visible from here.
     @MainActor
     @discardableResult
-    func startLocalDevVPN() async -> Bool {
+    func startLocalDevVPN() -> Bool {
         guard localDevVPNInstalled,
               let url = URL(string: "\(Self.localDevVPNScheme)://enable?scheme=\(Self.callbackScheme)")
         else {
@@ -2875,53 +4606,82 @@ final class Engine {
         }
         lastVPNStartAttempt = Date()
         log("Handing over to LocalDevVPN to connect the tunnel …")
-        // `open` says whether anything took the link, and unlike
-        // `canOpenURL` needs no Info.plist entry.
-        guard await UIApplication.shared.open(url) else {
-            lastVPNStartAttempt = nil
-            log("⛔️ LocalDevVPN didn't open, so it isn't installed. Get it from the App Store.")
+        UIApplication.shared.open(url)
+        return true
+    }
+
+    /// True when something that needs the tunnel starts it itself, so
+    /// the UI needn't ask for the tunnel first. The built-in tunnel is
+    /// tried first; LocalDevVPN is only the fallback.
+    var startsVPNWhenNeeded: Bool { autoStartVPN }
+
+    /// True when the tunnel is up, or will be started by what needs it.
+    /// The built-in tunnel counts: it's part of the app itself, so it can
+    /// always be started — the auto-start setting only governs jumping
+    /// over to the separate LocalDevVPN app.
+    var tunnelAvailable: Bool { vpnConnected || startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly }
+
+    /// 隧道租约（SIDE-2，2026-11-21 用户亲令“隧道别一直打开了，需要时候才打开”）：
+    /// 以前隧道只进不出——安装页预连、断线重连、操作入口都拉，收尾/后台/闲置从不
+    /// 停。现在需要设备链路的操作开始时 acquire、结束时 release；持有归零后闲置
+    /// 60 秒只停内置隧道。LocalDevVPN 的隧道是另一个 App 的，本 App 停不掉，
+    /// 只能做到“不主动拉起”。定位模拟是长时持有者，另有 tunnelLocationHold
+    /// 单独记一次（setup 与 stop/sessionClosed 两路结束，防重复释放）。
+    /// 持有计数与闲置计时只在主线程碰（acquire/release 都是 @MainActor）。
+    @ObservationIgnored var tunnelHolders = 0
+    @ObservationIgnored private var tunnelIdleTimer: Timer?
+    /// Pill 手动开的持有：用户亲手开的隧道不参与闲置停，只由 pill 关释放。
+    @ObservationIgnored var tunnelManualHold = false
+    /// 定位模拟会话的持有：prepare 成功置真，stop / sessionClosed 任一结束路清掉。
+    @ObservationIgnored private var tunnelLocationHold = false
+
+    /// 操作开始前调用：先记一次持有，再拉隧道（tunnelUp 幂等）。隧道起不来时
+    /// 把持有还回去，返回 false，调用方按现有失败路径处理。
+    @MainActor func acquireTunnel() async -> Bool {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+        tunnelHolders += 1
+        guard await tunnelUp() else {
+            tunnelHolders = max(0, tunnelHolders - 1)
             return false
         }
         return true
     }
 
-    /// True when something that needs the tunnel starts LocalDevVPN itself, so
-    /// the UI needn't ask for the tunnel first.
-    var startsVPNWhenNeeded: Bool { autoStartVPN && localDevVPNInstalled }
+    /// 操作结束后调用：持有归零时启动闲置计时，到时只停内置隧道。
+    @MainActor func releaseTunnel() {
+        tunnelHolders = max(0, tunnelHolders - 1)
+        guard tunnelHolders == 0 else { return }
+        scheduleTunnelIdleStop()
+    }
 
-    /// True when the tunnel is up, or will be started by what needs it.
-    var tunnelAvailable: Bool { vpnConnected || startsVPNWhenNeeded }
-
-    /// Makes sure the tunnel is up for something about to use it. With “Start
-    /// LocalDevVPN when needed” on and no tunnel, hands over to LocalDevVPN and
-    /// waits for the tunnel once SideInstaller is back. Returns whether it's up.
-    @MainActor
-    func tunnelUp() async -> Bool {
-        // A full-tunnel VPN that loops Device IP back is already the tunnel, so
-        // its probe answers before LocalDevVPN is opened over it.
-        await settleNetworkStatus()
-        guard !vpnConnected, startsVPNWhenNeeded else { return vpnConnected }
-        // A handover a moment ago is still under way: wait for it, don't
-        // open LocalDevVPN again.
-        let handingOver = lastVPNStartAttempt.map { Date().timeIntervalSince($0) < 5 } ?? false
-        if !handingOver {
-            guard await startLocalDevVPN() else { return false }
-        }
-        // Only time back in SideInstaller counts, so a while spent in
-        // LocalDevVPN (its VPN permission prompt, say) doesn't use up the wait.
-        var waited = 0.0
-        while waited < 15 {
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            if Task.isCancelled { return false }
-            refreshNetworkStatus()
-            if vpnConnected {
-                log("Tunnel up.")
-                return true
+    /// 闲置停计时：持有为零且内置隧道可用时才设 60 秒定时；到时二次核对三路
+    /// 长时持有（在跑安装 / 在跑续签 / 定位模拟中），任一成立就不停。
+    @MainActor private func scheduleTunnelIdleStop() {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+        guard tunnelHolders == 0, BuiltinTunnel.useBuiltinDirectly else { return }
+        tunnelIdleTimer = Timer(timeInterval: 60, repeats: false) { _ in
+            Task { @MainActor in
+                guard Engine.shared.tunnelHolders == 0,
+                      !Engine.shared.isRunning,
+                      !SideloadedAppsManager.shared.isRefreshing,
+                      !Engine.shared.connection.isSimulatingLocation else { return }
+                await BuiltinTunnel.stop()
+                Engine.shared.refreshNetworkStatus()
             }
-            if UIApplication.shared.applicationState == .active { waited += 0.5 }
         }
-        log("⚠️ LocalDevVPN didn't connect its tunnel.")
-        return false
+        RunLoop.main.add(tunnelIdleTimer!, forMode: .common)
+    }
+
+    /// 取消闲置停计时（pill 手动关时用；停隧道本身由调用方做）。
+    @MainActor func cancelTunnelIdleStop() {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+    }
+
+    /// 定位模拟会话结束时释放它那一次持有；没持有时空操作，防两路结束重复放。
+    @MainActor func releaseLocationTunnelHold() {
+        guard tunnelLocationHold else { return }
+        tunnelLocationHold = false
+        releaseTunnel()
     }
 
     /// False when Device IP is one of this iPhone's own addresses, which iOS
@@ -2930,7 +4690,12 @@ final class Engine {
     /// the address to connect to is the 10.7.0.1 under its Settings › Device
     /// IP. When the tunnel carries the default address, Device IP goes back to
     /// it instead. Only tells anything while the tunnel is up.
-    @MainActor
+    /// (Upstream 2.2.0 `deviceIPIsUsable`, restored 0.9.140: the four
+    /// Device-IP checkpoints call it first, so a stale own-address
+    /// silently falls back to the default instead of blocking the run.
+    /// Plain, not @MainActor: `Engine` here is @Observable with
+    /// non-isolated `log`/`deviceIP`, and two of the four call sites are
+    /// non-isolated too — all four run on the main thread from UI actions.)
     func deviceIPIsUsable() -> Bool {
         let host = deviceHost
         guard NetworkStatus.isOwnAddress(host) else { return true }
@@ -2945,6 +4710,65 @@ final class Engine {
         return false
     }
 
+    /// Makes sure the tunnel is up for something about to use it. Starts
+    /// Side+'s built-in tunnel first — that part is not gated by the
+    /// “Start LocalDevVPN when needed” setting; only if the built-in fails
+    /// and that setting is on does it hand over to LocalDevVPN and wait
+    /// for the tunnel once SideInstaller is back. Returns whether it's up.
+    @MainActor
+    func tunnelUp() async -> Bool {
+        // A full-tunnel VPN that loops Device IP back is already the tunnel, so
+        // its probe answers before LocalDevVPN is opened over it.
+        await settleNetworkStatus()
+        // 内置隧道不受自动启动开关限制：它是 App 自带的一部分。
+        // 那个开关只管内置起不来时要不要自动跳去打开独立装的 LOC。
+        guard !vpnConnected, startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly else {
+            // 隧道已经通着、又没人持有：补一次闲置停计时（不走租约的裸 tunnelUp
+            // 调用方，如安装页“修复隧道”按钮，靠这句兜底，不会一直开着）。
+            if vpnConnected { scheduleTunnelIdleStop() }
+            return vpnConnected
+        }
+        // Built-in tunnel first: no app switch, no dependency on a
+        // separately installed LocalDevVPN.
+        if await BuiltinTunnel.startAndWait() {
+            refreshNetworkStatus()
+            if vpnConnected {
+                log("Tunnel up (built-in).")
+                scheduleTunnelIdleStop()
+                return true
+            }
+        }
+        // Built-in didn't come up (e.g. the network-extension entitlement
+        // didn't survive signing) — fall back to LocalDevVPN if it's there
+        // and the user left automatic start on.
+        guard startsVPNWhenNeeded, localDevVPNInstalled else { return false }
+        // A handover a moment ago is still under way: wait for it, don't
+        // open LocalDevVPN again.
+        let handingOver = lastVPNStartAttempt.map { Date().timeIntervalSince($0) < 5 } ?? false
+        guard handingOver || startLocalDevVPN() else { return false }
+        // Only time back in SideInstaller counts, so a while spent in
+        // LocalDevVPN (its VPN permission prompt, say) doesn't use up the wait.
+        // S10：绝对上限——后台时 waited 永不涨，循环不能只靠它退出；
+        // 墙钟 30 秒或 60 次迭代先到为准，到时返回 false。
+        let waitStartedAt = Date()
+        var waited = 0.0
+        var waitIterations = 0
+        while waited < 15 && waitIterations < 60 && Date().timeIntervalSince(waitStartedAt) < 30 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return false }
+            waitIterations += 1
+            refreshNetworkStatus()
+            if vpnConnected {
+                log("Tunnel up.")
+                scheduleTunnelIdleStop()
+                return true
+            }
+            if UIApplication.shared.applicationState == .active { waited += 0.5 }
+        }
+        log("⚠️ LocalDevVPN didn't connect its tunnel.")
+        return false
+    }
+
     /// Start the RPPairing host; it reports back through the shared engine.
     func generatePairingFile() {
         Task { @MainActor in PairingController.shared.start() }
@@ -2952,7 +4776,18 @@ final class Engine {
 
     func connectAndReadDeviceInfo() {
         Task { @MainActor in
-            do { try await connect() } catch { log("Connect FAILED: \(short(error))") }
+            // SIDE-2：隧道按需开——单步连接自己拿租约；connect() 本身不拉隧道。
+            var tunnelAcquired = false
+            defer { if tunnelAcquired { releaseTunnel() } }
+            do {
+                guard await acquireTunnel() else {
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
+                try await connect()
+            } catch { log("Connect FAILED: \(short(error))") }
         }
     }
 
@@ -3007,6 +4842,20 @@ final class Engine {
         }
     }
 
+    /// B-3 (0.9.170): the bundle ID a failure history entry records —
+    /// the signed bundle when signing got that far, else the IPA file
+    /// this run was handed. `downloadedIPAPath` is deliberately not read
+    /// here: resetRun never clears it, so before this run's download step
+    /// it still points at the previous run's file (0.9.168) and would
+    /// record the wrong clone's ID. Callers pass their own run's IPA; a
+    /// run with no local file yet (a built-in source before its download)
+    /// passes nil and keeps the old name-match fallback.
+    private func failureRecordBundleID(ipaURL: URL?) -> String? {
+        if let signed = signedAppBundleID() { return signed }
+        guard let ipaURL else { return nil }
+        return IPALibrary.appInfo(at: ipaURL)?.bundleID
+    }
+
     /// Read CFBundleIdentifier from the signed .app's Info.plist.
     private func signedAppBundleID() -> String? {
         signedAppPlist()?["CFBundleIdentifier"] as? String
@@ -3031,6 +4880,13 @@ final class Engine {
     private func signedAppName() -> String? {
         guard let plist = signedAppPlist() else { return nil }
         return (plist["CFBundleDisplayName"] as? String) ?? (plist["CFBundleName"] as? String)
+    }
+
+    /// The signed app's own version, for the install history; nil when the
+    /// signed app has no readable plist or no version in it.
+    private func signedAppVersion() -> String? {
+        guard let plist = signedAppPlist() else { return nil }
+        return plist["CFBundleShortVersionString"] as? String
     }
 
     private func signedAppPlist() -> [String: Any]? {
@@ -3058,6 +4914,20 @@ final class Engine {
     /// optional (under Advanced) from 27 on.
     @MainActor
     func importPairingFile(from url: URL) async {
+        // B4：安装进行中不换配对文件——connection.disconnect() 会断掉在途
+        // 安装的设备链路。深链弹窗确认路也走这里，同一处拦住。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Pairing import: \(lastError ?? "")")
+            return
+        }
+        // B-38-B2：续签进行中不换配对文件——成功路调 connection.disconnect()
+        // 会断掉在途续签的设备链路。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            log("⛔️ Pairing import: \(lastError ?? "")")
+            return
+        }
         guard !isImportingPairing else { return }
         isImportingPairing = true
         // Delete the picker's temporary copy once the import is done.
@@ -3068,12 +4938,34 @@ final class Engine {
             let data = try Self.readImport(from: url)
             let kind = PairingFileKind.of(data: data)
             guard kind.isUsable else {
-                lastError = ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
-                                                  url.lastPathComponent))
+                lastError = L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                              url.lastPathComponent)
                 log("⛔️ Pairing import: \(lastError ?? "")")
                 return
             }
-            try adoptPairingFile(data, kind: kind, name: url.lastPathComponent)
+            if let fileUDID = kind.udid, let currentUDID = deviceUDID, fileUDID != currentUDID {
+                let mismatch = PairingImportMismatch(fileUDID: fileUDID, deviceUDID: currentUDID)
+                guard await confirmPairingImportMismatch(mismatch) else {
+                    log("Pairing import: kept the current pairing file (UDID mismatch).")
+                    return
+                }
+            }
+            try data.write(to: PrivateStore.pairingFile, options: .atomic)
+            // Drop the cached merged file; it was built from the old record.
+            CompositePairingFile.invalidateMerged()
+            pairingFilePath = PrivateStore.pairingFile.path
+            importedPairingName = url.lastPathComponent
+            UserDefaults.standard.set(url.lastPathComponent, forKey: Engine.importedPairingNameKey)
+            connection.disconnect()
+            deviceSummary = nil
+            setGuide(nil)
+            let records = [kind.hasLockdown ? "lockdown" : nil,
+                           kind.hasRemotePairing ? "remote-pairing" : nil]
+                .compactMap { $0 }.joined(separator: " + ")
+            log("Imported \(url.lastPathComponent) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
+            if !kind.hasLockdown {
+                log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+            }
         } catch {
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Pairing import: \(lastError ?? "")")
@@ -3108,7 +5000,6 @@ final class Engine {
         UserDefaults.standard.set(name, forKey: Engine.importedPairingNameKey)
         connection.disconnect()
         deviceSummary = nil
-        pairingStatus = L("imported pairing file")
         setGuide(nil)
         let records = [kind.hasLockdown ? "lockdown" : nil,
                        kind.hasRemotePairing ? "remote-pairing" : nil]
@@ -3153,7 +5044,17 @@ final class Engine {
         case .invalid(let message):
             log("⛔️ Link: \(message)")
             // A run's own popups come first; the log keeps the reason.
-            if !isRunning { lastError = message }
+            // B-2 (0.9.176): a batch in its download gap counts the
+            // same — `isRunning` alone lets the message land while the
+            // batch's next item fails and takes it for its own reason.
+            if isRunning || batchUpdateRunning {
+                // B1 (0.9.152): parked until the run ends, then shown with
+                // the finished popups — it used to vanish into the log.
+                pendingInvalidLinkMessage = message
+                log("Link: it asks once this install ends.")
+            } else {
+                lastError = message
+            }
         case .link(let link):
             if case .pairingFile = link { sideStorePairingRequestedAt = nil }
             if case .certificate(let cert) = link, cert.fromSideStore {
@@ -3162,6 +5063,11 @@ final class Engine {
                 log("Link: \(link.logDescription).")
                 certificateToImport = CertificateImport(certificate: cert, retryInstall: retryInstall)
                 return
+            }
+            if let old = pendingLink {
+                // B1 (0.9.152): one slot only — a second link used to
+                // silently drop the first; the log now says so.
+                log("Link: \(old.logDescription) was still waiting — superseded by \(link.logDescription).")
             }
             pendingLink = link
             log("Link: \(link.logDescription). \(isRunning ? "It asks once this install ends." : "Waiting for the go-ahead.")")
@@ -3181,7 +5087,29 @@ final class Engine {
         lastError = nil
         switch link {
         case .install(let url):
-            installLinkedIPA(url)
+            // B-2 (0.9.176): an update-all batch owns the install slot —
+            // its download gaps leave `isRunning` false, so this link's
+            // download would land mid-batch and steal the slot (the
+            // `startLinkImport` entry 同款，`answerLink` 是漏网的）。
+            // Refuse up front with a reason instead of starting a
+            // download that ends in a refused import.
+            guard !batchUpdateRunning else {
+                lastError = L("全部更新进行中，等它跑完再安装。")
+                log("⛔️ Link: \(lastError ?? "")")
+                return
+            }
+            Task {
+                // C12：只凭这次导入的返回值起管线——进行中被跳过时
+                // importCustomIPA 已置 lastError，旧 IPA 不会再被
+                // 当成新导入的装掉。
+                if await importCustomIPA(fromLink: url.absoluteString),
+                   IPALibrary.customImport() != nil {
+                    // B-39-B2：源赋值移到导入成功之后——导入被拒时
+                    // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                    installSource = .custom
+                    runOneClick()
+                }
+            }
         case .pairingFile(let file):
             do {
                 try adoptPairingFile(file.data, kind: file.kind, name: file.displayName)
@@ -3210,6 +5138,8 @@ final class Engine {
         }
     }
 
+    // MARK: - App presence & SideStore pairing helpers
+
     /// True unless SideStore is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
     var sideStoreInstalled: Bool {
@@ -3221,12 +5151,6 @@ final class Engine {
     /// keeps SideStore's certificate itself (`LiveContainerCertificate`).
     var canUseSideStoreCertificate: Bool {
         Self.runsInLiveContainer || sideStoreInstalled
-    }
-
-    /// True unless LiveContainer is known to be missing (see `appPresence`).
-    /// Opening it reports when it isn't there.
-    var liveContainerInstalled: Bool {
-        mayBeInstalled(scheme: "livecontainer")
     }
 
     /// Bumped each time SideInstaller comes back to the front. Apps installed
@@ -3291,25 +5215,6 @@ final class Engine {
         let defaults = UserDefaults.self as AnyObject
         guard defaults.responds(to: selector) else { return nil }
         return defaults.perform(selector)?.takeUnretainedValue() as? Bundle
-    }
-
-    /// Opens `livecontainer://install?url=`, which has LiveContainer download
-    /// the IPA and install it inside itself. LiveContainer asks before
-    /// replacing an app with the same bundle ID.
-    @MainActor
-    func installInLiveContainer(_ ipa: URL) {
-        // LiveContainer takes the link percent-decoded, so all of it is encoded.
-        let link = ipa.absoluteString.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
-        guard let url = URL(string: "livecontainer://install?url=\(link)") else { return }
-        lastError = nil
-        log("Asking LiveContainer to install \(ipa.lastPathComponent) …")
-        UIApplication.shared.open(url) { opened in
-            Task { @MainActor in
-                guard !opened else { return }
-                self.lastError = ErrorHelp.explained(L("LiveContainer isn't installed on this iPhone."))
-                self.log("⛔️ LiveContainer: \(self.lastError ?? "")")
-            }
-        }
     }
 
     /// True when “Get it from SideStore” has somewhere to get the pairing file:
@@ -3407,6 +5312,15 @@ final class Engine {
     /// List the supported pairing-target apps installed on the device.
     @MainActor
     func installedPairingTargets() async throws -> [InstalledPairingTarget] {
+        // SIDE-2：隧道按需开——单次配对操作自己拿租约、defer 还。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let apps = try await onDeviceQueue { try self.connection.installedApps() }
         let targets = PairingTargets.match(installed: apps)
@@ -3414,9 +5328,41 @@ final class Engine {
         return targets
     }
 
+    /// F-1 (0.9.161): uninstall the app with this bundle ID, via
+    /// installation_proxy. The running app can't uninstall itself —
+    /// installd would kill SideInstaller mid-call — so that is refused
+    /// here, not left to the swipe button that offered it.
+    @MainActor
+    func uninstallApp(bundleID: String) async throws {
+        guard bundleID != Bundle.main.bundleIdentifier else {
+            throw EngineError.message(L("SideInstaller can't uninstall itself."))
+        }
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
+        try await ensurePairingConnection()
+        try await onDeviceQueue { try self.connection.uninstallApp(bundleID: bundleID) }
+        log("Uninstalled \(bundleID).")
+    }
+
     /// Write the current pairing file into one installed target app's container.
     @MainActor
     func installPairing(into target: InstalledPairingTarget) async throws {
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let udid = deviceUDID
@@ -3430,6 +5376,15 @@ final class Engine {
     /// "Place In All Apps" does. Connects once, then writes each in turn.
     @MainActor
     func installPairing(intoAll targets: [InstalledPairingTarget]) async throws {
+        // SIDE-2：隧道按需开——同 installedPairingTargets（整批写完才还）。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let udid = deviceUDID
@@ -3439,11 +5394,13 @@ final class Engine {
             try self.resolvePlacement(rpPairingPath: path, udid: udid)
         }
         var failures: [String] = []
+        var succeeded: [String] = []
         for target in targets {
             do {
                 try await onDeviceQueue {
                     try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
                 }
+                succeeded.append(target.name)
             } catch {
                 // One app refusing the write shouldn't cost the rest.
                 log("⚠️ Couldn't write into \(target.name) (\(short(error))).")
@@ -3451,7 +5408,15 @@ final class Engine {
             }
         }
         guard failures.isEmpty else {
-            throw EngineError.message(L("Couldn't write into %@.", failures.joined(separator: ", ")))
+            // B7 (0.9.161): a partial write used to report only the failures —
+            // the apps that did get the file were invisible, so a user
+            // couldn't tell a partial success from a total one. Say both.
+            if succeeded.isEmpty {
+                throw EngineError.message(L("Couldn't write into %@.", failures.joined(separator: ", ")))
+            }
+            throw EngineError.message(L("Pairing file installed into %@, but couldn't be written into %@.",
+                                        succeeded.joined(separator: ", "),
+                                        failures.joined(separator: ", ")))
         }
     }
 
@@ -3461,12 +5426,9 @@ final class Engine {
     private func ensurePairingConnection() async throws {
         // No Wi-Fi check: this all runs over the loopback tunnel.
         guard await tunnelUp() else {
-            throw EngineError.message(L("LocalDevVPN isn't connected. Connect it, then try again."))
-        }
-        // Install checks this before it starts; every other page comes here.
-        guard deviceIPIsUsable() else {
-            throw EngineError.message(ErrorHelp.explained(L("Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.",
-                                                            deviceHost)))
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
         }
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         guard fileExistsNonEmpty(path) else {
@@ -3480,7 +5442,6 @@ final class Engine {
         deviceSummary = device.summary
         deviceUDID = device.udid
         deviceName = device.name
-        pairingStatus = L("connected")
     }
 
     /// Opens the device link with `connect`, which dials a tunnel, or reuses
@@ -3551,7 +5512,7 @@ final class Engine {
     /// Hands the pairing to SideStore the way nightly 0.7.0-20260920 and later
     /// read it (see `SideStorePairingHandoff`): one file per protocol, plus the
     /// two settings its own import writes. Older builds read `ALTPairingFile`,
-    /// written just before, so failures here only log. Runs on `deviceQueue`.
+    /// written just before, so failures here log and leave a notice (C25). Runs on `deviceQueue`.
     private func handOffSplitPairing(placementPath: String, bundleID: String,
                                      appName: String, home: SideStoreHome, udid: String?) {
         do {
@@ -3578,6 +5539,12 @@ final class Engine {
             }
             log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
         } catch {
+            // C25：只记日志不够——对方日后遇到要配对文件时，这边没有
+            // 任何提示能把两件事连起来；进度卡下方留一句（run 照常成功）。
+            // 照抄 C23（SideBySideView:1796-1799），复用同一条 key。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.")].compactMap { $0 }.joined(separator: "\n")
+            }
             log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
         }
     }
@@ -3619,6 +5586,15 @@ final class Engine {
     /// together so the caller can match each app to its profile.
     @MainActor
     func sideloadedAppInventory() async throws -> (apps: [[String: Any]], profiles: [Data]) {
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let apps = try await onDeviceQueue { try self.connection.installedAppPlists() }
         let profiles = try await onDeviceQueue { try self.connection.provisioningProfiles() }
@@ -3660,6 +5636,11 @@ final class Engine {
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The app before this one may have needed Airplane Mode again.
         try await MobileDataMode.shared.requireInternet(.signing)
+        // A21-2：defer 登记在 performSign 之前——签名失败时 defer 已登记、
+        // signedPath 仍是 nil 不删；成功时才删。失败的解包目录由 Rust 自清；
+        // catch 里的 discardExtraction(forIPA:) 只扫 24 小时以上的陈旧目录（此时还没有 bundle 路径）。
+        var signedPath: String?
+        defer { if let signedPath { Self.discardSignedBundle(at: signedPath) } }
         let signed: String
         do {
             signed = try await onSignQueue {
@@ -3667,12 +5648,16 @@ final class Engine {
                                      pairingFilePath: path,
                                      forMadeira: Self.isMadeira(ipaPath: ipaPath))
             }
-        } catch EngineError.certExists {
+            signedPath = signed
+        } catch {
+            Self.discardExtraction(forIPA: ipaPath)
             // Don't set `certConflict`: its retry button starts a full install
             // from the Install tab. Point to the Certificates page instead.
-            throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again."))
+            if case EngineError.certExists = error {
+                throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
+            }
+            throw error
         }
-        defer { Self.discardSignedBundle(at: signed) }
         installProgress = 0
         let ip = deviceHost
         // iOS may drop the tunnel during signing and `isConnected` doesn't
@@ -3687,8 +5672,11 @@ final class Engine {
     }
 
     /// Deletes a signed bundle after it's installed. A refresh extracts one
-    /// bundle per app, so each is removed right away to save space.
-    private static func discardSignedBundle(at path: String) {
+    /// bundle per app, so each is removed right away to save space; the
+    /// install pipelines call it from their shared tail for the same
+    /// reason, and Side by Side calls it as `Engine.discardSignedBundle`
+    /// (C20 — internal, not private, so the other file can reach it).
+    static func discardSignedBundle(at path: String) {
         // isideload extracts to <temp>/<ipa file name>_extracted/Payload/X.app.
         // Remove that `_extracted` directory; leave any other path alone.
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
@@ -3698,6 +5686,30 @@ final class Engine {
         guard extraction.deletingLastPathComponent().path == temp.path,
               extraction.lastPathComponent.hasSuffix("_extracted") else { return }
         try? FileManager.default.removeItem(at: extraction)
+    }
+
+    /// Removes extraction dirs a signing attempt left behind, but only
+    /// stale ones: a signing never lives 24 hours, so anything older
+    /// cannot belong to a live signing. Fresh dirs are left alone —
+    /// with unique names (B-50-B1) Swift can no longer tell which fresh
+    /// dir belongs to the failed attempt, and deleting it could kill a
+    /// concurrent live signing of the same-named IPA.
+    static func discardExtraction(forIPA ipaPath: String) {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
+        let name = URL(fileURLWithPath: ipaPath).lastPathComponent
+        guard !name.isEmpty else { return }
+        let fm = FileManager.default
+        let entries = (try? fm.contentsOfDirectory(
+            at: temp, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey])) ?? []
+        for entry in entries {
+            guard entry.lastPathComponent.hasPrefix(name + "_"),
+                  entry.lastPathComponent.hasSuffix("_extracted") else { continue }
+            guard let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey]),
+                  values.isDirectory == true,
+                  let mtime = values.contentModificationDate,
+                  Date().timeIntervalSince(mtime) > 24 * 3600 else { continue }
+            try? fm.removeItem(at: entry)
+        }
     }
 
     // MARK: - Location tab
@@ -3712,9 +5724,24 @@ final class Engine {
     @MainActor
     @discardableResult
     func prepareLocationSimulation(progress: @escaping (Double) -> Void) async throws -> Bool {
-        let mounted = try await prepareDeveloperDiskImage(progress: progress)
-        try await onDeviceQueue { try self.connection.beginLocationSimulation() }
-        return mounted
+        // SIDE-2: on-demand tunnel — take the lease for the whole simulation
+        // session; failure releases it in catch, success holds until stop /
+        // sessionClosed releases it (see tunnelLocationHold).
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelLocationHold = true
+        do {
+            let mounted = try await prepareDeveloperDiskImage(progress: progress)
+            try await onDeviceQueue { try self.connection.beginLocationSimulation() }
+            return mounted
+        } catch {
+            tunnelLocationHold = false
+            releaseTunnel()
+            throw error
+        }
     }
 
     /// Connect, and put the developer disk image on the device unless it
@@ -3802,9 +5829,26 @@ final class Engine {
     /// Give the device its real location back and close the session.
     @MainActor
     func stopSimulatingLocation() async throws {
-        guard connection.isSimulatingLocation else { return }
+        guard connection.isSimulatingLocation else {
+            // 会话已在别处断掉：顺手回收可能残留的持有（没持有时空操作）。
+            releaseLocationTunnelHold()
+            return
+        }
+        // B-C3：clear 失败也不能漏了 end + 释放——以前 clear 一抛，
+        // 后面的 endLocationSimulation() 与 releaseLocationTunnelHold()
+        // 都不跑，隧道租约永久 +1、isSimulatingLocation 一直为真。
+        // clear 失败只记日志继续走：设备位置按注释会自行失效，
+        // 本地会话关了、重发停了，目标（停止模拟）已经达到。
+        // defer 保证任何出口都释放持有（没持有时空操作）。
+        defer { releaseLocationTunnelHold() }
+        do {
+            try await onDeviceQueue {
+                try self.connection.clearSimulatedLocation()
+            }
+        } catch {
+            log("⚠️ Couldn't clear the simulated location (\(short(error))); closing the session anyway.")
+        }
         try await onDeviceQueue {
-            try self.connection.clearSimulatedLocation()
             self.connection.endLocationSimulation()
         }
         log("Simulated location cleared.")
@@ -3824,26 +5868,6 @@ final class Engine {
         return try await onDeviceQueue { try self.connection.installedAppPlists() }
     }
 
-    // MARK: - Crash logs (Report a problem)
-
-    /// The crash logs this iPhone kept for SideStore, LiveContainer and
-    /// Madeira (see `DeviceCrashLog.select`), redacted like the log. Opens the
-    /// device link first.
-    @MainActor
-    func deviceCrashLogs() async throws -> [DeviceCrashLog] {
-        guard !isRunning else {
-            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
-        }
-        try await ensurePairingConnection()
-        log("Crash logs: looking for SideStore's, LiveContainer's and Madeira's …")
-        let logs = try await onDeviceQueue {
-            try self.connection.crashReports(select: DeviceCrashLog.select)
-                .map { DeviceCrashLog(path: $0.path, data: $0.data) }
-        }
-        log(logs.isEmpty ? "Crash logs: none on this iPhone from the last \(DeviceCrashLog.maxAgeDays) days."
-                         : "Crash logs: \(logs.map(\.name).joined(separator: ", ")).")
-        return logs
-    }
 
     // MARK: - Developer Mode (Settings)
     //
@@ -3871,6 +5895,16 @@ final class Engine {
         }
         let outcome: DeveloperModeOutcome = request == .reveal ? .revealed : .enabling
         log("Developer Mode: \(request == .reveal ? "showing it in Settings" : "turning it on") …")
+        // SIDE-2：隧道按需开——单次操作自己拿租约；回落到 lockdownd 直连那路
+        // 也在租约内跑完，无非多持有一会儿，无害。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         do {
             try await ensurePairingConnection()
         } catch {
@@ -3934,8 +5968,9 @@ final class Engine {
         if raw.localizedCaseInsensitiveContains("passcode") {
             return EngineError.message(L("iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead."))
         }
-        return EngineError.message(L("This iPhone didn't take the Developer Mode request: %@", short(error)))
+        return EngineError.message(L("This iPhone didn't take the Developer Mode request: %@", error is DeviceConnection.FFIError ? L("the connection to this iPhone failed") : short(error)))
     }
+
 
     // MARK: The file other apps actually read
 
@@ -3943,9 +5978,8 @@ final class Engine {
     ///
     /// SideInstaller pairs via RPPairing, but minimuxer (SideStore, LiveContainer)
     /// and Feather need a classic lockdown record. This creates one over the open
-    /// tunnel and merges both records into one file, as iLoader does. From iOS
-    /// 26.4 on the RPPairing file goes alone: no app can use a lockdown record
-    /// through the loopback there, and on iOS 27 lockdownd won't pair at all.
+    /// tunnel and merges both records into one file, as iLoader does. On iOS 27
+    /// lockdownd won't pair, so the RPPairing file goes alone.
     ///
     /// Runs on `deviceQueue`. Never throws: on failure it returns the RPPairing
     /// file alone, which StikDebug can still use.
@@ -3978,7 +6012,7 @@ final class Engine {
             if let cached = CompositePairingFile.cachedLockdownRecord(forUDID: udid) {
                 lockdown = cached
             } else if !Self.canMintLockdownRecord {
-                log("Handing over the RPPairing record on its own: from iOS 26.4 on, lockdownd hangs up on lockdown records through LocalDevVPN, so no app could use one. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read the RPPairing record.")
+                log("Handing over the RPPairing record on its own: iOS 27 doesn't let lockdown pair over the tunnel. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read it.")
                 return rpPairingPath
             } else {
                 log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
@@ -4045,6 +6079,19 @@ final class Engine {
             self.twoFactor = TwoFactorPhase(request: request.id, signIn: ticket.id,
                                             appleID: ticket.appleID, prompt: prompt)
             self.log(prompt.logLine)
+            // P1-5 (0.9.186): a background refresh that hits 2FA used to
+            // wait forever on a sheet nobody can see — the 2FA sheet is
+            // a SwiftUI sheet in RootView, so while the app is backgrounded
+            // the sign-in blocks on `twoFactorRequests.wait` (no timeout)
+            // and the due apps silently don't renew until the user happens
+            // to open the app. Nudge them now; tapping the notification
+            // opens the app, where the pending sheet is already waiting.
+            // Foreground sign-ins show the sheet themselves, so they get
+            // no notification.
+            if ticket.purpose == .refresh,
+               UIApplication.shared.applicationState != .active {
+                Self.notifyBackgroundTwoFactor(requestID: request.id)
+            }
         }
         guard let answer = twoFactorRequests.wait(request),
               let bytes = answer.json.map({ Array($0.utf8) }), bytes.count < len else { return 0 }
@@ -4062,6 +6109,30 @@ final class Engine {
         guard twoFactorRequests.answer(phase.request, with: answer) else { return }
         if twoFactor?.request == phase.request { twoFactor?.answer = answer }
         log(answer.logLine)
+    }
+
+    /// P1-5 (0.9.186): tells the user a background refresh is waiting on
+    /// a 2FA code. One notification per 2FA request (the id keeps a
+    /// re-asked code from stacking); a failure only reaches the log —
+    /// the sheet itself is still there when the app comes forward, so
+    /// this is a nudge, not the only path. Called from the 2FA
+    /// callback's main-queue block, so `applicationState` is read on
+    /// the main thread.
+    private static func notifyBackgroundTwoFactor(requestID: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = L("续签需要验证码")
+        content.body = L("自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。")
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "resign-2fa-\(requestID)", content: content, trigger: nil)
+        Task {
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
+                Engine.shared.log("Auto refresh: 2FA notification failed to send (\(error.localizedDescription)).")
+            }
+        }
+        Engine.shared.log("Auto refresh: 2FA needed while backgrounded — notified the user.")
     }
 
     /// Close the sheet showing `phase`. While Apple waits on the user this
@@ -4188,21 +6259,39 @@ final class Engine {
 
     /// Bridge a blocking deviceQueue body to async.
     private func onDeviceQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            deviceQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                deviceQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
     /// Bridge a blocking signQueue body to async.
     private func onSignQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            signQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                signQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
@@ -4218,10 +6307,59 @@ final class Engine {
     }
 }
 
+/// One-shot holder for a checked continuation, so a queue bridge can be
+/// cancelled while its block is still queued or running: the queued block
+/// resumes it with its result, `withTaskCancellationHandler`'s onCancel
+/// resumes it with `CancellationError` — whichever runs first wins, the
+/// other finds nothing (AutoRefreshService.SingleResume / BuiltinTunnel
+/// TunnelWaitState 同款：NSLock + 恰好一次）。A resume that lands
+/// before the continuation is stored is replayed to it on `store`, so a
+/// task cancelled before the bridge was entered still throws at once
+/// instead of waiting for work it never needed. File scope, so the
+/// SideBySide and Entitlements queue bridges share it.
+final class CZFContinuationBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Error>?
+    private var pending: Result<T, Error>?
+
+    func store(_ continuation: CheckedContinuation<T, Error>) {
+        lock.lock()
+        let pending = self.pending
+        self.pending = nil
+        if pending == nil { self.continuation = continuation }
+        lock.unlock()
+        if let pending { continuation.resume(with: pending) }
+    }
+
+    func resume(returning value: T) { resume(with: .success(value)) }
+    func resume(throwing error: Error) { resume(with: .failure(error)) }
+
+    private func resume(with result: Result<T, Error>) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        if continuation == nil { pending = result }
+        lock.unlock()
+        continuation?.resume(with: result)
+    }
+}
+
 // MARK: - Predefined instruction cards
 
 /// Computed so text is localized when read and follows language changes.
 enum Guides {
+    static var wifi: Guide {
+        Guide(
+            title: L("Connect to Wi-Fi"),
+            systemImage: "wifi",
+            steps: [
+                L("Open Settings › Wi-Fi and join a network."),
+                L("Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find."),
+                L("Then come back here — this continues automatically."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
     /// Shown when no tunnel is up. Recommends LocalDevVPN, but any VPN on the
     /// device subnet works.
     static var vpn: Guide {
@@ -4303,7 +6441,7 @@ enum Guides {
             title: L("No App IDs left this week"),
             systemImage: "number.circle",
             steps: [
-                L("Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days."),
+                L("Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days."),
                 L("They can't be deleted sooner. Wait until some expire, then tap Install again."),
                 L("Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again."),
             ],
@@ -4409,38 +6547,21 @@ enum Guides {
     }
 
     /// Shown on an iPhone below iOS 27, where the pairing file has to be made
-    /// somewhere else and brought over. From iOS 26.4 on it has to be a remote
-    /// pairing (RPPairing) file: lockdownd hangs up on lockdown ones through
-    /// the loopback VPN (`Engine.lockdownWorksOverLoopback`).
+    /// somewhere else and brought over.
     static var importPairing: Guide {
-        let first = L("iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.", Engine.minimumOSText)
-        let last = L("Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.", Engine.minimumOSText)
-        guard Engine.lockdownWorksOverLoopback else {
-            return Guide(
-                title: L("Import a pairing file"),
-                systemImage: "lock.doc",
-                steps: [first,
-                        L("From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.")]
-                    + remotePairingSteps + [last],
-                actionLabel: L("Get idevice_pair"),
-                actionURLString: idevicePairURL)
-        }
-        return Guide(
+        Guide(
             title: L("Import a pairing file"),
             systemImage: "lock.doc",
             steps: [
-                first,
+                L("iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.", Engine.minimumOSText),
                 L("On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”)."),
                 L("Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable."),
-                last,
+                L("Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.", Engine.minimumOSText),
             ],
             actionLabel: L("Get jitterbugpair"),
             actionURLString: "https://github.com/osy/Jitterbug/releases")
     }
 
-    /// Shown from iOS 26.4 on, below iOS 27, when the imported pairing file
-    /// holds only a lockdown record: lockdownd hangs up on it through the
-    /// loopback VPN, and would on a new one just the same.
     static var remotePairingNeeded: Guide {
         Guide(
             title: L("Make a remote pairing file"),
@@ -4467,19 +6588,24 @@ enum Guides {
     /// Shown when Apple refuses a certificate because one exists (error 7460).
     /// When SideStore's certificate can be had, using it comes first.
     static func certExists(sideStoreCertificate: Bool) -> Guide {
-        Guide(
+        // Fork 的 Guide.steps 是 [String]（非可选），上游三元里的 nil 放不进来；
+        // 按本文件 deviceRegistration 的老办法，有条件才 append，顺序与文案不变。
+        var steps: [String] = [
+            L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
+            L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
+        ]
+        if sideStoreCertificate {
+            steps.append(L("If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked."))
+        }
+        steps += [
+            L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),
+            L("Revoking is permanent: every app already signed with that certificate stops launching, on every device."),
+            L("Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again."),
+        ]
+        return Guide(
             title: L("A signing certificate already exists"),
             systemImage: "exclamationmark.shield",
-            steps: [
-                L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
-                L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
-                sideStoreCertificate
-                    ? L("If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.")
-                    : nil,
-                L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),
-                L("Revoking is permanent: every app already signed with that certificate stops launching, on every device."),
-                L("Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again."),
-            ].compactMap { $0 },
+            steps: steps,
             actionLabel: nil, actionURLString: nil)
     }
 
@@ -4666,10 +6792,27 @@ struct TwoFactorPrompt: Decodable, Equatable {
         "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.",
     ]
 
-    /// `lastError` as the sheet shows it: Apple's own as it came, isideload's
-    /// in the app's language.
+    /// `lastError` as the sheet shows it: isideload's own sentences in the app's
+    /// language, Apple's service errors by their shape, and anything else as a
+    /// generic nudge — never Apple's raw English. The raw text is already in the
+    /// log (`logLine` carries it on every prompt).
     var shownError: String? {
-        lastError.map { Self.isideloadErrors.contains($0) ? L($0) : $0 }
+        guard let lastError else { return nil }
+        if Self.isideloadErrors.contains(lastError) { return L(lastError) }
+        // Trusted-device wrong code: Rust writes "-21669 - <message>" (:517).
+        if lastError.hasPrefix("-21669 -") { return L("The code was incorrect. Try again.") }
+        // SMS send refused: Rust writes "<title> - <message>" (:577) with no code
+        // in the string; the titles below are Apple's, verified against the
+        // isideload tests for -22979/-22981 and -28248.
+        if lastError.hasPrefix("Too many verification codes") {
+            return L("A code was already sent and is still valid. Enter it.")
+        }
+        if lastError.hasPrefix("Unknown 2FA method") {
+            return L("That way isn't available. Choose another way.")
+        }
+        // SMS wrong code (:628) has no verifiable title in-repo, and anything
+        // else Apple invents lands here too.
+        return L("That didn't work. Try another way.")
     }
 
     /// For a request that can't be read: the one prompt that always makes sense.
@@ -4750,4 +6893,238 @@ struct TwoFactorPhase: Equatable {
     var answer: TwoFactorAnswer?
 
     var isAsking: Bool { answer == nil }
+}
+
+// MARK: - 后台唤醒续签（BGAppRefreshTask）
+
+/// BGAppRefreshTask 胶水层：进程不在前台时（甚至被系统回收后），靠系统
+/// 适时把 App 唤醒，再跑一轮自动续签巡检。巡检本体在
+/// AutoRefreshService（tick）；这里只管提交下一次唤醒、被唤醒时先拉
+/// 隧道再巡检、以及保证任务恰好完成一次。实际唤醒时机由系统按使用
+/// 习惯决定，不是定时器。
+enum SIDAutoRefresh {
+
+    /// 与 Info.plist 的 BGTaskSchedulerPermittedIdentifiers 保持一致。
+    static let bgTaskIdentifier = "com.frizzle.sideinstaller.autorefresh"
+
+    /// 自动续签开关是否开着（与 AutoRefreshService 共用同一键）。
+    static var isEnabled: Bool {
+        UserDefaults.standard.bool(forKey: AutoRefreshService.enabledKey)
+    }
+
+    /// 向系统提交下一次后台唤醒（最早 2 小时后，实际时机系统定）。
+    /// 开关没开就不提交；提交失败只写日志，不打扰用户。
+    static func scheduleBackgroundWake() {
+        guard isEnabled else { return }
+        let request = BGAppRefreshTaskRequest(identifier: bgTaskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 2 * 3600)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            Engine.shared.log("Auto refresh: background wake scheduling failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// 回到前台时调：开关开着就确保常驻巡检在跑
+    /// （已在跑时 AutoRefreshService.start() 无副作用）。
+    static func consider() {
+        Task { @MainActor in
+            AutoRefreshService.shared.start()
+        }
+    }
+
+    /// 系统唤醒时的入口（SideInstallerApp 启动时注册）：先续上下
+    /// 一轮，再拉隧道、跑一轮巡检，最后恰好完成一次。
+    static func handleBackgroundWake(_ task: BGAppRefreshTask) {
+        scheduleBackgroundWake()
+        let completion = BGTaskCompletion(task)
+        // S10：过期回调取消工作 Task——它可能正卡在 tunnelUp 的 LOC
+        // 等待循环里（后台 waited 不涨），只 finish 不取消等于空转到过期。
+        var work: Task<Void, Never>?
+        task.expirationHandler = {
+            work?.cancel()
+            completion.finish(false)
+        }
+        work = Task {
+            guard isEnabled else {
+                completion.finish(true)
+                return
+            }
+            // SIDE-2：隧道按需开——唤醒续签拿租约，跑完还掉；拿不到也照常
+            // 跑巡检（tick 自己会判隧道未通而跳过）。
+            let tunnelAcquired = await Engine.shared.acquireTunnel()
+            // C11：只有巡检真跑了一轮才记成功——隧道不通、清单没读到、
+            // 正在跑别的安装时，finish(false)，让系统知道这轮没干活。
+            let ran = await AutoRefreshService.shared.runCheck()
+            if tunnelAcquired { await Engine.shared.releaseTunnel() }
+            completion.finish(ran)
+        }
+    }
+}
+
+/// BGTask 要求 setTaskCompleted 恰好调用一次；过期回调与工作 Task
+/// 可能同时到达，用一把锁护住完成标志。
+private final class BGTaskCompletion {
+    private let task: BGAppRefreshTask
+    private let lock = NSLock()
+    private var didFinish = false
+
+    init(_ task: BGAppRefreshTask) {
+        self.task = task
+    }
+
+    func finish(_ success: Bool) {
+        lock.lock()
+        guard !didFinish else {
+            lock.unlock()
+            return
+        }
+        didFinish = true
+        lock.unlock()
+        task.setTaskCompleted(success: success)
+    }
+}
+
+// MARK: - Restored from upstream (2026-10-25 merge recovery)
+// 290310a took Engine.swift from the fork side; these upstream members
+// (FrizzleM/SideInstaller @ 7d1cb04) were dropped with it.
+
+struct AppIDCost: Hashable {
+    /// The App IDs signing would register: the app's, if the Apple ID doesn't
+    /// have it yet. Extensions are signed with the app's profile and need none.
+    let newIDs: [String]
+    /// How many more Apple allows now; nil when it doesn't say.
+    let available: Int?
+    /// The limit, 10 a week for a free Apple ID; nil when Apple doesn't say.
+    let limit: Int?
+    /// When the soonest of the Apple ID's App IDs expires, freeing its slot.
+    let nextExpiry: Date?
+
+    var cost: Int { newIDs.count }
+    /// False when Apple says too few are left: signing would stop with 9120.
+    var isAffordable: Bool { available.map { cost <= $0 } ?? true }
+    /// What's left once this install has registered its App IDs.
+    var remainingAfter: Int? { available.map { Swift.max(0, $0 - cost) } }
+}
+
+extension Engine {
+    /// Detects an Apple ID sign-in refused because the Mac anisette server's
+    /// macOS is too old for Apple's current GrandSlam requirements.
+    static func isAppleOutdatedMacRefusal(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("-23782") || m.contains("a mac with macos version")
+    }
+
+    /// Detects GrandSlam -80046, "This action cannot be completed at this
+    /// time", at the sign-in token request: Apple took the password and the
+    /// code, then turned down the anisette (from its Android library, since
+    /// 2026-10-21).
+    static func isAppleTokenRefusal(_ raw: String) -> Bool {
+        raw.contains("-80046")
+    }
+
+    /// Detects isideload's `ANDROID_ADI_SKIP`: a sign-in through a server on
+    /// Apple's Android ADI library wasn't started, so nothing reached Apple.
+    static func isAndroidADISkip(_ raw: String) -> Bool {
+        raw.hasPrefix("login skipped") && raw.contains("-80046")
+    }
+
+    /// Whether a lockdown pair record still opens a tunnel to this iPhone.
+    /// False from iOS 26.4 on, where lockdownd hangs up on loopback
+    /// connections; see NOTES.md ("iOS 26.4+: lockdownd hangs up on loopback
+    /// connections").
+    static var lockdownWorksOverLoopback: Bool {
+        !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+            OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
+    }
+
+    /// The error when the anisette server picked in Settings, the only one
+    /// tried, runs Apple's Android library.
+    func androidADIRefusalMessage(server: String) -> String {
+        L("“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
+          anisetteName(for: server))
+    }
+
+    /// The error when Apple refused the sign-in token through `server` and no
+    /// server of another kind is left.
+    func appleTokenRefusalMessage(through server: String) -> String {
+        if AnisetteServer.library(of: server, in: anisetteServers) == .mac {
+            return L("Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.")
+        }
+        return L("Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
+                 anisetteName(for: server))
+    }
+
+    func anisetteSignedIn(_ address: String) {
+        if anisetteAuto { anisetteURL = address }
+        AnisetteServer.RecentFailures.clear(address)
+    }
+
+    /// Notes that a sign-in through `address` failed with `error`, so that
+    /// Auto tries it after the others for a while if the server was at fault.
+    func anisetteFailed(_ address: String, error: String) {
+        AnisetteServer.RecentFailures.record(address, error: error)
+    }
+
+    /// The error for a sign-in that failed on every server it tried. It shows
+    /// the error saying most about why (`AnisetteServer.SignInFailures`), and
+    /// with several servers tried, the one it came through. It counts the
+    /// servers tried, apart from those skipped. With a server picked in
+    /// Settings, the only one tried, it names that server and points to Auto,
+    /// which would have tried the others.
+    func anisetteSignInFailure(_ failures: AnisetteServer.SignInFailures) -> String {
+        let error = failures.shown.map { friendlyRustError($0.error) } ?? L("No anisette servers are configured.")
+        guard anisetteAuto else {
+            return L("Apple ID sign-in failed on %@. Error: %@", anisetteName(for: anisetteURL), error)
+                + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")
+        }
+        guard let shown = failures.shown, failures.tried > 1 else {
+            return L("Apple ID sign-in failed on %@. Error: %@", L("the anisette server"), error)
+        }
+        let servers = failures.skipped == 0
+            ? L("all %d anisette servers", failures.tried)
+            : L("%d anisette servers (%d skipped)", failures.tried, failures.skipped)
+        return L("Apple ID sign-in failed on %@. Error via %@: %@", servers, anisetteName(for: shown.server), friendlyRustError(shown.error))
+    }
+
+    func deviceCrashLogs() async throws -> [DeviceCrashLog] {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        // SIDE-2：隧道按需开——同上；本函数非 @MainActor，defer 里经 Task 回主线程还。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { Task { @MainActor in Engine.shared.releaseTunnel() } } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
+        try await ensurePairingConnection()
+        log("Crash logs: looking for SideStore's, LiveContainer's and Madeira's …")
+        let logs = try await onDeviceQueue {
+            try self.connection.crashReports(select: DeviceCrashLog.select)
+                .map { DeviceCrashLog(path: $0.path, data: $0.data) }
+        }
+        log(logs.isEmpty ? "Crash logs: none on this iPhone from the last \(DeviceCrashLog.maxAgeDays) days."
+                         : "Crash logs: \(logs.map(\.name).joined(separator: ", ")).")
+        return logs
+    }
+
+    // @MainActor: cancelOneClick() below is MainActor-isolated (#35 fix).
+    @MainActor
+    func answerAppIDCost(_ proceed: Bool) {
+        guard let reply = appIDCostReply else { return }
+        appIDCostReply = nil
+        if proceed {
+            reply.resume(returning: true)
+        } else {
+            // The run ends cancelled, the same as closing the popup.
+            reply.resume(returning: false)
+            cancelOneClick()
+        }
+        // Clear here as well as in confirmAppIDCost, so a cancelled run
+        // never leaves a stale cost popup behind.
+        appIDCost = nil
+    }
 }

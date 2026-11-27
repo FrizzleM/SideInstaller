@@ -49,11 +49,21 @@ struct ConnectLocalDevVPNIntent: AppIntent, ForegroundContinuableIntent {
             // Only time back in SideInstaller counts, as for an install, so
             // LocalDevVPN's own prompts don't use up the wait.
             var waited = 0.0
+            // B-3 (0.9.172): the foreground-only counter above never
+            // advances while SideInstaller sits in the background, so
+            // the loop never times out there — bound it by wall clock
+            // too: 60 seconds total from the start of the wait, then
+            // the same "isn't connected" error below. The 15-second
+            // foreground count is untouched; whichever budget runs out
+            // first ends the wait. (AboutView's self-update wait uses
+            // the same shape, with a 600-second cap.)
+            let waitStarted = Date()
             while waited < 15 {
                 try await Task.sleep(for: .milliseconds(500))
                 engine.refreshNetworkStatus()
                 if engine.vpnConnected { return }
                 if Shortcuts.isInForeground { waited += 0.5 }
+                if Date().timeIntervalSince(waitStarted) >= 60 { break }
             }
             throw ShortcutError(L("LocalDevVPN isn't connected. Connect it, then try again."))
         }

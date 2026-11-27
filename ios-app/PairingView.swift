@@ -102,7 +102,6 @@ struct PairingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle())
-                    .controlSize(.regular)
                     .disabled(manager.isBusy)
                 }
             }
@@ -141,19 +140,16 @@ struct PairingView: View {
     }
 
     private var vpnNote: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "shield.lefthalf.filled")
-                .foregroundStyle(Theme.negative)
-            Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        CalloutCard(tint: Theme.negative) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .foregroundStyle(Theme.negative)
+                Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.control))
-        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     // MARK: Scanned targets
@@ -169,7 +165,7 @@ struct PairingView: View {
                          ? L("%d supported app installed", manager.targets.count)
                          : L("%d supported apps installed", manager.targets.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
                 .cascadeItem(3)
@@ -199,7 +195,6 @@ struct PairingView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-        .controlSize(.regular)
         .disabled(manager.isBusy || engine.isRunning)
     }
 
@@ -213,7 +208,7 @@ struct PairingView: View {
                     .font(.headline)
                 Text(L("Install an app like SideStore, StikDebug, or Feather first, then rescan."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -234,7 +229,7 @@ struct PairingView: View {
                             .font(.subheadline.weight(.medium))
                         Text(target.bundleID)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
@@ -255,7 +250,6 @@ struct PairingView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                .controlSize(.regular)
                 .disabled(manager.isBusy || engine.isRunning)
             }
         }

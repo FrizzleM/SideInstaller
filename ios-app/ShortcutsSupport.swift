@@ -37,7 +37,10 @@ enum Shortcuts {
     /// into the message the app would show for it. Nothing runs before the
     /// terms are accepted, as in the app.
     static func run<T>(_ action: String, _ work: () async throws -> T) async throws -> T {
-        guard UserDefaults.standard.bool(forKey: SetupView.acceptedTermsKey) else {
+        // Fork has no SetupView: its welcome flow writes the same key
+        // directly (SideInstallerApp hasAcceptedTOS). Upstream's
+        // SetupView.acceptedTermsKey is this same "hasAcceptedTOS".
+        guard UserDefaults.standard.bool(forKey: "hasAcceptedTOS") else {
             throw ShortcutError(L("Open SideInstaller and accept its terms first."))
         }
         let engine = Engine.shared
@@ -160,45 +163,5 @@ enum Shortcuts {
     /// Deletes what `temporaryCopy` made, folder and all.
     static func discard(_ copy: URL) {
         try? FileManager.default.removeItem(at: copy.deletingLastPathComponent())
-    }
-}
-
-// MARK: - Siri and Spotlight
-
-/// The actions Siri and Spotlight offer without a shortcut being made first.
-struct SideInstallerShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(intent: SetSavedPlaceIntent(),
-                    phrases: ["Spoof my location to \(\.$place) with \(.applicationName)",
-                              "Set my \(.applicationName) location to \(\.$place)",
-                              "Spoof my location with \(.applicationName)"],
-                    shortTitle: "Spoof Location",
-                    systemImageName: "location.fill")
-        AppShortcut(intent: ResetLocationIntent(),
-                    phrases: ["Reset my location with \(.applicationName)",
-                              "Stop spoofing my location with \(.applicationName)"],
-                    shortTitle: "Reset Location",
-                    systemImageName: "location.slash")
-        AppShortcut(intent: StopRouteIntent(),
-                    phrases: ["Stop the route in \(.applicationName)"],
-                    shortTitle: "Stop Route",
-                    systemImageName: "stop.circle")
-        AppShortcut(intent: GetSpoofedLocationIntent(),
-                    phrases: ["Where is my \(.applicationName) location"],
-                    shortTitle: "Spoofed Location",
-                    systemImageName: "mappin.and.ellipse")
-        AppShortcut(intent: RefreshAllAppsIntent(),
-                    phrases: ["Refresh my apps with \(.applicationName)",
-                              "Refresh my sideloaded apps with \(.applicationName)"],
-                    shortTitle: "Refresh All Apps",
-                    systemImageName: "arrow.clockwise")
-        AppShortcut(intent: InstallAppIntent(),
-                    phrases: ["Install \(\.$app) with \(.applicationName)"],
-                    shortTitle: "Install App",
-                    systemImageName: "square.and.arrow.down")
-        AppShortcut(intent: ConnectLocalDevVPNIntent(),
-                    phrases: ["Connect LocalDevVPN with \(.applicationName)"],
-                    shortTitle: "Connect LocalDevVPN",
-                    systemImageName: "network")
     }
 }

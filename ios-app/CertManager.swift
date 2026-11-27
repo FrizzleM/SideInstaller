@@ -13,8 +13,6 @@ struct DevCert: Identifiable, Decodable, Equatable {
     let status: String
     /// RFC3339 expiry (e.g. `2027-01-01T00:00:00Z`), or "" if Apple omitted it.
     let expiration: String
-    /// True for the certificate SideInstaller signs with.
-    let signing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -25,7 +23,6 @@ struct DevCert: Identifiable, Decodable, Equatable {
         case platform
         case status
         case expiration
-        case signing
     }
 
     /// Stable identity: the serial revocation keys on, or the certificate id.
@@ -52,10 +49,30 @@ struct DevCert: Identifiable, Decodable, Equatable {
         guard let date = expiresAt else { return false }
         return date < Date()
     }
+}
 
-    /// The certificate SideInstaller signs with: the only one whose private key
-    /// is on this iPhone, so the only one it can export.
-    var isSigning: Bool { signing == true }
+/// F4 (0.9.153): soonest-expiring first, so the certificate that needs
+/// attention is at the top; one with no expiry date sinks to the
+/// bottom. Display order only — revoke/export never see this.
+/// `DevCert.expiresAt` is a pure parse of `expiration`.
+extension CertManager {
+    static func sortedByExpiry(_ list: [DevCert]) -> [DevCert] {
+        list.sorted {
+            switch ($0.expiresAt, $1.expiresAt) {
+            case let (a?, b?): return a < b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return false
+            }
+        }
+    }
+
+    /// F-2 (0.9.163): the team the signed-in Apple ID's certificates
+    /// belong to, parsed from the sign-in summary — the revoke confirm
+    /// matches installed apps against it. Their profiles carry the team,
+    /// not the certificate serial, so the match is by team: a free
+    /// account signs everything with the one certificate that team holds.
+    var teamID: String? { teamSummary.flatMap(Engine.teamID(inSummary:)) }
 }
 
 /// What `si_cert_import` reports: the team's certificate SideInstaller now signs
@@ -70,10 +87,9 @@ private struct CertImportResult: Decodable {
     }
 }
 
-/// Lists, revokes and exports the Apple ID's development certificates, and
-/// signs with SideStore's instead when asked, using the engine's credentials
-/// and 2FA prompt. Developer-portal only (no device); blocking FFI calls run on a
-/// background queue.
+/// Lists and revokes the Apple ID's development certificates, using the engine's
+/// credentials and 2FA prompt. Developer-portal only (no device); blocking FFI
+/// calls run on a background queue.
 final class CertManager: ObservableObject {
 
     @Published private(set) var certs: [DevCert] = []
@@ -83,8 +99,6 @@ final class CertManager: ObservableObject {
     @Published private(set) var isWorking = false
     /// `id` of the certificate currently being revoked, if any.
     @Published private(set) var revokingID: String?
-    /// `id` of the certificate currently being exported, if any.
-    @Published private(set) var exportingID: String?
     @Published var lastError: String?
     /// What the last certificate import did.
     @Published var lastSuccess: String?
@@ -93,7 +107,18 @@ final class CertManager: ObservableObject {
     /// True while a certificate SideStore sent is checked and put in place.
     @Published private(set) var isImporting = false
 
+    /// Busy with any certificate work (guard for the SideStore-certificate
+    /// request). Fork has no per-cert export, so unlike upstream's version
+    /// this does not OR in an exportingID.
+    var isBusy: Bool { isWorking || isImporting || revokingID != nil }
+
     private var session: OpaquePointer?            // CertSession*
+    /// B-5：ensureLoaded 在加载在途时被调，then 暂存于此——在途那次
+    /// loadCerts 成功（或取消）后顺带跑掉；失败时丢弃不跑。单槽：
+    /// 唯一调用点是安装页证书冲突弹窗的吊销按钮，不会同时排两个。
+    private var pendingThen: (() -> Void)?
+    /// A2：登录代际号——signOut 递增；signIn 完成后核对，未变才写会话。
+    private var signInGeneration = 0
     private let queue = DispatchQueue(label: "sideinstaller.certs")
 
     private var engine: Engine { Engine.shared }
@@ -108,11 +133,8 @@ final class CertManager: ObservableObject {
 
     // MARK: - Popups
 
-    /// What went wrong last, or what an import did, as popups `RootView` stacks
-    /// over the app.
-    var popups: [ToolPopup] {
-        [lastError.map(ToolPopup.error), lastSuccess.map(ToolPopup.success)].compactMap { $0 }
-    }
+    /// What went wrong last, as a popup `RootView` stacks over the app.
+    var popups: [ToolPopup] { [lastError.map(ToolPopup.error), lastSuccess.map(ToolPopup.success)].compactMap { $0 } }
 
     func closePopup(_ popup: ToolPopup) {
         switch popup {
@@ -120,9 +142,6 @@ final class CertManager: ObservableObject {
         case .success: lastSuccess = nil
         }
     }
-
-    /// True while signing in, listing, revoking, importing or exporting.
-    var isBusy: Bool { isWorking || isImporting || revokingID != nil || exportingID != nil }
 
     // MARK: - Public actions
 
@@ -139,32 +158,61 @@ final class CertManager: ObservableObject {
     /// Sign in if needed and reload the list; `then` runs only if it arrived.
     @MainActor
     func loadCerts(then: (() -> Void)? = nil) {
-        guard !isWorking, revokingID == nil else { return }
+        // B-5：loadCerts 本身也有同款静默守卫——在途时直接调它，
+        // then 同样暂存进 pendingThen，免得静默丢掉（吊销在途时
+        // 不存：那时没有在途加载，存了也没人跑）。
+        if isWorking {
+            if let then { pendingThen = then }
+            return
+        }
+        guard revokingID == nil else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = ErrorHelp.explained(L("No Apple ID saved. Add one in Settings › Account."))
+            lastError = L("No Apple ID saved. Add one in Settings › Account.")
             return
         }
         isWorking = true
         lastError = nil
         engine.log("=== Certificates: loading ===")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let list = try await onQueue { try self.performList() }
-                certs = list
+                guard generation == signInGeneration else { throw CancellationError() }
+                certs = Self.sortedByExpiry(list)
                 hasLoaded = true
+                // F-3 (0.9.159): the expiry notice follows the fresh list.
+                DevCertExpiryNotifier.reschedule(certs: list)
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
                 isWorking = false
                 then?()
+                // B-5：在途加载期间 ensureLoaded 暂存的回调，成功路顺带跑掉。
+                let pending = pendingThen
+                pendingThen = nil
+                pending?()
                 return
             } catch is CancellationError {
                 // Not currently cancellable; handled for consistency with Engine.
+                // C10：取消也跑 then——等回调的是用户已点过的动作
+                // （吊销 chooser），不跑界面就永远没反应；先把
+                // isWorking 复位，再跑 then，顺序与成功路一致。
+                engine.log("Certificates: load cancelled.")
+                isWorking = false
+                then?()
+                // B-5：取消路与成功路同口径，暂存的回调也跑掉。
+                let pending = pendingThen
+                pendingThen = nil
+                pending?()
+                return
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "failed")")
             }
             isWorking = false
+            // B-5：失败路不跑暂存的回调，直接丢弃。
+            pendingThen = nil
         }
     }
 
@@ -175,7 +223,7 @@ final class CertManager: ObservableObject {
         guard session != nil, revokingID == nil, !isWorking else { return }
         let serial = cert.serialNumber
         guard !serial.isEmpty else {
-            lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be revoked."))
+            lastError = L("This certificate has no serial number, so it can't be revoked.")
             return
         }
         revokingID = cert.id
@@ -183,72 +231,44 @@ final class CertManager: ObservableObject {
         engine.log("Certificates: revoking \(cert.displayName) (\(serial)) …")
         Task { @MainActor in
             var revoked = false
+            let generation = signInGeneration
             do {
                 try await onQueue { try self.performRevoke(serial: serial) }
                 revoked = true
                 engine.log("Certificates: revoked \(cert.displayName).")
-                let list = try await onQueue { try self.performList() }
-                certs = list
+                guard generation == signInGeneration else { throw CancellationError() }
+                do {
+                    let list = try await onQueue { try self.performList() }
+                    guard generation == signInGeneration else { throw CancellationError() }
+                    certs = Self.sortedByExpiry(list)
+                } catch {
+                    // C9：吊销成功了，只是列表没刷出来——先把这张从
+                    // 列表里拿掉，别让用户再点一次吊销；再告诉他
+                    // 列表可能还是旧的，重新加载会刷新。
+                    // B-48-B1：旧账号切走后的刷新失败不许写新账号的 lastError，
+                    // 也不许碰已被 signOut 清空的列表。
+                    guard generation == signInGeneration else { throw CancellationError() }
+                    certs.removeAll { $0.id == cert.id }
+                    lastError = L("Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
+                    engine.log("⛔️ Certificates: revoked \(cert.displayName), but the list refresh failed: \(short(error))")
+                }
+            } catch is CancellationError {
+                // B-48-B1：吊销本身已做成（旧账号），只作废写回与重试，
+                // 不记错。revoked 置 false 使尾部的 `if revoked { onSuccess?() }` 不跑——
+                // 切账号后拿新账号重跑安装是错的，用户手动重试。
+                revoked = false
+                engine.log("Certificates: revoke cancelled (account changed).")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
             }
             revokingID = nil
+            // F-3 (0.9.159): the revoked certificate's notice goes with it —
+            // the list is settled by now, refreshed or with the entry dropped.
+            DevCertExpiryNotifier.reschedule(certs: certs)
             // Run `onSuccess` if the revoke succeeded, even if the refresh failed.
             if revoked { onSuccess?() }
         }
-    }
-
-    /// Writes the certificate SideInstaller signs with and its private key to a
-    /// .p12 file protected by `password`, then hands the file to `share`. The
-    /// file is alone in a temporary folder, for `share` to delete when done. An
-    /// empty `password` makes a file that signing apps import without one, but
-    /// a Mac doesn't (see `p12::archive` in rust-core).
-    @MainActor
-    func export(_ cert: DevCert, password: String, share: @escaping (URL) -> Void) {
-        guard session != nil, !isBusy else { return }
-        let serial = cert.serialNumber
-        guard !serial.isEmpty else {
-            lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be exported."))
-            return
-        }
-        exportingID = cert.id
-        lastError = nil
-        lastSuccess = nil
-        engine.log("Certificates: exporting \(cert.displayName) (\(serial)) …")
-        Task { @MainActor in
-            defer { exportingID = nil }
-            do {
-                let file = try Self.exportFile(for: cert)
-                do {
-                    try await onQueue { try self.performExport(serial: serial, password: password, to: file) }
-                } catch {
-                    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
-                    throw error
-                }
-                engine.log("Certificates: exported \(cert.displayName) as a .p12 file.")
-                share(file)
-            } catch {
-                lastError = short(error)
-                engine.log("⛔️ Certificates: \(lastError ?? "export failed")")
-            }
-        }
-    }
-
-    /// Where an export goes: `<temporary>/Certificate export/<name>.p12`, the
-    /// folder emptied first so no earlier export lingers.
-    private static func exportFile(for cert: DevCert) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Certificate export", isDirectory: true)
-        try? FileManager.default.removeItem(at: folder)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        // Portal names read like "iOS Development: Name"; keep them file-safe.
-        let name = cert.displayName
-            .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
-            .joined(separator: " -")
-            .trimmingCharacters(in: .whitespaces)
-        return folder.appendingPathComponent(name.isEmpty ? "Development certificate" : name)
-            .appendingPathExtension("p12")
     }
 
     // MARK: - SideStore's certificate
@@ -330,25 +350,53 @@ final class CertManager: ObservableObject {
         engine.log("=== Certificates: checking \(title) ===")
         Task { @MainActor in
             defer { isImporting = false }
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let result = try await importFirstOnTeam(candidates)
+                guard generation == signInGeneration else { throw CancellationError() }
                 let name = result.certificate.machineLabel ?? result.certificate.displayName
                 engine.log(result.replacedKey
                     ? "Certificates: signing with \(name) (\(result.certificate.serialNumber)) from now on; nothing was revoked."
                     : "Certificates: \(name) is the certificate SideInstaller signs with already.")
-                if let list = try? await onQueue({ try self.performList() }) {
-                    certs = list
+                do {
+                    let list = try await onQueue { try self.performList() }
+                    guard generation == signInGeneration else { throw CancellationError() }
+                    certs = Self.sortedByExpiry(list)
                     hasLoaded = true
+                } catch {
+                    // C17：导入成功了，只是列表没刷出来——告诉他
+                    // 列表可能还是旧的，重新加载会刷新。
+                    // B-48-B1：同 C9，旧账号切走后的刷新失败不许写新账号的 lastError。
+                    guard generation == signInGeneration else { throw CancellationError() }
+                    lastError = L("Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
+                    engine.log("⛔️ Certificates: imported \(name), but the list refresh failed: \(short(error))")
                 }
+                // F-3 (0.9.159): the imported certificate's expiry notice
+                // follows the new list — the old date must not linger.
+                DevCertExpiryNotifier.reschedule(certs: certs)
                 if retryInstall {
-                    engine.log("Retrying the install with \(name).")
-                    engine.runOneClick()
-                } else {
+                    // B-2 (0.9.176): 证书重试导入后重跑安装——批跑下载
+                    // 间隙 `isRunning` 也是 false，`runOneClick` 会
+                    // 直接起跑、抢占安装槽，批跑下一项导入被拒、全批
+                    // 报废。证书本身已导入成功，只拦重跑这一路，原因
+                    // 写本页的 `lastError`。
+                    if engine.batchUpdateRunning {
+                        lastError = L("全部更新进行中，等它跑完再安装。")
+                        engine.log("⛔️ Certificates: retry install refused — an update-all batch is running.")
+                    } else {
+                        engine.log("Retrying the install with \(name).")
+                        engine.runOneClick()
+                    }
+                } else if lastError == nil {
                     lastSuccess = result.replacedKey
                         ? L("SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.", name)
                         : L("SideInstaller already signs with “%@”.", name)
                 }
+            } catch is CancellationError {
+                // A2：切账号后本次导入作废，不记错（isImporting 由外层 defer 复位）。
+                engine.log("Certificates: import cancelled (account changed).")
             } catch {
                 lastError = error is ImportNotOnTeam ? notOnTeam : short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "import failed")")
@@ -379,7 +427,13 @@ final class CertManager: ObservableObject {
     /// revoke chooser.
     @MainActor
     func ensureLoaded(then: @escaping () -> Void) {
-        guard !isWorking, revokingID == nil else { return }
+        guard revokingID == nil else { return }
+        if isWorking {
+            // B-5：加载在途时 then 不再静默丢掉，暂存进 pendingThen，
+            // 在途那次 loadCerts 成功后顺带跑掉；失败时丢弃。
+            pendingThen = then
+            return
+        }
         if hasLoaded, session != nil {
             then()
             return
@@ -391,12 +445,22 @@ final class CertManager: ObservableObject {
     /// No-op if not signed in.
     @MainActor
     func signOut() {
+        // A2：世代递增放 guard 之前——登录在途时 session 还是 nil，早退会漏递增。
+        signInGeneration += 1
+        // A3：成功文案也放 guard 之前，session 已是 nil 时早退会漏清。
+        lastSuccess = nil
         guard let session else { return }
-        si_cert_session_free(session)
+        // C18：释放排进证书队列（与在途的 FFI 调用串行），不在主线程直接
+        // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。
+        let freed = session
+        queue.async { si_cert_session_free(freed) }
         self.session = nil
         isSignedIn = false
         teamSummary = nil
         certs = []
+        // F-3 (0.9.159): the old account's certificates are gone, so their
+        // expiry notices go too — an empty reschedule only clears stale ones.
+        DevCertExpiryNotifier.reschedule(certs: [])
         hasLoaded = false
         didAutoLoad = false
         lastError = nil
@@ -408,6 +472,8 @@ final class CertManager: ObservableObject {
     @MainActor
     private func signIn(id: String, pw: String) async throws {
         // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        // A2：排队等待期间切账号同样作废本次尝试，世代在等位前抓。
+        let generation = signInGeneration
         let ticket = try await engine.appleSignIns.waitForTurn(.certificates, appleID: id)
         defer { engine.appleSignIns.finished(ticket) }
         // A load and an import can both have been waiting; the first signed in.
@@ -420,20 +486,30 @@ final class CertManager: ObservableObject {
         // off); a credential or 2FA error stops the loop.
         let servers = anisetteCandidates()
         let dir = storageDir
-        var failures = AnisetteServer.SignInFailures()
+        var lastError = L("No anisette servers are configured.")
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
+            // A3：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             if appleRefusals.rulesOut(ani) {
                 engine.log("Certificates: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
-                failures.skip()
                 continue
             }
             do {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
+                // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.session {
+                        self.session = nil
+                        queue.async { si_cert_session_free(stale) }
+                    }
+                    throw CancellationError()
+                }
+                engine.anisetteURL = ani               // stick with what worked
                 engine.anisetteSignedIn(ani)
                 AccountStore.shared.signedIn(id, withTeam: Engine.teamID(inSummary: summary))
                 teamSummary = summary
@@ -441,7 +517,9 @@ final class CertManager: ObservableObject {
                 engine.log("Certificates: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
-                let failure = error.errorDescription ?? "sign-in failed"
+                // A3：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
+                lastError = error.errorDescription ?? L("Sign-in failed.")
                 if ticket.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
@@ -450,48 +528,26 @@ final class CertManager: ObservableObject {
                     engine.log("No developer team picked — stopping.")
                     throw EngineError.message(Engine.noTeamPickedMessage)
                 }
-                if Engine.isAccountLocked(failure) {
-                    engine.log("Apple has locked this Apple Account: \(failure)")
+                                if Engine.isAccountLocked(lastError) {
+                    engine.log("Apple has locked this Apple Account: \(lastError)")
                     throw EngineError.accountLocked
                 }
-                if Engine.isEmailUnverifiedError(failure) {
-                    engine.log("Apple wants this Apple Account's email address verified first: \(failure)")
+                if Engine.isEmailUnverifiedError(lastError) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(lastError)")
                     throw EngineError.emailUnverified
                 }
-                if Engine.isCredentialError(failure) {
-                    engine.log("Apple ID credentials rejected: \(failure)")
+                if Engine.isCredentialError(lastError) {
+                    engine.log("Apple ID credentials rejected: \(lastError)")
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
-                // Not logged in through an Android-ADI server (-80046).
-                if Engine.isAndroidADISkip(failure) {
-                    engine.log("Certificates: skipping anisette \(idx + 1)/\(servers.count): Apple refuses the sign-in token for anisette from its Android library (-80046).")
-                    appleRefusals.recordTokenRefusal(ani)
-                    failures.skip()
-                    if failures.tried == 0, appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
-                        throw EngineError.message(engine.androidADIRefusalMessage(server: ani))
-                    }
-                    continue
-                }
-                engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(failure)")
-                failures.failed(ani, error: failure)
-                engine.anisetteFailed(ani, error: failure)
-                if Engine.isAppleRateLimit(failure) {
+                engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                if Engine.isAppleRateLimit(lastError) {
                     engine.log("Certificates: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
                 // Apple refuses a reported device through every server alike;
                 // see `AnisetteServer.AppleRefusals`.
-                if Engine.isAppleOutdatedMacRefusal(failure) {
-                    appleRefusals.recordOutdated(ani)
-                }
-                if Engine.isAppleTokenRefusal(failure) {
-                    appleRefusals.recordTokenRefusal(ani)
-                    if appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
-                        engine.log("Certificates: Apple refused the sign-in token (-80046) — stopping.")
-                        throw EngineError.message(engine.appleTokenRefusalMessage(through: ani))
-                    }
-                }
-                if Engine.isAppleServiceRefusal(failure) {
+                if Engine.isAppleServiceRefusal(lastError) {
                     appleRefusals.record(ani)
                     if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         engine.log("Certificates: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
@@ -500,7 +556,7 @@ final class CertManager: ObservableObject {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Engine.isAppleUnreachable(failure) {
+                if Engine.isAppleUnreachable(lastError) {
                     appleUnreachable += 1
                     if let message = await engine.appleUnreachableStop(
                         failures: appleUnreachable, logPrefix: "Certificates: ") {
@@ -511,7 +567,12 @@ final class CertManager: ObservableObject {
                 }
             }
         }
-        throw EngineError.message(engine.anisetteSignInFailure(failures))
+        let tried = servers.count == 1
+            ? L("the anisette server")
+            : L("all %d anisette servers", servers.count)
+        let detail = (lastError == L("No anisette servers are configured."))
+            ? lastError : friendlyRustError(lastError)
+        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
     /// One sign-in attempt against a specific anisette server, on `team` when
@@ -534,6 +595,7 @@ final class CertManager: ObservableObject {
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
+            engine.log("Certificates: sign-in failed: \(msg)")
             throw EngineError.message(msg)
         }
     }
@@ -541,7 +603,7 @@ final class CertManager: ObservableObject {
     // MARK: - List / revoke FFI
 
     private func performList() throws -> [DevCert] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_list(session, &json, &error)
@@ -551,44 +613,31 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([DevCert].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read the certificate list: \(error)")
+                // C-5：证书列表读失败只显示友好文案，不嵌 error 原串；
+                // error 原文进活动日志，不进用户面。
+                engine.log("Certificates: couldn't read the certificate list: \(error)")
+                throw EngineError.message(L("Couldn't read the certificate list."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Listing certificates failed: \(msg)")
+            engine.log("Certificates: list failed: \(msg)")
+            throw EngineError.message(L("Listing certificates failed: %@", friendlyRustError(msg)))
         }
     }
 
     private func performRevoke(serial: String) throws {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_revoke(session, serial, &error)
         if rc != 0 {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Revoke failed: \(msg)")
+            engine.log("Certificates: revoke failed: \(msg)")
+            throw EngineError.message(L("Revoke failed: %@", friendlyRustError(msg)))
         }
     }
 
-    /// Error 3 from `si_cert_export`: not the certificate SideInstaller signs with.
-    private static let exportNotSigning: Int32 = 3
-
-    private func performExport(serial: String, password: String, to file: URL) throws {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
-        var error: UnsafeMutablePointer<CChar>?
-        let rc = si_cert_export(session, serial, password, file.path, &error)
-        if rc == 0 { return }
-        let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
-        error.map { si_string_free($0) }
-        engine.log("Certificate export: \(msg)")
-        if rc == Self.exportNotSigning {
-            throw EngineError.message(L("Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it."))
-        }
-        throw EngineError.message(L("Couldn't export the certificate: %@", msg))
-    }
-
-    /// Error 3 from `si_cert_import`: no certificate on the team has the key.
     private static let importNotOnTeam: Int32 = 3
 
     /// Thrown for error 3, which the import explains for where the
@@ -596,7 +645,7 @@ final class CertManager: ObservableObject {
     private struct ImportNotOnTeam: Error {}
 
     private func performImport(p12: Data, password: String) throws -> CertImportResult {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = p12.withUnsafeBytes { bytes in
@@ -609,14 +658,65 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode(CertImportResult.self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read what the import did: \(error)")
+                // C-5：同上——只显示友好文案，error 原文进活动日志。
+                engine.log("Certificates: couldn't read the import result: \(error)")
+                throw EngineError.message(L("Couldn't read what the import did."))
             }
         }
         let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
         error.map { si_string_free($0) }
         engine.log("Certificate import: \(msg)")
         if rc == Self.importNotOnTeam { throw ImportNotOnTeam() }
-        throw EngineError.message(L("Couldn't use that certificate: %@", msg))
+        throw EngineError.message(L("Couldn't use that certificate: %@", friendlyRustError(msg)))
+    }
+
+    /// Makes sure there is a live Apple sign-in session, signing in first
+    /// if needed — the same auto-login `loadCerts` and the import flow do.
+    /// Export used to just guard on the session, so opening the app detail
+    /// page without ever visiting the certificates page always failed with
+    /// "Not signed in." Throws the sign-in error itself when login fails.
+    func ensureSignedIn() async throws {
+        let id = engine.normalizedAppleID, pw = engine.applePassword
+        guard !id.isEmpty, !pw.isEmpty else {
+            throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
+        }
+        if session == nil { try await signIn(id: id, pw: pw) }
+    }
+
+    /// Export the signing certificate as p12 (base64) + password.
+    /// Returns (p12Data, password).
+    func exportP12() throws -> (Data, String) {
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
+        let email = engine.appleID
+        // Machine name: use the first cert's machineName, or fallback
+        let machineName = certs.first?.machineName ?? "SideInstaller"
+        let storageDir = PrivateStore.isideload.path
+
+        var outJson: UnsafeMutablePointer<CChar>?
+        var outError: UnsafeMutablePointer<CChar>?
+        let rc = si_cert_export_p12(
+            session,
+            email, machineName, storageDir,
+            &outJson, &outError
+        )
+        if rc == 0 {
+            let jsonStr = outJson.map { String(cString: $0) } ?? "{}"
+            outJson.map { si_string_free($0) }
+            guard let jsonData = jsonStr.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: String],
+                  let b64 = obj["p12_b64"],
+                  let password = obj["password"],
+                  let p12Data = Data(base64Encoded: b64) else {
+                // C-5：p12 导出结果解析失败的文案进 L()。
+                throw EngineError.message(L("Couldn't parse p12 export result."))
+            }
+            return (p12Data, password)
+        } else {
+            let msg = outError.map { String(cString: $0) } ?? "rc=\(rc)"
+            outError.map { si_string_free($0) }
+            engine.log("Certificates: export failed: \(msg)")
+            throw EngineError.message(L("Export failed: %@", friendlyRustError(msg)))
+        }
     }
 
     // MARK: - Helpers

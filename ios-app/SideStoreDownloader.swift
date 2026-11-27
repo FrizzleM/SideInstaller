@@ -1,9 +1,10 @@
 import Compression
 import CryptoKit
 import Foundation
+import UIKit
 
 /// Which release track to pull the IPA from.
-enum ReleaseChannel: String, CaseIterable, Identifiable {
+enum ReleaseChannel: String, CaseIterable, Identifiable, Codable {
     case stable
     case nightly
 
@@ -92,7 +93,7 @@ struct AltSourceFeed {
 /// What to install: two SideStore builds and Madeira, fetched from GitHub,
 /// AltStore, fetched from its own source, or a user-supplied IPA. Nothing is
 /// known about the latter, so its release properties are nil.
-enum InstallSource: String, CaseIterable, Identifiable {
+enum InstallSource: String, CaseIterable, Identifiable, Codable {
     case sideStore
     case liveContainer
     case madeira
@@ -415,7 +416,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
 
 /// One release of a build, as the version picker under Advanced offers it, or
 /// one GitHub Actions build of it.
-struct ReleaseVersion: Identifiable, Hashable {
+struct ReleaseVersion: Identifiable, Hashable, Codable {
     /// The release's tag, e.g. "0.6.3" or "alpha"; for an Actions build, its
     /// short commit ("e96065a").
     let tag: String
@@ -458,7 +459,7 @@ struct ReleaseVersion: Identifiable, Hashable {
 }
 
 /// A build's releases on GitHub, sorted into the two channels for the picker.
-struct ReleaseCatalog {
+struct ReleaseCatalog: Codable {
     /// The release "Latest" installs on each channel, when the list has it.
     let latest: [ReleaseChannel: ReleaseVersion]
     /// Each channel's other releases carrying the build, newest first.
@@ -545,6 +546,21 @@ enum SideStoreDownloader {
     /// Called on the download's own queue.
     @TaskLocal static var reportProgress: (@Sendable (Double) -> Void)?
 
+    /// B1 (0.9.155): the byte count of a release download whose total the
+    /// server never stated — `ResumingDownload` only calls this when there
+    /// is no total to make a fraction from, so a caller that gets bytes
+    /// knows the fraction will stay silent. Same `withValue` shape as
+    /// `reportProgress`, called on the download's own queue.
+    @TaskLocal static var reportProgressBytes: (@Sendable (Int) -> Void)?
+
+    /// F-2 (0.9.157): (bytes written, total bytes, -1 while the total is
+    /// unknown) — the speed/ETA sample for the Install tab and Side by
+    /// Side. Neither the fraction nor the byte count alone can supply it:
+    /// the fraction has no bytes, the byte count has no total. Same
+    /// `withValue` shape as `reportProgress`, called on the download's
+    /// own queue, throttled like the fraction.
+    @TaskLocal static var reportProgressDetail: (@Sendable (Int, Int) -> Void)?
+
     struct GHAsset: Decodable {
         let name: String
         let browser_download_url: String
@@ -603,6 +619,9 @@ enum SideStoreDownloader {
         /// The source lists no version of the build that runs on the iPhone's
         /// iOS (the build, its host, the iOS version).
         case noListedVersion(String, String, String)
+        /// The iPhone has no room for the download: what it needs, and
+        /// what's free on it.
+        case notEnoughSpace(needed: Int, available: Int)
 
         var description: String {
             switch self {
@@ -616,13 +635,13 @@ enum SideStoreDownloader {
                 return L("bad asset URL")
             case .notDownloadable:
                 return L("there's nothing to download for a custom IPA — import one first")
-            case let .badStatus(status, detail, retryAfter):
+            case let .badStatus(status, _, retryAfter):
                 // Replace GitHub's rate-limit text with when to retry.
                 if let retryAfter {
                     return L("GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.",
                              Self.relative(retryAfter))
                 }
-                return L("GitHub answered HTTP %d%@", status, detail.map { ": \($0)" } ?? "")
+                return L("GitHub answered HTTP %d", status)
             case let .repoUnavailable(repo):
                 return L("GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.",
                          repo)
@@ -658,6 +677,10 @@ enum SideStoreDownloader {
                          source, host)
             case let .noListedVersion(source, host, os):
                 return L("%@ lists no version of %@ that runs on iOS %@.", host, source, os)
+            case let .notEnoughSpace(needed, available):
+                return L("Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.",
+                         ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file),
+                         ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file))
             }
         }
 
@@ -669,7 +692,7 @@ enum SideStoreDownloader {
                  .sourceUnreachable, .badSource, .unverifiedListing:
                 return true
             case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable,
-                 .noBuild, .sourceStatus, .noListedVersion:
+                 .noBuild, .sourceStatus, .noListedVersion, .notEnoughSpace:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
@@ -703,7 +726,8 @@ enum SideStoreDownloader {
                 return true
             case .badURL, .notDownloadable, .badStatus, .repoUnavailable, .unreachable,
                  .badRelease, .notAnIPA, .linkStatus, .noBuild, .relayFailed, .unverifiedBuild,
-                 .sourceUnreachable, .sourceStatus, .badSource, .unverifiedListing, .noListedVersion:
+                 .sourceUnreachable, .sourceStatus, .badSource, .unverifiedListing, .noListedVersion,
+                 .notEnoughSpace:
                 return false
             }
         }
@@ -817,6 +841,9 @@ enum SideStoreDownloader {
         }
         // A file of that name the user put there isn't replaced.
         if FileManager.default.fileExists(atPath: dest.path), !DownloadLedger.isManaged(dest) {
+            guard IPALibrary.looksLikeIPA(dest) else {
+                throw DownloadError.repoUnavailable(repo)
+            }
             log("Using your own \(dest.lastPathComponent) instead — skipping the download.")
             return dest.path
         }
@@ -980,6 +1007,42 @@ enum SideStoreDownloader {
         return file
     }
 
+    /// Refuses a download the iPhone has no room for, before a byte is
+    /// written: a HEAD read gives the file's size, matched against the free
+    /// space for important usage on the volume Documents lives on. When the
+    /// size can't be learned, a big IPA is assumed and at least
+    /// `minimumFreeSpace` must be free (unknown total = bytes already saved,
+    /// here none, + threshold). A HEAD that fails — offline, or a host that
+    /// won't answer one — never blocks the download: only a size known to
+    /// exceed the free space refuses it. A volume whose free space can't be
+    /// read doesn't block it either.
+    private static let minimumFreeSpace = 100_000_000
+
+    private static func checkFreeSpace(for url: URL, named name: String,
+                                       log: ((String) -> Void)? = nil) async throws -> Int? {
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        var expected: Int?
+        if let (_, response) = try? await URLSession.shared.data(for: req),
+           response.expectedContentLength > 0 {
+            expected = Int(response.expectedContentLength)
+        }
+        try Task.checkCancellation()
+        // F-G (0.9.156): the size is returned now, so the cellular prompt
+        // below can show it — a HEAD that failed leaves it nil ("unknown").
+        guard let available = (try? IPALibrary.documentsDir.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]))
+            .flatMap(\.volumeAvailableCapacityForImportantUsage)
+            .map({ Int($0) }) else { return expected }
+        let needed = expected ?? minimumFreeSpace
+        guard needed <= available else {
+            log?("⚠️ Not enough free space for \(name): needs \(ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file)), only \(ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file)) free.")
+            throw DownloadError.notEnoughSpace(needed: needed, available: available)
+        }
+        return expected
+    }
+
     /// Download one URL to a temporary file, if the response isn't a refusal.
     ///
     /// The IPA is tens or hundreds of megabytes, so a transfer that stalls or
@@ -988,6 +1051,15 @@ enum SideStoreDownloader {
                               idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
         log("Downloading \(name) …")
+        let size = try await checkFreeSpace(for: url, named: name, log: log)
+        // F-G (0.9.156): every release download funnels through here, after
+        // the reuse checks decided a body really has to move — ask first on
+        // cellular when the switch is on, with the size the HEAD just
+        // learned. A no throws CancellationError, which the callers already
+        // treat as a stop, not a failure.
+        guard await Engine.shared.confirmCellularDownload(size: size.map(Int64.init), what: name) else {
+            throw CancellationError()
+        }
         let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout,
                                         progress: reportProgress, log: log)
         do {
@@ -1009,44 +1081,126 @@ enum SideStoreDownloader {
     /// to the link rather than GitHub.
     static func fetchDirect(_ url: URL,
                             named name: String,
+                            // B1 (0.9.155): told the bytes arrived, only while
+                            // the transfer states no total — the fraction
+                            // stays silent then, so the caller needs this to
+                            // show anything moving at all.
+                            onBytes: ((Int) -> Void)? = nil,
+                            // F-2 (0.9.157): told (bytes written, total, -1
+                            // while unknown) on the same cadence as the
+                            // fraction / byte reports, for the caller's
+                            // speed and ETA — the KVO fraction alone has no
+                            // bytes, the byte count alone has no total.
+                            onProgressDetail: ((Int, Int) -> Void)? = nil,
                             progress: @escaping (Double) -> Void) async throws -> URL {
         var req = URLRequest(url: url)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        // F1 (0.9.145): same free-space precheck as `fetch` — a pasted link is
+        // a big IPA too, and refusing it here beats filling the disk first.
+        let size = try await checkFreeSpace(for: url, named: name)
+        // F-G (0.9.156): 同 `fetch`——链接导入与 Side by Side 的下载都走
+        // 这里，蜂窝下先确认再开始；拒绝即取消，不记失败。
+        guard await Engine.shared.confirmCellularDownload(size: size.map(Int64.init), what: name) else {
+            throw CancellationError()
+        }
 
         let staging = FileManager.default.temporaryDirectory
             .appendingPathComponent("ipa-link-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         let dest = staging.appendingPathComponent(name)
 
-        return try await withCheckedThrowingContinuation { cont in
-            // Progress is observed via KVO on the task's `Progress` instead of
-            // a download delegate, which would conflict over the downloaded file.
-            var observation: NSKeyValueObservation?
-            let task = URLSession.shared.downloadTask(with: req) { file, response, error in
-                observation?.invalidate()
-                do {
-                    if let error { throw error }
-                    guard let file, let http = response as? HTTPURLResponse else {
-                        throw DownloadError.badURL
-                    }
-                    guard (200...299).contains(http.statusCode) else {
-                        throw DownloadError.linkStatus(http.statusCode)
-                    }
-                    // The temp file is deleted when this handler returns, so
-                    // move it now.
-                    try FileManager.default.moveItem(at: file, to: dest)
-                    cont.resume(returning: dest)
-                } catch let urlError as URLError {
-                    cont.resume(throwing: urlError.code == .cancelled
-                                ? CancellationError() : DownloadError.unreachable(urlError))
-                } catch {
-                    cont.resume(throwing: error)
+        // B1 (0.9.147): cancellable — the old bare continuation left a
+        // pasted link unstoppable once started, with the import button
+        // disabled until it finished. The task is made before the
+        // continuation, so the cancel handler reaches it as a plain `let`
+        // (the `attempt` shape below); the continuation is resumed only
+        // through `settle`, which takes it once, so a cancel landing as
+        // the download finishes can't resume it twice.
+        let settleLock = NSLock()
+        var pending: CheckedContinuation<URL, Error>?
+        func settle(_ result: Result<URL, Error>) {
+            settleLock.lock()
+            let continuation = pending
+            pending = nil
+            settleLock.unlock()
+            switch result {
+            case .success(let url): continuation?.resume(returning: url)
+            case .failure(let error): continuation?.resume(throwing: error)
+            }
+        }
+        // A-2：KVO 路的进度节流器（与 byte-loop 路同一 helper，各自的状态）。
+        let progressThrottler = ProgressThrottler()
+        // Progress is observed via KVO on the task's `Progress` instead of
+        // a download delegate, which would conflict over the downloaded file.
+        var observation: NSKeyValueObservation?
+        let task = URLSession.shared.downloadTask(with: req) { file, response, error in
+            observation?.invalidate()
+            do {
+                if let error { throw error }
+                guard let file, let http = response as? HTTPURLResponse else {
+                    throw DownloadError.badURL
+                }
+                guard (200...299).contains(http.statusCode) else {
+                    throw DownloadError.linkStatus(http.statusCode)
+                }
+                // The temp file is deleted when this handler returns, so
+                // move it now.
+                try FileManager.default.moveItem(at: file, to: dest)
+                settle(.success(dest))
+            } catch let urlError as URLError {
+                // N3(C)：失败路只 resume、不删 staging，会留空 ipa-link-* 目录。
+                try? FileManager.default.removeItem(at: staging)
+                settle(.failure(urlError.code == .cancelled
+                            ? CancellationError() : DownloadError.unreachable(urlError)))
+            } catch {
+                try? FileManager.default.removeItem(at: staging)
+                settle(.failure(error))
+            }
+        }
+        // B1 (0.9.155): a chunked transfer never states a total, so
+        // `fractionCompleted` sits at 0 the whole way — report the bytes
+        // instead (256KB steps, lock-guarded like LocationView's
+        // `lastPublished`), and let the caller go indeterminate.
+        var lastBytesReported = 0
+        let bytesLock = NSLock()
+        observation = task.progress.observe(\.fractionCompleted) { done, _ in
+            if done.totalUnitCount > 0 {
+                progressThrottler.publish(done.fractionCompleted) { fraction in
+                    progress(fraction)
+                    // F-2 (0.9.157): the speed sample rides the same
+                    // throttled publish as the fraction.
+                    onProgressDetail?(Int(done.completedUnitCount), Int(done.totalUnitCount))
+                }
+            } else if let onBytes {
+                let bytes = Int(done.completedUnitCount)
+                bytesLock.lock()
+                let fresh = bytes > 0 && (bytes - lastBytesReported >= 256 * 1024 || lastBytesReported == 0)
+                if fresh { lastBytesReported = bytes }
+                bytesLock.unlock()
+                guard fresh else { return }
+                onBytes(bytes)
+                // F-2 (0.9.157): same 256KB cadence, total unknown.
+                onProgressDetail?(bytes, -1)
+            }
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                pending = cont
+                if Task.isCancelled {
+                    // Cancelled before the download started: stop the task
+                    // and resume here — the cancel may or may not deliver
+                    // the completion handler, and `settle` lets only the
+                    // first resume through.
+                    task.cancel()
+                    try? FileManager.default.removeItem(at: staging)
+                    settle(.failure(CancellationError()))
+                } else {
+                    task.resume()
                 }
             }
-            observation = task.progress.observe(\.fractionCompleted) { done, _ in
-                progress(done.fractionCompleted)
-            }
-            task.resume()
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -1071,7 +1225,7 @@ enum SideStoreDownloader {
             release = try JSONDecoder().decode(GHRelease.self, from: data)
         } catch {
             // The status was 2xx, so this is a real decode failure.
-            throw DownloadError.badRelease(String(describing: error))
+            throw DownloadError.badRelease(L("the data couldn't be read"))
         }
         log("\(channel.displayName) \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
 
@@ -1160,7 +1314,7 @@ enum SideStoreDownloader {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw DownloadError.badRelease(String(describing: error))
+            throw DownloadError.badRelease(L("the data couldn't be read"))
         }
     }
 
@@ -1206,10 +1360,10 @@ enum SideStoreDownloader {
         do {
             listing = try JSONDecoder().decode(AltSourceListing.self, from: data)
         } catch {
-            throw DownloadError.badSource(feed.name, String(describing: error))
+            throw DownloadError.badSource(feed.name, L("the data couldn't be read"))
         }
         guard let app = listing.apps.first(where: { $0.bundleIdentifier == feed.bundleID }) else {
-            throw DownloadError.badSource(feed.name, "\(feed.bundleID) isn't listed")
+            throw DownloadError.badSource(feed.name, L("%@ isn't listed", feed.bundleID))
         }
         return (app.versions ?? []).compactMap { listed -> ReleaseVersion? in
             // Only over HTTPS, and only what this iOS can run.
@@ -1261,7 +1415,9 @@ enum SideStoreDownloader {
 
     /// True when iOS `os` is in a listing's range: `min` or later, and `max`
     /// or earlier when it gives one. A bound that isn't a version is no bound.
-    private static func runs(on os: OperatingSystemVersion, from min: String?, to max: String?) -> Bool {
+    /// Internal (not private): F-1 (0.9.158) reuses it for the IPA's own
+    /// MinimumOSVersion pre-check in `Engine` and Side by Side.
+    static func runs(on os: OperatingSystemVersion, from min: String?, to max: String?) -> Bool {
         let key = { (v: OperatingSystemVersion) in (v.majorVersion, v.minorVersion, v.patchVersion) }
         if let min = min.flatMap(osVersion), key(os) < key(min) { return false }
         if let max = max.flatMap(osVersion), key(os) > key(max) { return false }
@@ -1459,8 +1615,12 @@ enum SideStoreDownloader {
     private static func check(_ response: URLResponse, body: Data? = nil) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200...299).contains(http.statusCode) else {
+            let detail = body.flatMap(errorMessage(in:))
+            // GitHub's own words stay in the log only — the user-facing
+            // description no longer carries them (C-48-1).
+            if let detail { Engine.shared.log("GitHub API error HTTP \(http.statusCode): \(detail)") }
             throw DownloadError.badStatus(status: http.statusCode,
-                                          detail: body.flatMap(errorMessage(in:)),
+                                          detail: detail,
                                           retryAfter: retryAfter(http))
         }
     }
@@ -1497,6 +1657,66 @@ enum SideStoreDownloader {
 /// from the start link. The rest must be of the same file: a 206 with another
 /// ETag starts the download over, for a nightly replaced meanwhile. `If-Range`
 /// asks for that too, but GitHub's release storage ignores it.
+/// A-2：下载进度节流——断点续传路每 chunk、KVO 路每次变化都调 progress，
+/// 再经 Engine/SBS 的 report 闭包每次 `Task { @MainActor in }` 发布一次。
+/// 变化 ≥0.5% 或距上次发布 ≥100ms 才放行，最后一块强制发布。
+/// 一个下载一个实例（状态跟下载走，两个下载并行不互相压）。
+private final class ProgressThrottler: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPublished: Double?
+    private var lastPublishedAt: Date?
+
+    /// Gates `fraction` through `send`; the last chunk always goes through.
+    func publish(_ fraction: Double, send: (Double) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = Date()
+        if fraction < 1,
+           let last = lastPublished, let at = lastPublishedAt,
+           abs(fraction - last) < 0.005, now.timeIntervalSince(at) < 0.1 { return }
+        lastPublished = fraction
+        lastPublishedAt = now
+        send(fraction)
+    }
+}
+
+/// F-2 (0.9.157): the speed/ETA sampler `IPADownloader.noteProgress`
+/// already does, shared by the Install tab and Side by Side: an
+/// exponential moving average over the throttled (bytes, total) samples,
+/// so one fast chunk doesn't swing the estimate; the first sample only
+/// sets the baseline. Owned on the main actor by the caller, so no lock.
+struct DownloadSpeedSampler {
+    private var lastBytes: Int64 = 0
+    private var lastAt: Date?
+
+    /// Bytes per second; 0 until two samples arrive.
+    private(set) var speed: Double = 0
+    /// Seconds left; nil while the total is unknown or no speed is known.
+    private(set) var estimatedTimeRemaining: TimeInterval?
+
+    mutating func note(bytes: Int64, total: Int64) {
+        let now = Date()
+        if let lastAt, now > lastAt {
+            let delta = bytes - lastBytes
+            if delta >= 0 {
+                let instant = Double(delta) / now.timeIntervalSince(lastAt)
+                speed = speed > 0 ? 0.7 * speed + 0.3 * instant : instant
+            }
+        }
+        lastBytes = bytes
+        self.lastAt = now
+        estimatedTimeRemaining = total > 0 && speed > 0
+            ? TimeInterval(max(total - bytes, 0)) / speed : nil
+    }
+
+    mutating func reset() {
+        lastBytes = 0
+        lastAt = nil
+        speed = 0
+        estimatedTimeRemaining = nil
+    }
+}
+
 private final class ResumingDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
     /// The request timeout until something has answered: URLSession's
@@ -1528,6 +1748,18 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     private let idleTimeout: TimeInterval
     /// Told the fraction that has arrived, once the file's size is known.
     private let progress: (@Sendable (Double) -> Void)?
+    /// B1 (0.9.155): told the bytes arrived, only while the file's size is
+    /// unknown — read from the `reportProgressBytes` task-local, like
+    /// `progress` is read from `reportProgress`.
+    private let progressBytes: (@Sendable (Int) -> Void)?
+    /// F-2 (0.9.157): told (bytes written, total) on the same cadence as
+    /// the fraction / byte reports above, for the caller's speed and ETA.
+    private let progressDetail: (@Sendable (Int, Int) -> Void)?
+    /// Last byte count reported through `progressBytes`, so the unknown-total
+    /// reports stay throttled to 256KB steps instead of one per chunk.
+    private var lastReportedBytes = 0
+    /// A-2：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
+    private let progressThrottler = ProgressThrottler()
     private let log: (String) -> Void
     private let queue: OperationQueue = {
         let queue = OperationQueue()
@@ -1566,6 +1798,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         self.name = name
         self.idleTimeout = idleTimeout
         self.progress = progress
+        self.progressBytes = SideStoreDownloader.reportProgressBytes
+        self.progressDetail = SideStoreDownloader.reportProgressDetail
         self.log = log
         file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).download")
     }
@@ -1587,6 +1821,10 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         defer { session.invalidateAndCancel() }
 
         var idle = 0
+        // B1 (0.9.141): retries that went back to the start link for a fresh
+        // storage link. The loop below is otherwise bounded (pauses /
+        // firstPauses run out and throw); this counter bounds this path too.
+        var storageRetries = 0
         while true {
             try Task.checkCancellation()
             let before = written, fromStorage = storage != nil
@@ -1623,8 +1861,17 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
                 if fromStorage, retryAfter == nil {
                     // Expired, most likely: straight back to the start link,
                     // whose answer comes from a new storage link or not at all.
-                    log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one.")
+                    // B1 (0.9.141): bounded — a deleted or renamed asset
+                    // answers 404/403 every time, and this path used to
+                    // `continue` with no sleep and no limit, spinning
+                    // forever with the progress wheel turning and no error.
+                    // Three tries, then the refusal surfaces like any other.
+                    storageRetries += 1
+                    guard storageRetries <= 3 else { throw reason }
+                    log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one (attempt \(storageRetries) of 3).")
                     storage = nil
+                    let storagePause = Self.pauses[min(storageRetries - 1, Self.pauses.count - 1)]
+                    try await Task.sleep(nanoseconds: storagePause * 1_000_000_000)
                     continue
                 }
                 guard retryAfter == nil, (500...599).contains(status) else { throw reason }
@@ -1633,6 +1880,9 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             let pause: UInt64
             if written > before {
                 idle = 0
+                // B1 (0.9.141): bytes arrived, so the storage link works
+                // again — a later expiry starts a fresh set of three tries.
+                storageRetries = 0
                 pause = 1
             } else {
                 let table = responded ? Self.pauses : Self.firstPauses
@@ -1739,7 +1989,23 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             try output?.write(contentsOf: data)
             written += data.count
             if let progress, let total, total > 0 {
-                progress(min(1, Double(written) / Double(total)))
+                progressThrottler.publish(min(1, Double(written) / Double(total))) { fraction in
+                    progress(fraction)
+                    // F-2 (0.9.157): the speed sample rides the same
+                    // throttled publish as the fraction.
+                    progressDetail?(written, total)
+                }
+            } else if let progressBytes {
+                // B1 (0.9.155): no total to make a fraction from — report
+                // the bytes instead, throttled to 256KB steps, so the
+                // progress card can go indeterminate plus a byte count
+                // rather than sitting at 0% until the file lands whole.
+                if written > 0 && (written - lastReportedBytes >= 256 * 1024 || lastReportedBytes == 0) {
+                    lastReportedBytes = written
+                    progressBytes(written)
+                    // F-2 (0.9.157): same 256KB cadence, total unknown.
+                    progressDetail?(written, -1)
+                }
             }
         } catch {
             writeError = error
@@ -1811,6 +2077,33 @@ private final class ReleaseTagRecorder: NSObject, URLSessionTaskDelegate {
 
 // MARK: - IPAs already on disk
 
+/// A-37-3：七只 UIImage 缩略图桶的共享后备——同一 IPA 在文件行/应用库/
+/// 证书页/应用页各解一份（120×120 约 57KB/张），50 只 IPA 近 14MB
+/// 且无驱逐。路径为键（各桶本来就按路径查；文件行 key 的 id 就是
+/// url.path），解码统一 120（各处最大需求），NSCache 按 cost 驱逐；
+/// 各页仍用自己的 tried 集防重取、iconEpoch 触发重绘。
+enum ThumbnailCache {
+    private static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
+        c.totalCostLimit = 24 * 1024 * 1024
+        c.name = "ThumbnailCache"
+        return c
+    }()
+
+    static func image(for path: String) -> UIImage? {
+        cache.object(forKey: path as NSString)
+    }
+
+    static func set(_ image: UIImage, for path: String) {
+        let cost = image.cgImage.map { $0.width * $0.height * 4 } ?? 0
+        cache.setObject(image, forKey: path as NSString, cost: cost)
+    }
+
+    static func remove(_ path: String) {
+        cache.removeObject(forKey: path as NSString)
+    }
+}
+
 /// IPAs in the app's Documents directory, whether downloaded, imported, or
 /// copied in with the Files app.
 enum IPALibrary {
@@ -1859,7 +2152,9 @@ enum IPALibrary {
     static func scan() -> [Entry] {
         let entries = describe(namesIn: documentsDir).compactMap { (name, url, attrs) -> Entry? in
             guard let kind = classify(name) else { return nil }
-            let isManaged = DownloadLedger.isManaged(url)
+            // A-38-A2：用 describe 已取到的 size/mtime 拼指纹，不再自己 stat。
+            let isManaged = DownloadLedger.isManaged(url, size: (attrs[.size] as? Int) ?? 0,
+                                                     modified: attrs[.modificationDate] as? Date)
             return Entry(source: kind.source, channel: kind.channel, url: url,
                          size: (attrs[.size] as? Int) ?? 0,
                          modified: attrs[.modificationDate] as? Date,
@@ -1887,13 +2182,19 @@ enum IPALibrary {
     }
 
     /// Directory listing paired with each entry's attributes.
+    /// A-38-A2：一次枚举预取 size/mtime（resourceValues），不再每文件
+    /// 各做一次 attributesOfItem；attrs 仍只含 .size 与 .modificationDate 两键，
+    /// 调用方（scan / customImport / installable 的 extra）一字不动。options: []
+    /// 含隐藏文件，与现行 contentsOfDirectory(atPath:) 行为一致。
     private static func describe(namesIn dir: URL) -> [(name: String, url: URL, attrs: [FileAttributeKey: Any])] {
-        let fm = FileManager.default
-        let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
-        return names.compactMap { name in
-            let url = dir.appendingPathComponent(name)
-            guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
-            return (name, url, attrs)
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey], options: [])) ?? []
+        return urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) else { return nil }
+            var attrs: [FileAttributeKey: Any] = [:]
+            if let size = values.fileSize { attrs[.size] = size }
+            if let modified = values.contentModificationDate { attrs[.modificationDate] = modified }
+            return (url.lastPathComponent, url, attrs)
         }
     }
 
@@ -1903,6 +2204,25 @@ enum IPALibrary {
     static func entry(source: InstallSource, channel: ReleaseChannel) -> Entry? {
         guard source != .custom else { return customImport() }
         let canonical = source.fileName(channel)
+        // A-38-A3：canonical 快路——先按 canonical 文件名直接命中，省掉全量
+        // scan()。只有命中且 classify 回到同一 source/channel、且是 imported
+        // （rank 0，不可能被超越）、且无版本号时才直接返回；
+        // 其余一律回落全量 scan()（现行逻辑原样）。
+        let canonicalURL = documentsDir.appendingPathComponent(canonical)
+        if FileManager.default.fileExists(atPath: canonicalURL.path),
+           let kind = classify(canonical),
+           kind.source == source, kind.channel == channel,
+           let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalURL.path) {
+            let size = (attrs[.size] as? Int) ?? 0
+            let modified = attrs[.modificationDate] as? Date
+            let isManaged = DownloadLedger.isManaged(canonicalURL, size: size, modified: modified)
+            let version = isManaged ? kind.source.version(inFileName: canonical, channel: channel) : nil
+            if version == nil, !isManaged {
+                return Entry(source: source, channel: channel, url: canonicalURL,
+                             size: size, modified: modified,
+                             isImported: true, version: nil)
+            }
+        }
         func rank(_ e: Entry) -> Int {
             (e.isImported ? 0 : 2) + (e.url.lastPathComponent == canonical ? 0 : 1)
         }
@@ -1959,13 +2279,78 @@ enum IPALibrary {
         try copy(url, to: staged)
         guard looksLikeIPA(staged) else { throw ImportError.notAnIPA }
 
-        // One import at a time, so "the custom IPA" stays unambiguous.
-        try? fm.removeItem(at: customDir)
+        // B-50-B2: only the previous import goes. Custom/ also holds other
+        // renewal-source IPAs and user files (installable() treats every
+        // .ipa in here as a renewal source) — wiping the whole dir deleted
+        // them with no log and no warning.
+        if let old = customImport() {
+            try? fm.removeItem(at: old.url)
+        }
         try fm.createDirectory(at: customDir, withIntermediateDirectories: true)
         let dest = customDir.appendingPathComponent(name).appendingPathExtension("ipa")
         // Same volume as the staging dir, so this is a rename, not a second copy.
         try fm.moveItem(at: staged, to: dest)
+        // B-50-B2: say so when other files stay behind.
+        let remaining = (try? fm.contentsOfDirectory(atPath: customDir.path)) ?? []
+        if remaining.count > 1 {
+            Engine.shared.log("Custom import replaced; kept \(remaining.count - 1) other file(s) in Custom/.")
+        }
         return dest
+    }
+
+    /// Keeps a library copy of an imported IPA in Documents, so it survives
+    /// the next import: replaceCustomImport evicts the previous custom
+    /// import, so an IPA installed from a link lived only in the Custom/
+    /// slot until the next import deleted it — and the apps page could no
+    /// longer pair it with the installed app (0.9.150: the 18-app
+    /// screenshot, every row "no matching IPA"). The library copy is found
+    /// by installable()'s Documents + Custom/ scan, so the next load pairs
+    /// it again. A file of the same name that is already the same bytes is
+    /// left alone; one that differs is never overwritten — a user's file,
+    /// or one of the app's own managed downloads — and the copy lands under
+    /// "<stem> (imported).ipa" instead, replaced on re-import since it is
+    /// ours. Never throws: failure only logs, and the import that just
+    /// succeeded stays successful. Blocking; the caller runs it on the
+    /// import's background queue, while isImportingIPA still bars the next
+    /// import from evicting the source.
+    static func archiveImportedIPA(_ url: URL) {
+        let fm = FileManager.default
+        let name = url.lastPathComponent
+        guard name.lowercased().hasSuffix(".ipa") else { return }
+        let dest = documentsDir.appendingPathComponent(name)
+        if isSameIPA(url, dest) {
+            Engine.shared.log("Library copy: \(name) is already in Documents.")
+            return
+        }
+        var target = dest
+        if fm.fileExists(atPath: dest.path) {
+            // A different file of that name is already there — never
+            // overwrite a user's file or a managed download.
+            let stem = url.deletingPathExtension().lastPathComponent
+            target = documentsDir.appendingPathComponent(stem + " (imported).ipa")
+            if isSameIPA(url, target) {
+                Engine.shared.log("Library copy: \(target.lastPathComponent) is already in Documents.")
+                return
+            }
+        }
+        do {
+            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+            try copy(url, to: target)
+            Engine.shared.log("Library copy: kept \(target.lastPathComponent) in Documents for refresh.")
+        } catch {
+            Engine.shared.log("Library copy: couldn't keep \(name) in Documents (\(error.localizedDescription)) — refresh will still work until the next import replaces it.")
+        }
+    }
+
+    /// True when both paths hold the same bytes: same size first (cheap),
+    /// then SHA-256 (exact). A missing or unreadable file is never the same.
+    private static func isSameIPA(_ a: URL, _ b: URL) -> Bool {
+        let fm = FileManager.default
+        guard let aSize = (try? fm.attributesOfItem(atPath: a.path)[.size]) as? Int,
+              let bSize = (try? fm.attributesOfItem(atPath: b.path)[.size]) as? Int,
+              aSize == bSize else { return false }
+        guard let aHash = sha256(of: a), let bHash = sha256(of: b) else { return false }
+        return aHash == bHash
     }
 
     /// Copy `src` to `dest` under a file coordinator, which waits for an iCloud
@@ -2043,33 +2428,313 @@ extension IPALibrary {
         let bundleID: String
         let name: String
         let version: String?
+        /// CFBundleVersion (build number) from the same plist — the
+        /// duplicate cleanup groups on bundle ID + version + build, so a
+        /// re-signed or rebuilt copy with the same version still counts
+        /// as a different build, not a duplicate.
+        let build: String?
+        /// MinimumOSVersion from the same plist; the cert page pre-fills its
+        /// edit fields with the IPA's current values.
+        let minOS: String?
     }
 
     /// IPAs on disk with their app info, newest first, one per bundle ID (the
     /// same build can exist as both a download and an import).
     static func installable() -> [(entry: Entry, info: AppInfo)] {
         var seen = Set<String>()
-        return scan().compactMap { entry in
+        let scanned = scan().compactMap { entry -> (entry: Entry, info: AppInfo)? in
             guard let info = appInfo(at: entry.url),
                   seen.insert(info.bundleID).inserted else { return nil }
             return (entry, info)
+        }
+        // scan() 只认文件名含 livecontainer/sidestore/madeira 的三个自家
+        // 产品（加 Custom 里最新一个导入）。用户手导的 IPA——比如文件页
+        // 里明明有的 iCTRL.ipa——就这么被漏掉，续签页还显示“没有对应
+        // 的 IPA”，其实文件就在那。文件页能列出来的 IPA 都能当重签源，
+        // 续签也必须认：根目录与 Custom 里所有 .ipa 都算上（仍按包名去
+        // 重、最新的赢，scan() 的结果优先）。
+        let extra = [documentsDir, customDir]
+            .flatMap { describe(namesIn: $0) }
+            .filter { $0.name.lowercased().hasSuffix(".ipa") }
+            .sorted { ($0.attrs[.modificationDate] as? Date ?? .distantPast) > ($1.attrs[.modificationDate] as? Date ?? .distantPast) }
+            .compactMap { (_, url, attrs) -> (entry: Entry, info: AppInfo)? in
+                guard let info = appInfo(at: url),
+                      seen.insert(info.bundleID).inserted else { return nil }
+                return (Entry(source: .custom, channel: .stable, url: url,
+                             size: (attrs[.size] as? Int) ?? 0,
+                             modified: attrs[.modificationDate] as? Date,
+                             isImported: true, version: nil), info)
+            }
+        return (scanned + extra).sorted {
+            ($0.entry.modified ?? .distantPast) > ($1.entry.modified ?? .distantPast)
         }
     }
 
     /// Reads an IPA's main `Info.plist`. Nil if it can't be read; such files are
     /// left out of the refresh list.
+    ///
+    /// A8：结果按路径 + 文件指纹（大小-修改时间）缓存——续签配对每次都要把
+    /// 磁盘上每个 IPA 的 Info.plist 重新解压解析一遍，未变的文件不再重复
+    /// 解。调用方遍布主线程与 detached 任务，缓存读写用同一把锁串行化；
+    /// 指纹取不到（文件已删）时不缓存，每次都重新解析。
+    private static let appInfoLock = NSLock()
+    private static var appInfoCache: [String: AppInfo] = [:]
+
+    /// A-4/A-10：iconData 的缓存（与 A8 的 appInfoCache 同款）——键复用
+    /// fileFingerprint（路径 + 大小 + 修改时间），文件换了键变旧条目
+    /// 自然失效；缓存 Data 不缓存 UIImage（解码仍在各调用方做）。
+    /// A-10：字典 + 手工锁改 NSCache，按 cost 记字节数、上限 64MB，
+    /// 系统内存紧张时自动逐出（逐出后下次访问重解，zip 解析本身便宜）；
+    /// NSCache 自带线程安全，不再另加锁。AppInfo 是结构体、进不了
+    /// NSCache，appInfoCache 不动。
+    private static let iconDataCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.totalCostLimit = 64 * 1024 * 1024
+        return cache
+    }()
+
+    /// A-4/A-5：文件指纹（路径 # 大小 @ 修改时间秒），文件已删时 nil。
+    /// A8 的缓存键、选包脱壳复用、补团队号 tried 集三处共用同一格式。
+    static func fileFingerprint(of url: URL) -> String? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int,
+              let modified = attrs[.modificationDate] as? Date
+        else { return nil }
+        return "\(url.path)#\(size)@\(Int(modified.timeIntervalSince1970))"
+    }
+
+    private static func appInfoCacheKey(_ url: URL) -> String? {
+        fileFingerprint(of: url)
+    }
+
     static func appInfo(at url: URL) -> AppInfo? {
+        if let key = appInfoCacheKey(url) {
+            appInfoLock.lock()
+            defer { appInfoLock.unlock() }
+            if let cached = appInfoCache[key] { return cached }
+        }
+        guard let info = parseAppInfo(at: url) else { return nil }
+        if let key = appInfoCacheKey(url) {
+            appInfoLock.lock()
+            defer { appInfoLock.unlock() }
+            appInfoCache[key] = info
+        }
+        return info
+    }
+
+    private static func parseAppInfo(at url: URL) -> AppInfo? {
         guard let raw = infoPlist(inIPA: url),
               let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
-              let dict = plist as? [String: Any],
-              let bundleID = dict["CFBundleIdentifier"] as? String, !bundleID.isEmpty
+              let dict = plist as? [String: Any]
         else { return nil }
+        return appInfo(from: dict)
+    }
+
+    /// A-38-A1：从已解码的 Info.plist 字典派生 AppInfo——
+    /// parseAppInfo 与 appInfoAndIconData 共用。bundleID 缺失/为空时 nil，
+    /// 与原 parseAppInfo 的 nil 语义一致。
+    private static func appInfo(from dict: [String: Any]) -> AppInfo? {
+        guard let bundleID = dict["CFBundleIdentifier"] as? String, !bundleID.isEmpty else { return nil }
         let display = dict["CFBundleDisplayName"] as? String
         let bundleName = dict["CFBundleName"] as? String
         let name = display?.isEmpty == false ? display!
             : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         return AppInfo(bundleID: bundleID, name: name,
-                       version: dict["CFBundleShortVersionString"] as? String)
+                       version: dict["CFBundleShortVersionString"] as? String,
+                       build: dict["CFBundleVersion"] as? String,
+                       minOS: dict["MinimumOSVersion"] as? String)
+    }
+
+    /// The .app's icon PNG bytes, or nil. Reads only the central directory
+    /// + the one icon entry (no full unpack, same mechanism as appInfo).
+    /// Prefers the highest-resolution CFBundleIconFiles entry (@3x, then
+    /// @2x, then base); falls back to the largest AppIcon/Icon PNG in the
+    /// .app root. IPAs whose icons live only in Assets.car (no loose PNG)
+    /// return nil — the caller shows a neutral square for those, not a
+    /// fake app icon. Verified on real IPAs: Side's own IPA and ESign
+    /// 5.0.0 both carry loose AppIcon60x60@2x.png in the .app root.
+    /// A-4：先查缓存再解（与 appInfo(at:) 同款：查一次、解完再按
+    /// 当时指纹存一次）；指纹取不到（文件已删）时不缓存。
+    /// A-10：缓存本体是 NSCache，cost 按字节数记。
+    static func iconData(at url: URL) -> Data? {
+        if let key = fileFingerprint(of: url),
+           let cached = iconDataCache.object(forKey: key as NSString) {
+            return cached as Data
+        }
+        guard let data = parseIconData(at: url) else { return nil }
+        if let key = fileFingerprint(of: url) {
+            iconDataCache.setObject(data as NSData, forKey: key as NSString, cost: data.count)
+        }
+        return data
+    }
+
+    /// A-38-A1：一次开包同时产出 AppInfo + 图标 Data——文件页行与证书页
+    /// 选择器同时要两半，旧路各开一次包（2 次 central directory 解析 +
+    /// 2 次 plist 读解）。指纹只算一次，同时查两路缓存；任一半缺失才解析，
+    /// 解析时一个 FileHandle + 一次 centralDirectory + 一次读主 plist +
+    /// 一次 PropertyListSerialization 解码。两路 nil 语义互相独立：无
+    /// bundleID 不拖死图标（仍走 AppIcon/Icon 回落），Assets.car 独占
+    /// 图标不拖死 info；nil 的一半不缓存（解析失败不缓存、指纹取不到
+    /// 不缓存，保持现状）。单路调用方继续走 appInfo(at:) / iconData(at:)。
+    static func appInfoAndIconData(at url: URL) -> (info: AppInfo?, icon: Data?) {
+        let key = fileFingerprint(of: url)
+        var info: AppInfo?
+        var icon: Data?
+        if let key {
+            appInfoLock.lock()
+            info = appInfoCache[key]
+            appInfoLock.unlock()
+            if let cached = iconDataCache.object(forKey: key as NSString) {
+                icon = cached as Data
+            }
+        }
+        if info != nil, icon != nil { return (info, icon) }
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return (info, icon) }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let plistEntry = mainInfoPlist(in: directory),
+              let appPrefix = appPrefix(in: plistEntry) else { return (info, icon) }
+        let dict = plistDict(of: plistEntry, handle)
+        if info == nil, let dict {
+            info = appInfo(from: dict)
+        }
+        if icon == nil {
+            icon = iconData(fromPlist: dict, directory: directory, appPrefix: appPrefix, handle: handle)
+        }
+        if let key, let info {
+            appInfoLock.lock()
+            appInfoCache[key] = info
+            appInfoLock.unlock()
+        }
+        if let key, let icon {
+            iconDataCache.setObject(icon as NSData, forKey: key as NSString, cost: icon.count)
+        }
+        return (info, icon)
+    }
+
+    /// A-7（SIDE-36）：把图标 Data 解成指定边长的缩略图再显示——
+    /// UIImage(data:) 是惰性解码，首次绘制才在主线程解全尺寸图；
+    /// 这里在 detached 任务里先画进位图上下文解掉，@State 里只留缩略图。
+    /// 长边超过 maxPixelSize 才缩小，小图原样返回；解不出返回 nil，
+    /// 调用方显示中性占位，不造假图。行高 60pt 用 120、44pt 用 88、
+    /// 52pt 用 104（@2x 像素数，见各 load* 调用点）。
+    static func thumbnail(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        let longest = max(image.size.width, image.size.height)
+        guard longest > maxPixelSize else { return image }
+        let scale = maxPixelSize / longest
+        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
+    }
+
+    private static func parseIconData(at url: URL) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let plistEntry = mainInfoPlist(in: directory),
+              let appPrefix = appPrefix(in: plistEntry) else { return nil }
+        return iconData(fromPlist: plistDict(of: plistEntry, handle),
+                        directory: directory, appPrefix: appPrefix, handle: handle)
+    }
+
+    /// A-38-A1：从主 Info.plist 条目读解码后的字典；读不出时 nil（
+    /// 调用方仍走 AppIcon/Icon 回落，与 parseIconData 现状一致）。
+    private static func plistDict(of entry: ZipEntry, _ handle: FileHandle) -> [String: Any]? {
+        guard let raw = contents(of: entry, handle),
+              let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
+              let dict = plist as? [String: Any]
+        else { return nil }
+        return dict
+    }
+
+    /// A-38-A1：从主 Info.plist 条目名派生 .app 前缀；非 Payload/*.app
+    /// 布局时 nil。
+    private static func appPrefix(in plistEntry: ZipEntry) -> String? {
+        let parts = plistEntry.name.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "Payload", parts[1].hasSuffix(".app") else { return nil }
+        return "Payload/\(parts[1])/"
+    }
+
+    /// A-38-A1：从已读 plist 字典 + central directory 派生图标 Data——
+    /// parseIconData 与 appInfoAndIconData 共用。dict 为 nil（plist 读不出）
+    /// 时 iconBases 为空，仍走 AppIcon/Icon 回落；候选路径拼法、
+    /// 同名条目去重、回落排序照抄 parseIconData 现状，一字不动。
+    private static func iconData(fromPlist dict: [String: Any]?, directory: [ZipEntry],
+                                 appPrefix: String, handle: FileHandle) -> Data? {
+        var iconBases: [String] = []
+        if let dict {
+            if let icons = dict["CFBundleIcons"] as? [String: Any],
+               let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+               let files = primary["CFBundleIconFiles"] as? [String] {
+                iconBases = files
+            }
+            if iconBases.isEmpty,
+               let single = dict["CFBundleIconFile"] as? String, !single.isEmpty {
+                iconBases = [single]
+            }
+        }
+        // 同名条目只留第一个：Dictionary(uniqueKeysWithValues:) 遇到
+        // 重复名会直接 trap，坏包/畸形包不能因此闪退。
+        var byPath: [String: ZipEntry] = [:]
+        byPath.reserveCapacity(directory.count)
+        for entry in directory where byPath[entry.name] == nil {
+            byPath[entry.name] = entry
+        }
+        // CFBundleIconFiles entries are base names without suffix
+        // (e.g. "AppIcon60x60"); the files are base@3x/@2x/.png.
+        // If a base already carries @2x/@3x, try it exact first.
+        var candidates: [String] = []
+        for base in iconBases {
+            let stem = (base as NSString).deletingPathExtension
+            if stem.hasSuffix("@2x") || stem.hasSuffix("@3x") {
+                candidates.append("\(appPrefix)\(stem).png")
+                let plain = stem.replacingOccurrences(of: "@2x", with: "").replacingOccurrences(of: "@3x", with: "")
+                candidates.append("\(appPrefix)\(plain)@3x.png")
+                candidates.append("\(appPrefix)\(plain)@2x.png")
+                candidates.append("\(appPrefix)\(plain).png")
+            } else {
+                candidates.append("\(appPrefix)\(stem)@3x.png")
+                candidates.append("\(appPrefix)\(stem)@2x.png")
+                candidates.append("\(appPrefix)\(stem).png")
+            }
+        }
+        for path in candidates {
+            if let entry = byPath[path], let data = contents(of: entry, handle) {
+                return data
+            }
+        }
+        // Fallback: largest AppIcon/Icon PNG in the .app root.
+        let fallbacks = directory.filter { entry in
+            guard entry.name.hasPrefix(appPrefix) else { return false }
+            let rest = entry.name.dropFirst(appPrefix.count)
+            guard !rest.contains("/"), rest.lowercased().hasSuffix(".png") else { return false }
+            let lower = rest.lowercased()
+            return lower.hasPrefix("appicon") || lower.hasPrefix("icon")
+        }.sorted { a, b in
+            func rank(_ name: String) -> Int {
+                if name.contains("@3x") { return 3 }
+                if name.contains("@2x") { return 2 }
+                return 1
+            }
+            let ra = rank(a.name), rb = rank(b.name)
+            if ra != rb { return ra > rb }
+            return a.uncompressedSize > b.uncompressedSize
+        }
+        for entry in fallbacks {
+            if let data = contents(of: entry, handle) {
+                return data
+            }
+        }
+        return nil
     }
 
     /// The build of SideInstaller's own that the IPA at `url` is, told by its
@@ -2210,6 +2875,87 @@ extension IPALibrary {
         }
     }
 
+    /// A-5：只读 IPA 里 `Payload/*.app/embedded.mobileprovision` 这一条目，
+    /// 不解压整个包（provisionTeamID 用）。mobileprovision 只有几十 KB，
+    /// 现有 4MB 单条目上限够用；多 .app 时取 central directory 里第一个，
+    /// 与 provisionTeamID 现行的 `payload.first(where: { .pathExtension == "app" })`
+    /// 同口径。
+    static func embeddedProvisionData(inIPA url: URL) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let entry = directory.first(where: { entry in
+                  let parts = entry.name.split(separator: "/", omittingEmptySubsequences: false)
+                  return parts.count == 3 && parts[0] == "Payload"
+                      && parts[1].hasSuffix(".app") && parts[2] == "embedded.mobileprovision"
+              }) else { return nil }
+        return contents(of: entry, handle)
+    }
+
+    /// Every app in the IPA with its executable's zip path: all
+    /// `Payload/*.app/Info.plist` entries, read for `CFBundleExecutable`
+    /// (falling back to the `.app` name, same as the slow path). Returns nil
+    /// when the central directory can't be read or any app's executable
+    /// can't be found — the caller falls back to full extraction.
+    static func appExecutableEntries(inIPA url: URL) -> [(appName: String, executablePath: String)]? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size) else { return nil }
+        let plists = directory.filter { entry in
+            let parts = entry.name.split(separator: "/", omittingEmptySubsequences: false)
+            return parts.count == 3 && parts[0] == "Payload"
+                && parts[1].hasSuffix(".app") && parts[2] == "Info.plist"
+        }.sorted { $0.name < $1.name }
+        guard !plists.isEmpty else { return nil }
+        var out: [(appName: String, executablePath: String)] = []
+        for plistEntry in plists {
+            guard let data = contents(of: plistEntry, handle),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+                  let dict = plist as? [String: Any] else { return nil }
+            let parts = plistEntry.name.split(separator: "/")
+            guard parts.count == 3 else { return nil }
+            let appName = String(parts[1])
+            let exe = (dict["CFBundleExecutable"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (appName as NSString).deletingPathExtension
+            let exePath = "Payload/\(appName)/\(exe)"
+            guard directory.contains(where: { $0.name == exePath }) else { return nil }
+            out.append((appName: appName, executablePath: exePath))
+        }
+        return out
+    }
+
+    /// The first `byteCount` uncompressed bytes of one zip entry, without
+    /// inflating the whole entry. Stored entries are read straight off disk;
+    /// deflated ones stream-inflate only until the prefix is produced.
+    /// Returns fewer bytes when the entry itself is shorter, nil when the
+    /// entry can't be located or the data is damaged.
+    static func executablePrefixData(inIPA url: URL, entryName: String, byteCount: Int) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let entry = directory.first(where: { $0.name == entryName }),
+              entry.uncompressedSize > 0,
+              let start = dataOffset(of: entry, handle),
+              (try? handle.seek(toOffset: UInt64(start))) != nil else { return nil }
+        switch entry.method {
+        case 0:
+            guard let data = try? handle.read(upToCount: min(byteCount, entry.uncompressedSize)),
+                  !data.isEmpty else { return nil }
+            return data
+        case 8:
+            guard entry.compressedSize > 0 else { return nil }
+            return inflatePrefix(entry.compressedSize, from: handle, upTo: byteCount)
+        default:
+            return nil
+        }
+    }
+
     private static func contents(of entry: ZipEntry, _ handle: FileHandle, maxSize: Int = 4 << 20) -> Data? {
         // Sanity limit: an Info.plist is only kilobytes, and the inflate below
         // allocates this size.
@@ -2337,6 +3083,70 @@ extension IPALibrary {
             }
             guard let ended else { return nil }
             if ended { return written }
+        }
+        return nil          // the zip ended before the stream did
+    }
+
+    /// Inflates the next `count` compressed bytes of `input`, raw DEFLATE,
+    /// into memory, stopping as soon as `byteCount` bytes are produced.
+    /// Returns the prefix (fewer bytes when the entry itself is shorter),
+    /// or nil when the data is damaged or cut short, or a read fails.
+    /// Same loop as `inflate(_:from:to:)`, with a memory sink and an early
+    /// exit; the result is truncated to exactly `byteCount` bytes.
+    private static func inflatePrefix(_ count: Int, from input: FileHandle, upTo byteCount: Int) -> Data? {
+        let chunkSize = 1 << 20
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+                == COMPRESSION_STATUS_OK else { return nil }
+        defer { compression_stream_destroy(stream) }
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        defer { buffer.deallocate() }
+
+        var out = Data()
+        var left = count
+        while left > 0 {
+            // True at the end of the stream, false once a chunk is used up.
+            let ended: Bool? = autoreleasepool {
+                guard let chunk = try? input.read(upToCount: min(left, chunkSize)), !chunk.isEmpty
+                else { return nil }
+                left -= chunk.count
+                let flags = left == 0 ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+                return chunk.withUnsafeBytes { raw -> Bool? in
+                    stream.pointee.src_ptr = raw.bindMemory(to: UInt8.self).baseAddress!
+                    stream.pointee.src_size = raw.count
+                    var idle = 0
+                    while true {
+                        stream.pointee.dst_ptr = buffer
+                        stream.pointee.dst_size = chunkSize
+                        let status = compression_stream_process(stream, flags)
+                        let produced = chunkSize - stream.pointee.dst_size
+                        if produced > 0 {
+                            out.append(buffer, count: produced)
+                            if out.count >= byteCount { return true }
+                        }
+                        switch status {
+                        case COMPRESSION_STATUS_END:
+                            return true
+                        case COMPRESSION_STATUS_OK:
+                            // Input used up with room to spare: the next chunk.
+                            // Finishing, there's none, and it still holds output,
+                            // so it's called until the end unless it stops moving.
+                            guard stream.pointee.src_size == 0, stream.pointee.dst_size > 0 else { continue }
+                            if flags == 0 { return false }
+                            idle = produced == 0 ? idle + 1 : 0
+                            if idle == 3 { return nil }
+                        default:
+                            return nil
+                        }
+                    }
+                }
+            }
+            guard let ended else { return nil }
+            if ended {
+                if out.count > byteCount { out.removeLast(out.count - byteCount) }
+                return out
+            }
         }
         return nil          // the zip ended before the stream did
     }
@@ -2593,49 +3403,92 @@ enum DownloadLedger {
         return String(path.dropFirst(docs.count + 1))
     }
 
-    private static var table: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    /// A9：两张表改内存常驻 + 写透——首次访问时从 UserDefaults 读一次进
+    /// 内存，之后读写只碰内存、写时同步写回 UserDefaults。scan() 每文件
+    /// 都要查 isManaged，以前每次都全量读字典。读改写（record/forget）
+    /// 在同一把锁里一次完成，不留交错丢更新的窗口；调用方须已持有
+    /// ledgerLock 的 helper 后缀 Locked。
+    private static let ledgerLock = NSLock()
+    private static var cachedTable: [String: String]?
+    private static var cachedEtags: [String: String]?
+
+    private static func tableLocked() -> [String: String] {
+        if cachedTable == nil {
+            cachedTable = UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
+        }
+        return cachedTable!
+    }
+
+    private static func setTableLocked(_ value: [String: String]) {
+        cachedTable = value
+        UserDefaults.standard.set(value, forKey: defaultsKey)
+    }
+
+    private static func etagsLocked() -> [String: String] {
+        if cachedEtags == nil {
+            cachedEtags = UserDefaults.standard.dictionary(forKey: etagsKey) as? [String: String] ?? [:]
+        }
+        return cachedEtags!
+    }
+
+    private static func setEtagsLocked(_ value: [String: String]) {
+        cachedEtags = value
+        UserDefaults.standard.set(value, forKey: etagsKey)
     }
 
     /// True only for a file this app downloaded and nothing has touched since.
     static func isManaged(_ url: URL) -> Bool {
         guard let fp = fingerprint(url) else { return false }
-        return table[key(url)] == fp
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        return tableLocked()[key(url)] == fp
+    }
+
+    /// A-38-A2：同上，但指纹由调用方传入的 size/mtime 现拼——格式与
+    /// fingerprint(_:) 逐字一致（"<size>@<Int(mtime秒)>"），不再自己 stat。老签名
+    /// 保留给 :820 的下载去重检查用。
+    static func isManaged(_ url: URL, size: Int, modified: Date?) -> Bool {
+        let fp = "\(size)@\(Int(modified?.timeIntervalSince1970 ?? 0))"
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        return tableLocked()[key(url)] == fp
     }
 
     /// ETags by ledger key, each stored as "<fingerprint>|<etag>" so it only ever
     /// describes the exact file it was recorded with.
-    private static var etags: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: etagsKey) as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: etagsKey) }
-    }
 
     static func record(_ url: URL, etag: String? = nil) {
         guard let fp = fingerprint(url) else { return }
-        var t = table
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        var t = tableLocked()
         t[key(url)] = fp
-        table = t
+        setTableLocked(t)
         // Replaced, or dropped when this download came without one.
-        var e = etags
+        var e = etagsLocked()
         e[key(url)] = etag.map { "\(fp)|\($0)" }
-        etags = e
+        setEtagsLocked(e)
     }
 
     /// The ETag GitHub served `url` with, while the file is still exactly the one
     /// that was downloaded.
     static func etag(for url: URL) -> String? {
-        guard let fp = fingerprint(url), table[key(url)] == fp,
-              let entry = etags[key(url)], entry.hasPrefix(fp + "|") else { return nil }
+        guard let fp = fingerprint(url) else { return nil }
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        guard tableLocked()[key(url)] == fp,
+              let entry = etagsLocked()[key(url)], entry.hasPrefix(fp + "|") else { return nil }
         return String(entry.dropFirst(fp.count + 1))
     }
 
     static func forget(_ url: URL) {
-        var t = table
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        var t = tableLocked()
         t.removeValue(forKey: key(url))
-        table = t
-        var e = etags
+        setTableLocked(t)
+        var e = etagsLocked()
         e.removeValue(forKey: key(url))
-        etags = e
+        setEtagsLocked(e)
     }
 }

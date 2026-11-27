@@ -68,6 +68,16 @@ final class PairingManager: ObservableObject {
     /// `Engine.pairingPIN`. Drops the device link, which a re-pair invalidates.
     func generate() {
         guard !isBusy else { return }
+        // B-3 (0.9.164): `generateForPage` refuses while an install runs,
+        // but this page's Generate only refused while its own work ran —
+        // starting one now would drop the install's device link when
+        // `pairThisDevice` disconnects at the end, so refuse the same way.
+        // (0.9.163's B-3 only skipped that disconnect at the end; this
+        // closes the race while generation is in progress.)
+        guard !engine.isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            return
+        }
         lastError = nil
         lastSuccess = nil
         isGenerating = true
@@ -112,7 +122,16 @@ final class PairingManager: ObservableObject {
             MobileDataMode.shared.dialEnded(opened: false)
         }
         _ = try await PairingController.shared.startAndWait()
-        engine.connection.disconnect()
+        // B-3 (0.9.163): generation started while no install was running,
+        // but one may have started since (runOneClick refuses while
+        // generating, but the enterprise / signed entries don't go
+        // through it) — dropping the link now would cut that install's
+        // device link mid-run (`disconnect()` releases the adapter, and
+        // every later device call throws), so leave it; the next run
+        // re-pairs with the new file.
+        if !engine.isRunning {
+            engine.connection.disconnect()
+        }
         targets = []
         hasScanned = false
         // Allow an auto-scan again for the new pairing file.
@@ -249,12 +268,7 @@ final class PairingManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Human-readable pairing-file size, e.g. "2 KB".
-    var pairingFileSizeText: String {
-        ByteCountFormatter.string(fromByteCount: Int64(pairingFileSize), countStyle: .file)
-    }
-
     private func message(_ error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        userFacingErrorMessage(error)
     }
 }

@@ -65,6 +65,8 @@ typedef struct {
     char *pairing_file_path;
     char *host_alt_irk_hex;
     // The address the device connected from: its IP on this network.
+    // (Restored 2026-10-25: the merge took the fork's header, but the Rust
+    // side already fills this field; see pairing.rs.)
     char *device_address;
 } SIPairResult;
 
@@ -251,6 +253,58 @@ int32_t si_sign_ipa(SignSession *session,
                     char **out_signed_path,
                     char **out_error);
 
+// Sign an IPA with a user-supplied enterprise certificate, locally:
+// no Apple ID, no network. The .p12 is parsed by the caller, so the
+// certificate and RSA private key arrive as DER files, alongside the
+// .mobileprovision. On success *out_signed_path is the signed
+// bundle's directory. Free strings with si_string_free.
+int32_t si_sign_ipa_with_cert(const char *ipa_path,
+                              const char *cert_der_path,
+                              const char *key_der_path,
+                              const char *provision_path,
+                              char **out_signed_path,
+                              char **out_error);
+
+// Like si_sign_ipa_with_cert, plus a JSON options object (may be
+// NULL) with optional pre-signing modifications and a signed-.ipa
+// output: {name, bundleId, version, minOS, iconPng, outIpa}.
+int32_t si_sign_ipa_with_cert_ex(const char *ipa_path,
+                                 const char *cert_der_path,
+                                 const char *key_der_path,
+                                 const char *provision_path,
+                                 const char *options_json,
+                                 char **out_signed_path,
+                                 char **out_error);
+
+// Extract an .ipa and return its .app bundle directory in
+// *out_bundle_path. Free strings with si_string_free.
+int32_t si_extract_ipa(const char *ipa_path,
+                       char **out_bundle_path,
+                       char **out_error);
+
+// Zip the files/folders listed in a JSON array of absolute paths
+// into out_zip. For the file manager.
+int32_t si_zip_create(const char *paths_json,
+                      const char *out_zip,
+                      char **out_error);
+
+// Extract a zip archive into dest_dir. For the file manager.
+int32_t si_unzip_archive(const char *archive_path,
+                         const char *dest_dir,
+                         char **out_error);
+
+// Mach-O dependency info as JSON in *out_json:
+// {fat, slices: [{arch, deps: [{kind, name}], rpaths}]}.
+int32_t si_macho_info(const char *path,
+                      char **out_json,
+                      char **out_error);
+
+// One Mach-O dependency edit: op_json is
+// {action: "remove"|"rename", name, newName}.
+int32_t si_macho_edit(const char *path,
+                      const char *op_json,
+                      char **out_error);
+
 // The sign-in an app needs to renew its own provisioning profile, for handing
 // to Madeira. BLOCKS, but asks Apple nothing. On success *out_json is a heap
 // JSON object: {team_id, adsid, token, token_expires: <unix seconds, 0 if Apple
@@ -273,16 +327,12 @@ int32_t si_account_config(SignSession *session,
                           char **out_json,
                           char **out_error);
 
-// What signing an app would cost in App IDs, asked before si_sign_ipa so the
-// user can decide. `bundle_id` is the main app's bundle id as the IPA has it;
-// extensions are signed with the main app's profile and need no App ID. BLOCKS;
-// lists the team's App IDs and registers nothing. On success *out_json is a heap
-// JSON object: {new_ids: [the App ID si_sign_ipa would register, team suffix
-// included; empty if the team has it], available: <how many more Apple allows
-// now, or null>, max: <the limit, or null>, next_expiry: <unix seconds the
-// soonest App ID expires, or null>}.
-// Returns 0 on success, non-zero on error (*out_error set). Free strings with
-// si_string_free.
+// What signing an app whose main bundle ID is `bundle_id` would cost in App
+// IDs. BLOCKS; registers nothing. On success *out_json is a heap JSON object:
+// {new_ids: [<identifier, ...>], available: <how many more Apple allows now,
+// or null>, max: <the limit, or null>, next_expiry: <unix seconds the soonest
+// App ID expires, or null>}. Returns 0 on success, non-zero on error
+// (*out_error set). Free strings with si_string_free.
 int32_t si_appid_quota(SignSession *session,
                        const char *bundle_id,
                        char **out_json,
@@ -324,8 +374,7 @@ int32_t si_cert_signin(const char *apple_id,
 
 // List the team's iOS development certificates. BLOCKS. On success *out_json is
 // a heap JSON array of objects: {name, serial_number, machine_name, machine_id,
-// certificate_id, platform, status, expiration, signing}, where signing is true
-// for the one SideInstaller signs with. Free with si_string_free.
+// certificate_id, platform, status, expiration}. Free with si_string_free.
 int32_t si_cert_list(CertSession *session,
                      char **out_json,
                      char **out_error);
@@ -336,12 +385,10 @@ int32_t si_cert_revoke(CertSession *session,
                        const char *serial_number,
                        char **out_error);
 
-// Sign with the certificate in a PKCS#12 archive (SideStore's export, from
-// sidestore://certificate) from now on: its private key becomes the Apple ID's
-// signing key, once the portal lists a certificate for it on the session's team.
-// BLOCKS. Returns 0 on success (*out_json = {"certificate": <cert>,
-// "replaced_key": bool}), 3 when no certificate on the team has the archive's
-// key (nothing written), other non-zero on error (*out_error set).
+// Import a PKCS#12 archive's key as the signing key (see certs::cert_import).
+// On success *out_json is a heap JSON string: {certificate, replaced_key}.
+// Free with si_string_free. Returns 0 on success, 3 when no certificate on
+// this team has the key, other non-zero on error (*out_error set).
 int32_t si_cert_import(CertSession *session,
                        const uint8_t *p12,
                        size_t p12_len,
@@ -349,17 +396,15 @@ int32_t si_cert_import(CertSession *session,
                        char **out_json,
                        char **out_error);
 
-// Write the certificate with the given serial number and its private key to
-// out_path as a PKCS#12 archive encrypted with password (triple-DES, SHA-1 MAC),
-// for another app or computer to sign with. Only the certificate SideInstaller
-// signs with has its key here. BLOCKS. Returns 0 on success, 3 when the
-// certificate isn't that one (nothing written), other non-zero on error
-// (*out_error set).
-int32_t si_cert_export(CertSession *session,
-                       const char *serial_number,
-                       const char *password,
-                       const char *out_path,
-                       char **out_error);
+// Export the signing certificate as PKCS#12 (base64 JSON). BLOCKS.
+// On success *out_b64 is a heap JSON string: {p12_b64, password}.
+// Free with si_string_free. Returns 0 on success, non-zero on error.
+int32_t si_cert_export_p12(CertSession *session,
+                           const char *email,
+                           const char *machine_name,
+                           const char *storage_dir,
+                           char **out_b64,
+                           char **out_error);
 
 // Free a certificate session.
 void si_cert_session_free(CertSession *session);

@@ -9,6 +9,118 @@ import SwiftUI
 ///
 /// The first-run setup lays the same pieces out as a page of its own
 /// (`SetupView`), with the buttons at its foot.
+// MARK: - First-run setup
+
+/// First-run Apple ID setup, shown once after the TOS screen. The saved account
+/// is used by every screen that signs in. Can be skipped and set later in
+/// Settings › Account.
+struct AccountSetupView: View {
+    @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
+    @AppStorage(OfficialSourceCheck.defaultsKey) private var confirmedOfficialSource = false
+    @EnvironmentObject private var accounts: AccountStore
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+
+    @State private var email = ""
+    @State private var password = ""
+    @FocusState private var focus: AccountField?
+
+    private var canSave: Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty
+    }
+
+    var body: some View {
+        ZStack {
+            AppBackground()
+            ScrollView {
+                VStack(spacing: 22) {
+                    if confirmedOfficialSource {
+                        header.cascadeItem(0)
+                        card.cascadeItem(1)
+                        buttons.cascadeItem(2)
+                    } else {
+                        // No skipping here: "Set this up later" is only on
+                        // the sign-in form.
+                        OfficialSourceCheck { confirmedOfficialSource = true }
+                            .cascadeItem(0)
+                    }
+                }
+                .padding(20)
+                .padding(.top, 24)
+                .pageColumn()
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        // Focus only once the welcome page has zoomed away and the card has
+        // faded in. AutoFill pairs the username field with a *visible* password
+        // field when it gains focus; focusing during the entrance (card still
+        // transparent) makes it fill the email alone, then the password separately.
+        .task(id: confirmedOfficialSource) {
+            guard confirmedOfficialSource else { return }
+            try? await Task.sleep(for: .milliseconds(650))
+            focus = .email
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "person.crop.circle.fill.badge.checkmark")
+                .font(.largeTitle)
+                .foregroundStyle(Theme.brand)
+                .padding(.bottom, 4)
+            Text(L("Sign in with your Apple ID"))
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text(L("Don't worry, these are stored locally"))
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var card: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                TextField(L("Email"), text: $email)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.emailAddress)
+                    .textContentType(.username)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.next)
+                    .focused($focus, equals: .email)
+                    .onSubmit { focus = .password }
+                    .fieldBackground()
+                SecureField(L("Password"), text: $password)
+                    .textContentType(.password)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.done)
+                    .focused($focus, equals: .password)
+                    .fieldBackground()
+            }
+        }
+    }
+
+    private var buttons: some View {
+        VStack(spacing: 14) {
+            Button(L("Continue")) {
+                accounts.save(appleID: email, password: password)
+                hasCompletedAccountSetup = true
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(!canSave)
+            .animation(.snappy(duration: 0.25), value: canSave)
+
+            Button(L("Set this up later")) { hasCompletedAccountSetup = true }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .buttonStyle(.plain, sound: .tap)
+        }
+    }
+}
+
+
 struct OfficialSourceCheck: View {
     /// Set once the user says the app came from sideinstaller.net.
     static let defaultsKey = "confirmedOfficialSource"
@@ -45,21 +157,21 @@ struct OfficialSourceQuestion: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.shield")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
+                .font(.largeTitle)
+                .foregroundStyle(Theme.muted)
                 .padding(.bottom, 4)
-                .setupObject(0)
+                .cascadeItem(0)
             Text(L("Did you download SideInstaller from sideinstaller.net?"))
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .setupObject(1)
+                .cascadeItem(1)
             Text(L("SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official."))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .setupObject(2)
+                .cascadeItem(2)
         }
     }
 }
@@ -74,14 +186,13 @@ struct OfficialSourceAnswers: View {
         VStack(spacing: 12) {
             Button(L("Yes, from sideinstaller.net"), action: onYes)
                 .buttonStyle(PrimaryButtonStyle())
-                .setupObject(3)
+                .cascadeItem(3)
             Button(action: onNo) {
                 Text(L("No, or I'm not sure"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .press)
-            .controlSize(.large)
-            .setupObject(4)
+            .cascadeItem(4)
         }
     }
 }
@@ -91,22 +202,21 @@ struct OfficialSourceWarning: View {
     @EnvironmentObject private var loc: Localizer
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(Theme.warning)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("Don't sign in with this copy"))
-                    .font(.headline)
-                Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        PanelCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(Theme.warning)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("Don't sign in with this copy"))
+                        .font(.headline)
+                    Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }
 
@@ -126,7 +236,7 @@ struct OfficialSourceWarningActions: View {
             .buttonStyle(PrimaryButtonStyle())
             Button(L("Back"), action: onBack)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .buttonStyle(.plain, sound: .tap)
 
             // Kept small and dim on purpose, and behind a confirmation, so
@@ -174,6 +284,11 @@ enum AccountEditorTarget: Identifiable {
 /// account.
 struct AccountEditor: View {
     @EnvironmentObject private var accounts: AccountStore
+    // B6：安装进行中时保存会切账号掉 session（revision bump → RootView
+    // 丢 session），与设置页账号区禁用同理，编辑器里的保存也禁掉。
+    @Environment(Engine.self) private var engine
+    /// B-48-B2：续签进行中时保存也禁掉（同上，切账号会清掉续签在用的 signingTeamID）。
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
     @AppStorage(OfficialSourceCheck.defaultsKey) private var confirmedOfficialSource = false
     @EnvironmentObject private var loc: Localizer
     @Environment(\.dismiss) private var dismiss
@@ -255,7 +370,7 @@ struct AccountEditor: View {
                     accounts.save(appleID: email, password: password, replacing: target.account)
                     dismiss()
                 }
-                .disabled(!canSave)
+                .disabled(!canSave || engine.isRunning || appsManager.isRefreshing)
             }
         }
     }

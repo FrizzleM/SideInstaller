@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Applications | grep -i xcode)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project SideInstaller.xcodeproj -scheme SideInstaller -destination 'generic/platform=iOS Simulator' -derivedDataPath build-dd build)",
+      "Bash(grep -n \"callout{\\\\|section class=\\\\\"step\\\\\" id=\\\\\"setup\\\\\"\\\\|hero,.step,.footer\\\\|link-btn.ipa:hover\\\\|releases/latest/download\" index.html)",
+      "Bash(OUTPUT_HTML=/private/tmp/claude-501/-Users-tommdadd-Desktop-SideInstaller/2810e84a-1e03-48c7-ba24-42a9946a8f01/scratchpad/plain.html bash scripts/generate_index.sh)",
+      "Bash(UNSIGNED_IPA_URL='https://example.com/builds/Side.ipa?token=a&v=2' OUTPUT_HTML=/private/tmp/claude-501/-Users-tommdadd-Desktop-SideInstaller/2810e84a-1e03-48c7-ba24-42a9946a8f01/scratchpad/override.html bash scripts/generate_index.sh)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -fsSL --max-time 25 \"https://sideloading.net/api/certificates/list/signed/2\")",
+      "Bash(curl -fsSL --max-time 25 \"https://sideloading.net/api/certificates/list/all/1\")",
+      "Bash(curl -fsS --max-time 25 \"https://sideloading.net/api/certificates/download/30/password\")",
+      "Bash(curl -fsS --max-time 25 \"https://sideloading.net/api/certificates/download/30/password.txt\")",
+      "Bash(curl -fsSI --max-time 25 \"https://sideloading.net/api/certificates/download/30/cert.p12\")",
+      "Bash(curl -fsSI --max-time 25 \"https://sideloading.net/api/certificates/download/30/cert.mobileprovision\")",
+      "Bash(cat)",
+      "Bash(bash /tmp/testfn2.sh)",
+      "Bash(bash -n scripts/sign_with_all_certs.sh)",
+      "Bash(rm -rf /tmp/nex-test-out)",
+      "Bash(mkdir -p /tmp/nex-test-out)",
+      "Bash(CERT_ZIP_URL=https://sideloading.net NEXCERTS_STATUS=all/3 UNSIGNED_IPA_URL=https://example.com/dummy.ipa PRECHECK_ONLY=1 SIGN_STATE_FILE=/tmp/precheck-state.tsv OUTPUT_DIR=/tmp/nex-test-out bash scripts/sign_with_all_certs.sh)",
+      "Bash(rm -rf /tmp/nex-test-out2)",
+      "Bash(mkdir -p /tmp/nex-test-out2)",
+      "Bash(CERT_ZIP_URL=https://github.com/NovaDev404/NexCerts NEXCERTS_STATUS=all/1 UNSIGNED_IPA_URL=https://example.com/dummy.ipa PRECHECK_ONLY=1 SIGN_STATE_FILE=/tmp/precheck-state2.tsv OUTPUT_DIR=/tmp/nex-test-out2 bash scripts/sign_with_all_certs.sh)",
+      "Bash(command -v shellcheck)",
+      "Bash(shellcheck -S warning scripts/sign_with_all_certs.sh)",
+      "Bash(rm -rf /tmp/nex-test-out /tmp/nex-test-out2 /tmp/precheck-state.tsv /tmp/precheck-state2.tsv /tmp/testfn.sh /tmp/testfn2.sh /tmp/testfn3.sh)",
+      "Bash(git --no-pager diff --stat)"
+    ]
+  }
+}

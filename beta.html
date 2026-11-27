@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SideInstaller — Beta</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" href="app-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#011a5c">
+<style>
+  /* Same palette as index.html so the closed beta page still reads as SideInstaller. */
+  :root{
+    --page:#011a5c;
+    --card:rgba(15,22,40,.62);
+    --stroke:rgba(255,255,255,.10); --stroke-strong:rgba(255,255,255,.18);
+    --text:#f4f6fb; --muted:#c6cee0; --faint:#a5aec4;
+    --accent:#2170f5; --accent2:#4dadff;
+    --brand:linear-gradient(135deg,var(--accent),var(--accent2));
+    --radius:22px; --radius-btn:18px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%; background:var(--page)}
+  body{
+    margin:0; min-height:100vh; min-height:100dvh; color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55; background:var(--page);
+    display:grid; place-items:center;
+    padding:max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom));
+  }
+
+  .card{
+    width:min(480px,100%); padding:34px 26px 28px; text-align:center;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    animation:rise .5s cubic-bezier(.22,.9,.35,1) both;
+  }
+  @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
+  @media (prefers-reduced-motion:reduce){ .card{animation:none} }
+
+  .logo{
+    width:88px; height:88px; margin:0 auto 20px; overflow:hidden;
+    border-radius:21px; background:linear-gradient(150deg,#0d1530,#05070f);
+    border:1px solid var(--stroke-strong);
+    box-shadow:0 12px 40px rgba(33,112,245,.32), 0 18px 60px rgba(1,26,92,.85);
+  }
+  .logo img{width:100%; height:100%; object-fit:cover}
+  .tag{
+    display:inline-block; margin-bottom:12px; padding:5px 12px;
+    font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--faint); background:rgba(255,255,255,.05); border:1px solid var(--stroke); border-radius:999px;
+  }
+  h1{margin:0; color:#fff; font-size:clamp(26px,6vw,34px); font-weight:800; letter-spacing:-.02em}
+  p{margin:10px auto 0; max-width:380px; color:var(--muted); font-size:15px}
+
+  .actions{display:flex; flex-direction:column; gap:10px; margin-top:24px}
+  .btn{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:13px 16px; font-size:15px; font-weight:700; text-decoration:none;
+    border-radius:var(--radius-btn); transition:transform .14s, filter .14s;
+  }
+  .btn svg{width:17px; height:17px; flex:none}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{color:#fff; background:var(--brand); box-shadow:0 8px 24px rgba(33,112,245,.4)}
+  .btn.discord{color:#fff; background:#5865f2}
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo"><img src="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png" alt="SideInstaller"></div>
+    <span class="tag">Beta closed</span>
+    <h1>The beta is over</h1>
+    <p>Thanks to everyone who tested and sent feedback. Beta builds are no longer available. Get the latest release from the main page.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://sideinstaller.net/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+        Go to SideInstaller
+      </a>
+      <a class="btn discord" href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.61 1.249a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.893.077.077 0 0 0-.041.106c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+        Join the Discord
+      </a>
+      <a class="link-btn kofi" href="https://ko-fi.com/frizzlem" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        Ko-fi
+      </a>
+    </div>
+    <div class="links repo">
+      <a class="link-btn ipa" href="https://github.com/FrizzleM/SideInstaller/raw/refs/heads/main/SideInstaller-v1beta8.ipa" download rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download IPA
+      </a>
+      <a class="link-btn github" href="https://github.com/FrizzleM/SideInstaller/tree/main" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+
+  <div class="notice">
+    <b>Note</b>
+    <p>SideInstaller is not affiliated anyhow with SideStore. Please do not ask questions to the SideStore staff about SideInstaller as they are not able to answer. Instead, if you have issues or suggestions, write them in the <a href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">SideInstaller Discord</a>.</p>
+  </div>
+
+  <section class="step" id="setup">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <div>
+        <h2 class="step-title">Setup</h2>
+      </div>
+    </div>
+    <a class="install-btn" href="SideInstallerDNS.mobileconfig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
+      Install DNS Profile
+    </a>
+    <div class="step-card">
+      <ol>
+        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile.</li>
+        <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
+        <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="step" id="installation">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <div>
+        <h2 class="step-title">Installation</h2>
+      </div>
+    </div>
+
+    <label class="tos-gate">
+      <input type="checkbox" id="tosCheck">
+      <span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>
+      <span class="tos-text">I have read and accept the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span>
+    </label>
+
+    <div class="controls">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+      </div>
+      <select id="sort" class="sort" aria-label="Sort certificates">
+        <option value="days">Most days left</option>
+        <option value="days-asc">Soonest to expire</option>
+        <option value="name">Name (A–Z)</option>
+      </select>
+    </div>
+
+    <main id="grid" class="grid">
+    <article class="cert-card" data-name="Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11" data-days="1003" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-06-12 &middot; <span class="days good">1003 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Moving-Increasingly-Interconnected-Technology-Co.-Ltd-comoaddw" data-days="1003" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Moving-Increasingly-Interconnected-Technology-Co.-Ltd-comoaddw</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-06-12 &middot; <span class="days good">1003 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Moving-Increasingly-Interconnected-Technology-Co.-Ltd-comoaddw.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde" data-days="894" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-02-23 &middot; <span class="days good">894 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-p" data-days="894" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-p</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-02-23 &middot; <span class="days good">894 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-p.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-product" data-days="894" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-product</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-02-23 &middot; <span class="days good">894 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-product.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="XL-AXIATA-PT-TBK" data-days="889" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">XL-AXIATA-PT-TBK</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-02-17 &middot; <span class="days good">889 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-XL-AXIATA-PT-TBK.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="National-Oilwell-Varco-Inc-Carbon-LAM" data-days="866" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">National-Oilwell-Varco-Inc-Carbon-LAM</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-01-25 &middot; <span class="days good">866 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-National-Oilwell-Varco-Inc-Carbon-LAM.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="National-Oilwell-Varco-Inc-WB-Carbon" data-days="866" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">National-Oilwell-Varco-Inc-WB-Carbon</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2029-01-25 &middot; <span class="days good">866 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-National-Oilwell-Varco-Inc-WB-Carbon.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Qingdao-Rural-Commercial-Bank-Co.-Ltd" data-days="793" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Qingdao-Rural-Commercial-Bank-Co.-Ltd</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-11-14 &middot; <span class="days good">793 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Qingdao-Rural-Commercial-Bank-Co.-Ltd.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien" data-days="781" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-11-02 &middot; <span class="days good">781 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.tracnghiemantoan" data-days="781" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.tracnghiemantoan</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-11-02 &middot; <span class="days good">781 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.tracnghiemantoan.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-Academy-of-Railway-Sciences" data-days="775" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">China-Academy-of-Railway-Sciences</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-27 &middot; <span class="days good">775 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-China-Academy-of-Railway-Sciences.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="PowerChina-International-Group-Limited-DoaTYw" data-days="769" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">PowerChina-International-Group-Limited-DoaTYw</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-21 &middot; <span class="days good">769 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-PowerChina-International-Group-Limited-DoaTYw.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="PowerChina-International-Group-Limited-HRU79V" data-days="769" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">PowerChina-International-Group-Limited-HRU79V</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-21 &middot; <span class="days good">769 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-PowerChina-International-Group-Limited-HRU79V.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="PowerChina-International-Group-Limited-iWaMrs" data-days="769" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">PowerChina-International-Group-Limited-iWaMrs</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-21 &middot; <span class="days good">769 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-PowerChina-International-Group-Limited-iWaMrs.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="PowerChina-International-Group-Limited-j3krPY" data-days="769" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">PowerChina-International-Group-Limited-j3krPY</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-21 &middot; <span class="days good">769 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-PowerChina-International-Group-Limited-j3krPY.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="PowerChina-International-Group-Limited-nj61nO" data-days="769" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">PowerChina-International-Group-Limited-nj61nO</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-21 &middot; <span class="days good">769 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-PowerChina-International-Group-Limited-nj61nO.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Viet-Nam-Rubber-Group-Limited" data-days="762" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Viet-Nam-Rubber-Group-Limited</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-10-14 &middot; <span class="days good">762 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Viet-Nam-Rubber-Group-Limited.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="HSBC-Bank-plc" data-days="595" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">HSBC-Bank-plc</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-04-29 &middot; <span class="days good">595 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-HSBC-Bank-plc.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Commission-on-Elections-Complaints-Management" data-days="592" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Commission-on-Elections-Complaints-Management</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-04-27 &middot; <span class="days good">592 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Commission-on-Elections-Complaints-Management.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone" data-days="540" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-03-06 &middot; <span class="days good">540 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-worktwo" data-days="540" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-worktwo</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2028-03-06 &middot; <span class="days good">540 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-worktwo.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Forevermark-Marketing-Shanghai-Limited" data-days="146" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Forevermark-Marketing-Shanghai-Limited</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2027-02-05 &middot; <span class="days good">146 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Forevermark-Marketing-Shanghai-Limited.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan" data-days="54" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2026-11-06 &middot; <span class="days good">54 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan" data-days="54" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2026-11-06 &middot; <span class="days good">54 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC-International-China-Limited-qi-ye-weixin-app-id-tuisong-kuozhan" data-days="54" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC-International-China-Limited-qi-ye-weixin-app-id-tuisong-kuozhan</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2026-11-06 &middot; <span class="days good">54 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC-International-China-Limited-qi-ye-weixin-app-id-tuisong-kuozhan.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC-International-China-Limited-qi-ye-weixin-zhu-app-id" data-days="54" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC-International-China-Limited-qi-ye-weixin-zhu-app-id</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2026-11-06 &middot; <span class="days good">54 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC-International-China-Limited-qi-ye-weixin-zhu-app-id.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Aramco-Services-Company" data-days="12" data-rank="2" data-status="revoked">
+      <div class="cert-head">
+        <h3 class="cert-name">Aramco-Services-Company</h3>
+        
+      </div>
+      <p class="cert-meta">Expires 2026-09-24 &middot; <span class="days warn">12 days left</span></p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Aramco-Services-Company.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Aramco" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Aramco</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaAcademy" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaAcademy</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaPower" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaPower</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Election" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Election</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Forever" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Forever</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="National" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">National</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Postal" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Postal</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Rural" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Rural</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Takeoff" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Takeoff</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Vietnam" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Vietnam</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Wuling" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">Wuling</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="XL" data-days="-999999" data-rank="2" data-status="unknown">
+      <div class="cert-head">
+        <h3 class="cert-name">XL</h3>
+        
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    </main>
+    <p id="empty" class="empty">No certificates match your search.</p>
+
+    <details class="howto">
+      <summary>How to install</summary>
+      <div class="howto-body">
+        <ol>
+          <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
+          <li>Pick any certificate above and tap <b>Install</b>, then confirm the prompt.</li>
+          <li>Wait for the app to finish installing on your Home Screen.</li>
+          <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
+          <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+        </ol>
+      </div>
+    </details>
+  </section>
+
+  <section class="step" id="completion">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <div>
+        <h2 class="step-title">Completion</h2>
+        <p class="step-sub">You're all set.</p>
+      </div>
+    </div>
+    <div class="step-card">
+      <p>That's it. Open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
+      <div class="callout">
+        <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Built automatically &middot; signed with 41 certificate(s), 0 currently valid
+    <br>Last updated: 13 Sep 2026, 13:37 CET
+    <br><a href="terms.html">Terms of Service</a>
+  </footer>
+
+</div>
+
+<div class="modal" id="tutorialModal" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" id="tutorialCard">
+    <div class="modal-head">
+      <button type="button" class="modal-back" id="tutorialBack" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="modal-title" id="tutorialTitle">Language</h3>
+      <button type="button" class="modal-close" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="wizard" id="tutorialWizard">
+      <!-- step 1 — language -->
+      <div class="pane pane-q" data-step="0">
+        <button type="button" class="opt" data-value="en">
+          <span class="opt-icon" aria-hidden="true">EN</span>
+          <span class="opt-text"><b>English</b></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="es">
+          <span class="opt-icon" aria-hidden="true">ES</span>
+          <span class="opt-text"><b>Spanish</b><small>Español</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 2 — topic -->
+      <div class="pane pane-q" data-step="1" hidden>
+        <button type="button" class="opt" data-value="sidestore">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg></span>
+          <span class="opt-text"><b data-t="optSidestore">SideStore</b><small data-t="optSidestoreSub">Installing SideStore on your device</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="jit">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+          <span class="opt-text"><b data-t="optJit">JIT</b><small data-t="optJitSub">Enabling JIT for your apps</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 3 — the tutorials themselves -->
+      <div class="pane" data-step="2" hidden>
+        <div class="videos" id="tutorialVideos"></div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -7,20 +7,43 @@ import CoreImage.CIFilterBuiltins
 struct AboutView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
+    @EnvironmentObject private var updateChecker: UpdateChecker
+    /// F-1 (0.9.179): the enterprise branch of the self-update hands its
+    /// downloaded IPA to the signing page through this workspace.
+    @EnvironmentObject private var certWorkspace: CertWorkspace
+    // F-1 (0.9.176): the self-update's state lives on `updateChecker`
+    // now, shared with the Install tab's banner — this view only reads
+    // it (see `versionPillText` / `updateCheckDetail`). The progress
+    // line still redraws as the download advances: it reads
+    // `Engine.shared` inside `selfUpdateProgressText`, and that read
+    // happens during this view's body evaluation, so the view tracks it.
 
     @State private var showSettings = false
     @State private var showCrypto = false
     @State private var showReport = false
+    /// True while a manual update check is in flight.
+    @State private var isCheckingUpdate = false
+    /// The in-flight manual check, so a second tap can cancel it.
+    @State private var checkTask: Task<Void, Never>?
+    /// What the last manual update check found; nil until one runs.
+    @State private var updateCheckStatus: UpdateChecker.CheckResult?
+    /// F-2 (0.9.178): true while the full release-notes sheet is up.
+    @State private var showingReleaseNotes = false
+    /// F-1 (0.9.179): true while the certificate choice sheet is up —
+    /// a verified update doesn't install straight away any more, the
+    /// user picks enterprise or Apple ID signing first.
+    @State private var showingSigningChoice = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     header.cascadeItem(0)
-                    summary.cascadeItem(1)
-                    links.cascadeItem(2)
-                    thanks.cascadeItem(3)
-                    builtWith.cascadeItem(4)
+                    updateCheck.cascadeItem(1)
+                    summary.cascadeItem(2)
+                    links.cascadeItem(3)
+                    thanks.cascadeItem(4)
+                    builtWith.cascadeItem(5)
                 }
                 .padding(20)
                 .pageColumn()
@@ -30,18 +53,82 @@ struct AboutView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showCrypto) { CryptoDonationsView() }
             .sheet(isPresented: $showReport) { ReportProblemView() }
+            .sheet(isPresented: $showingSigningChoice) {
+                CertificateChoiceSheet(
+                    onChoose: { showingSigningChoice = false; chooseSelfUpdateIdentity($0, updateChecker: updateChecker, certWorkspace: certWorkspace) },
+                    onCancel: { showingSigningChoice = false }
+                )
+            }
         }
     }
 
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "info.circle", image: "AppLogo", title: "SideInstaller",
-                    subtitle: L("an app by Frizzle")) {
-            Text(versionText)
-                .font(.footnote.monospaced())
-                .foregroundStyle(Theme.muted)
+        BrandHeader(icon: "info.circle.fill", image: "AppLogo", title: "SideInstaller 🅥",
+                    subtitle: L("an app by Frizzle") + "\n解剖自我 🅥 " + L("Modified edition")) {
+            versionPill
         }
+    }
+
+    /// The version line: static text when there's nothing to update, a
+    /// button when a verified newer version is waiting (0.9.149). A tap
+    /// with no update known runs a check first; a tap with one waiting
+    /// installs it. It looks the same either way — the pill is the row.
+    private var versionPill: some View {
+        Button { CZFHaptics.impact(); versionRowTapped() } label: {
+            StatusPill(text: versionPillText, systemImage: versionPillIcon, color: versionPillColor)
+        }
+        .buttonStyle(.plain, sound: .tick)
+        // B-2 (0.9.164): no `.disabled(isSelfUpdating)` any more — the pill
+        // is the cancel while a self-update runs (versionRowTapped below),
+        // and the wait has no other handle.
+    }
+
+    /// The version line's text: the running version, or what the row is
+    /// doing — checking, offering the new version, downloading it,
+    /// installing it. The self-update's state is `updateChecker`'s now
+    /// (F-1, 0.9.176); this row only reads it.
+    private var versionPillText: String {
+        // B-2 (0.9.164): while updating the pill is the cancel — the
+        // progress itself still shows under "Check for updates".
+        if updateChecker.isSelfUpdating { return L("Installing — tap to cancel") }
+        if let progress = updateChecker.selfUpdateProgressText { return progress }
+        if updateChecker.selfUpdateAvailable, let latest = updateChecker.latestVersion {
+            // F-3 (0.9.179): "Update to 0.9.179 · 28 MB" — the verified
+            // release IPA's size, when the gate recorded it.
+            if let size = updateChecker.latestAssetSize {
+                return L("Update to %@ · %@", latest, CZFFormattedSize.size(size))
+            }
+            return L("Update to %@", latest)
+        }
+        if isCheckingUpdate { return L("Checking for updates…") }
+        return versionText
+    }
+
+    private var versionPillIcon: String {
+        updateChecker.selfUpdateAvailable || updateChecker.isSelfUpdating ? "arrow.down.circle.fill" : "tag.fill"
+    }
+
+    private var versionPillColor: Color {
+        updateChecker.selfUpdateAvailable || updateChecker.isSelfUpdating ? Theme.accent : Theme.accent2
+    }
+
+    /// The version row's tap: install when a verified update is waiting,
+    /// otherwise check first (0.9.142 manual check, 0.9.146 timeout +
+    /// cancel); a newer verified version lights the update state, and the
+    /// next tap installs it. While a self-update runs the row cancels it
+    /// instead (B-2, 0.9.164) — the install itself keeps going on the
+    /// Install page; only the watching stops.
+    /// F-1 (0.9.179): a verified update no longer installs straight
+    /// away — the certificate choice sheet comes first.
+    private func versionRowTapped() {
+        if updateChecker.isSelfUpdating {
+            updateChecker.cancelSelfUpdate()
+            return
+        }
+        if updateChecker.selfUpdateAvailable { showingSigningChoice = true; return }
+        runUpdateCheck()
     }
 
     /// Version and build number, read from the app bundle.
@@ -49,6 +136,106 @@ struct AboutView: View {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         return L("Version %@ (%@)", short, build)
+    }
+
+    // MARK: Check for updates
+
+    /// Manual update check, under the version line: the launch check only
+    /// runs once a day, so this is how to ask right now. The row's detail
+    /// line reports the outcome; a newer version also lights the Install
+    /// tab's banner, which carries the download link.
+    private var updateCheck: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                AboutRow(systemImage: "arrow.down.circle",
+                         title: L("Check for updates"),
+                         detail: updateCheckDetail,
+                         action: { runUpdateCheck() })
+                // F-1 (0.9.177): the verified newer release's notes —
+                // the same section as the Install banner; only when an
+                // install is actually offered.
+                // F-2 (0.9.178): tap it for the full notes (the Install
+                // banner's `ReleaseNotesSheet` 同款).
+                if updateChecker.selfUpdateAvailable, let notes = updateChecker.releaseNotesPreview {
+                    Button {
+                        showingReleaseNotes = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(L("What's new"))
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Text(notes)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingReleaseNotes) {
+                        ReleaseNotesSheet(updateChecker: updateChecker)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The detail line under "Check for updates": nothing until a check runs.
+    /// A failed self-update reports here too, so the reason stays on this
+    /// page even after the Install sheet is dismissed.
+    private var updateCheckDetail: String? {
+        if let selfUpdateError = updateChecker.selfUpdateError { return selfUpdateError }
+        if let progress = updateChecker.selfUpdateProgressText { return progress }
+        if isCheckingUpdate { return L("Checking for updates… Tap again to cancel.") }
+        switch updateCheckStatus {
+        case nil, .skipped: return nil
+        case .upToDate: return L("You're up to date.")
+        case .newer(let latest):
+            return L("SideInstaller %@ is available — you're on %@.",
+                     latest, updateChecker.currentVersion)
+        case .pendingRelease(let latest):
+            // B-1 (0.9.177): txt 已新、门控未过 — the same sentence the
+            // Install banner shows; the update itself stays unoffered
+            // until the release verifies.
+            // B-1 (0.9.179): a gate that failed on the network says so —
+            // the release-is-still-publishing sentence is only for a
+            // gate that failed on the release itself (wrong tag /
+            // missing asset).
+            if updateChecker.pendingReleaseNetworkFailed {
+                return L("Couldn't check for updates. Check your connection and try again.")
+            }
+            return L("SideInstaller %@ is still being published — try again later.", latest)
+        case .failed:
+            return L("Couldn't check for updates. Check your connection and try again.")
+        }
+    }
+
+    /// Run a check that ignores the 24-hour stamp. B5 (0.9.146): a second
+    /// tap while one is in flight cancels it, and the detail line goes back
+    /// to whatever the last check found — a cancelled check writes no
+    /// outcome, so "Checking…" can't stick around after the tap.
+    private func runUpdateCheck() {
+        if isCheckingUpdate {
+            checkTask?.cancel()
+            return
+        }
+        // A fresh check clears the last self-update's outcome: it reports
+        // the new check, not the old install.
+        updateChecker.selfUpdateError = nil
+        updateChecker.selfUpdateFinished = false
+        isCheckingUpdate = true
+        checkTask = Task {
+            let result = await updateChecker.check(force: true)
+            if !Task.isCancelled {
+                updateCheckStatus = result
+            }
+            isCheckingUpdate = false
+            checkTask = nil
+        }
     }
 
     // MARK: What it is
@@ -128,7 +315,7 @@ struct AboutView: View {
                 sectionTitle(L("Built with"), systemImage: "shippingbox")
                 Text(L("The open source work this app is built on:"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 AboutRow(systemImage: "iphone.gen3",
                          title: "idevice",
@@ -185,10 +372,10 @@ private struct AboutRow: View {
 
     var body: some View {
         if let action {
-            Button(action: action) { content(accessory: "chevron.right") }
+            Button { CZFHaptics.impact(); action() } label: { content(accessory: "chevron.right") }
                 .buttonStyle(.plain, sound: .tick)
         } else if let url = urlString.flatMap(URL.init(string:)) {
-            Button { openURL(url) } label: { content(accessory: "arrow.up.right") }
+            Button { CZFHaptics.impact(); openURL(url) } label: { content(accessory: "arrow.up.right") }
                 // `.plain` keeps the row from using the accent color.
                 .buttonStyle(.plain, sound: .tick)
         } else {
@@ -209,7 +396,7 @@ private struct AboutRow: View {
                 if let detail {
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -266,7 +453,7 @@ private struct CryptoDonationsView: View {
                 VStack(spacing: 16) {
                     Text(L("Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you."))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Picker(L("Coin"), selection: $selection) {
@@ -279,7 +466,7 @@ private struct CryptoDonationsView: View {
                     Label(L("Send each coin only on the network shown. Crypto sent on another network can't be recovered."),
                           systemImage: "exclamationmark.triangle")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -306,7 +493,7 @@ private struct CryptoDonationsView: View {
                     .accessibilityLabel(L("QR code for the %@ address", wallet.name))
                 Text(L("Network: %@", wallet.network))
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 // One line, shrunk to fit: wrapped, it gets hyphenated in some
                 // languages, and a hyphen copied by hand breaks the address.
                 Text(wallet.address)

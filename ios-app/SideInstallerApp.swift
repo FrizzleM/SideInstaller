@@ -1,4 +1,17 @@
+import BackgroundTasks
 import SwiftUI
+import UserNotifications
+
+/// Shows notifications even when the app is in foreground.
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+}
 
 @main
 struct SideInstallerApp: App {
@@ -10,16 +23,36 @@ struct SideInstallerApp: App {
     @StateObject private var localizer = Localizer.shared
     // The saved Apple IDs, shared by every screen that signs in.
     @StateObject private var accounts = AccountStore.shared
-    /// False until the TOS is accepted on the first setup page.
-    @AppStorage(SetupView.acceptedTermsKey) private var hasAcceptedTOS = false
     /// False until account setup is completed or skipped. Never reset, even if
     /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
+    // 0.9.89（SIDE-2 修复）：下面 5 个声明是合并时丢的，从提交历史原样恢复——
+    // hasAcceptedTOS（@AppStorage，WelcomeView 写同一键）、appearance（SIDAppearance，
+    // 与设置页同一键）、scenePhase、notificationDelegate、keepAlive。
+    @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
+    @AppStorage("SIDAppearance") private var appearance: AppAppearance = .system
+    @Environment(\.scenePhase) private var scenePhase
+    private let notificationDelegate = NotificationDelegate()
+    private let keepAlive = KeepAlive()
 
     init() {
         // A pairing code still up from a run that was killed means nothing now.
         PairingLiveActivity.shared.endLeftovers()
         PairingNotification.shared.reset()
+        // Show resign notifications even in foreground.
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        // Request notification permission for resign alerts.
+        Task {
+            _ = try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound, .badge])
+        }
+        // 后台唤醒续签：BGTask 处理入口必须在启动结束前注册，
+        // 系统日后唤醒时才有地方接。
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: SIDAutoRefresh.bgTaskIdentifier, using: nil
+        ) { task in
+            SIDAutoRefresh.handleBackgroundWake(task as! BGAppRefreshTask)
+        }
         // So is an install's progress.
         InstallActivity.shared.endLeftovers()
         // iOS hands over the last crash's diagnostic now, for Report a problem.
@@ -37,14 +70,29 @@ struct SideInstallerApp: App {
                         .environmentObject(updateChecker)
                         .environmentObject(localizer)
                         .environmentObject(accounts)
+                        // 更新检查：只在 latest_version.txt 比本机新时才亮横幅，
+                        // 相等/取不到都不打扰；txt 由发版同步改（见 UpdateChecker）。
                         .task { await updateChecker.check() }
+                        .onAppear {
+                            // Start background keep-alive for Shortcuts resign
+                            keepAlive.startAudio()
+                            // 自动续签开关开着时，拉起常驻巡检（内部自查开关）
+                            AutoRefreshService.shared.start()
+                        }
                         .transition(.opacity)
-                } else {
-                    // The terms, the sideinstaller.net question and the Apple
-                    // ID, a page each; the pages move among themselves.
-                    SetupView()
+                } else if hasAcceptedTOS {
+                    AccountSetupView()
                         .environmentObject(localizer)
                         .environmentObject(accounts)
+                        .transition(.asymmetric(
+                            insertion: .identity,
+                            removal: .opacity.combined(with: .scale(scale: 1.06))))
+                        // Layered between the welcome page and the app, so each
+                        // zooms out over the next screen.
+                        .zIndex(0.5)
+                } else {
+                    WelcomeView()
+                        .environmentObject(localizer)
                         // Zoom past the camera while the app fades in beneath.
                         .transition(.asymmetric(
                             insertion: .identity,
@@ -52,24 +100,92 @@ struct SideInstallerApp: App {
                         .zIndex(1)
                 }
             }
+
+            .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
+            // 外观统一在窗口根上应用，三个页面（欢迎/账户/主界面）都跟着走。
+            .preferredColorScheme(appearance.colorScheme)
+            // LocalDevVPN 连好跳回来（或 App 从后台回前台）时，
+            // 若有快捷指令留下的待续签标记，接着把续签跑完。
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    SideloadedAppsManager.shared.consumePendingRefresh()
+                    // 回前台时确保自动续签巡检在跑（开关内部自查）。
+                    SIDAutoRefresh.consider()
+                    // SIDE-2 S1：回前台重起状态轮询（进后台时已停）。
+                    engine.startStatusMonitor()
+                } else if phase == .background {
+                    // 进后台时把下一次系统唤醒交上去（开关开着才提交）。
+                    SIDAutoRefresh.scheduleBackgroundWake()
+                    // SIDE-2 S1：进后台停掉隧道状态轮询——自动续签保活常驻
+                    // 后台时它每 5 秒醒 CPU 空转系统调用；唤醒续签入口自己
+                    // 会调 refreshNetworkStatus，不依赖轮询。
+                    engine.stopStatusMonitor()
+                }
+            }
             // Every switch in the app clicks on and off.
             .toggleStyle(SoundingToggleStyle())
             // Files opened in the app (share sheet, "Open with", other apps), as
-            // an alternative to the document picker, and `sideinstaller://`
-            // links, which ask before doing anything.
+            // an alternative to the document picker.
             .onOpenURL { url in
-                guard url.isFileURL else {
-                    engine.receiveLink(url)
+                // Handle `sideinstaller://` links: refresh-all from Shortcuts
+                // runs at once; every other link goes through the Engine's
+                // confirmation popup and does nothing until the user says yes.
+                // LocalDevVPN returning to the app carries no action, so it
+                // parses as ignored and is safely dropped.
+                if url.scheme == "sideinstaller" {
+                    if url.host == "refresh-all" {
+                        // SIDE-2 C2：以前这里先 post 通知、再直调 refreshAllFromShortcut，
+                        // 应用页在前台时通知同步跑 refreshAll() 抢掉 isRefreshing，直调的
+                        // LocalDevVPN 交接分支永远走不到。只留直调一个入口。
+                        Task { await SideloadedAppsManager.shared.refreshAllFromShortcut() }
+                    } else {
+                        Task { @MainActor in engine.receiveLink(url) }
+                    }
                     return
                 }
+                guard url.isFileURL else { return }
                 // `.mobiledevicepairing`/`.plist` are pairing files; anything else
                 // is treated as an IPA.
                 if ["mobiledevicepairing", "plist"].contains(url.pathExtension.lowercased()) {
                     Task { await engine.importPairingFile(from: url) }
                 } else {
-                    engine.installSource = .custom
-                    Task { await engine.importCustomIPA(from: url) }
+                    Task {
+                        // 从分享/“打开方式”进来的 IPA 直接装：只有这次导入成功
+                        // 才起管线（C12：凭返回值判，不再凭 lastError + 旧文件）。
+                        // 导入失败时 importCustomIPA 会写 lastError，管线不启动。
+                        // B3：安装进行中时导入本身已被拒（importCustomIPA 入口守卫），
+                        // 这里的 wasRunning 分支已不可达——删掉，导入成功就直接起管线。
+                        // 管线自己的 guards 会在缺证书/配对/WiFi 时停下并给出指引，
+                        // 与点安装按钮同一套。
+                        // B-2 (0.9.176): 批跑下载间隙 `isRunning` 也是
+                        // false——只查上面那道会放行，导入成功后
+                        // runOneClick 立即起跑、抢占安装槽，批跑下一项
+                        // 导入被拒、全批报废。入口先拦，原因写
+                        // `engine.lastError`（安装页弹）。
+                        guard !engine.batchUpdateRunning else {
+                            engine.lastError = L("全部更新进行中，等它跑完再安装。")
+                            engine.log("⛔️ Share: \(engine.lastError ?? "")")
+                            return
+                        }
+                        guard await engine.importCustomIPA(from: url) else { return }
+                        // F-2 (0.9.179): don't run straight into the Apple
+                        // ID pipeline — the import is staged; ask which
+                        // certificate signs it first. The choice sheet
+                        // (RootView) runs the ID pipeline or hands the
+                        // staged IPA to the enterprise signing page.
+                        // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时
+                        // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                        // 非隔离 Task：挂选择请求前跳回 @MainActor。
+                        let staged = IPALibrary.customImport()
+                        await MainActor.run {
+                            if let staged {
+                                engine.pendingSigningChoice = SigningChoiceRequest(ipaURL: staged.url)
+                            } else {
+                                engine.lastError = L("Import failed")
+                            }
+                        }
+                    }
                 }
             }
         }

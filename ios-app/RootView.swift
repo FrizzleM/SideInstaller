@@ -1,14 +1,74 @@
 import SwiftUI
+import UIKit
 
-/// Tab container (Install, Tools, About). Each page draws its own
-/// `AppBackground`, since `TabView` would hide a shared one. Also hosts the
-/// sign-in sheet (2FA, and which team signs) and the pages' popups, so they
-/// show over any tab.
+/// B-2 (0.9.157): the Sources badge's recount wiring, as its own
+/// modifier — `RootView.body`'s chain grew too long for the compiler to
+/// type-check once these five joined it (0.9.157 build: "unable to
+/// type-check this expression in reasonable time" at RootView:251).
+/// Same wiring, only split out of `body`: the fix is to split the
+/// expression, not to change the logic. The chain is now shorter than
+/// the 0.9.156 one that built green.
+private struct SourcesBadgeRecountModifier: ViewModifier {
+    @ObservedObject var sourcesManager: SourcesManager
+    @ObservedObject var appsManager: SideloadedAppsManager
+
+    func body(content: Content) -> some View {
+        content
+            // F-D (0.9.156): the installed list arrives after the launch
+            // fetch (autoLoad reads the device), so the badge recounts
+            // when it lands.
+            .onChange(of: appsManager.entries) { _, entries in
+                sourcesManager.recountUpdates(installed: entries)
+            }
+            // B-2 (0.9.157): the badge counts from this manager's states,
+            // so it recounts whenever they or the disabled set change —
+            // not only at the three call sites that used to recount by hand.
+            .onChange(of: sourcesManager.states) { _, _ in
+                sourcesManager.recountUpdates(installed: appsManager.entries)
+            }
+            .onChange(of: sourcesManager.disabled) { _, _ in
+                sourcesManager.recountUpdates(installed: appsManager.entries)
+            }
+            // B-2 (0.9.157): the Sources tab fetches through the fork
+            // store, not this manager — when it lands a document, adopt
+            // it for the badge; when the list or a disabled flag changes,
+            // re-read them.
+            .onReceive(NotificationCenter.default.publisher(for: SourceStore.contentDidChange)) { _ in
+                Task { @MainActor in
+                    sourcesManager.adoptCachedSources()
+                    sourcesManager.recountUpdates(installed: appsManager.entries)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
+                Task { @MainActor in
+                    sourcesManager.syncURLs()
+                    sourcesManager.recountUpdates(installed: appsManager.entries)
+                }
+            }
+    }
+}
+
+/// Tab container (Files, Apps, Sources, Downloads, Settings). Each page draws its own
+/// `AppBackground`, since `TabView` would hide a shared one; they stay in sync
+/// because the background animates off the clock. Also hosts the sign-in sheet
+/// (2FA, and which team signs) and the pages' popups, so they show over any tab.
 struct RootView: View {
     /// The tabs. The selection is tracked so a tab switch can tick, and a
-    /// link can bring the Install tab forward.
+    /// link can bring the install sheet forward.
+    /// U-UI：五栏改成截图那套——文件 / 应用 / 源 / 下载 / 设置。
+    /// 证书 tab 拆掉（签名段 → 设置·企业证书页，应用库段 → 文件·应用文件夹库）；
+    /// Install tab 拆掉（ContentView 变全屏 sheet，见 showInstallSheet）；
+    /// Tools/About 两 tab 拆掉（行 → 设置·工具区 / 关于区）。
     private enum Page: Hashable {
-        case install, tools, about
+        case files, apps, sources, downloads, settings
+
+        var wash: Backdrop.Level {
+            // 工具 tab 的 .dark 随旧工具页一起没了；新列表页全是
+            // 白底（U8），wash 全亮，不再分情况。
+            switch self {
+            case .files, .apps, .sources, .downloads, .settings: .bright
+            }
+        }
     }
 
     /// What the sign-in sheet shows: a 2FA prompt, or which team signs.
@@ -65,50 +125,171 @@ struct RootView: View {
     /// The app's own, shared with the Shortcuts actions.
     @ObservedObject private var locationManager = LocationManager.shared
     @StateObject private var entitlementsManager = EntitlementsManager()
-    /// The app's own, shared with the Shortcuts actions.
+    /// 与快捷指令共用同一个实例（SideloadedAppsManager.shared），后台续签状态界面可见。
     @ObservedObject private var appsManager = SideloadedAppsManager.shared
     @StateObject private var sideBySideManager = SideBySideManager()
+    /// 证书页与文件页之间传递待签 IPA。
+    @StateObject private var certWorkspace = CertWorkspace()
+    @State private var page: Page = .sources
+    /// U-UI：安装页改全屏 sheet 后的开关（浮动 pill 与链接/分享入口共用）。
+    @State private var showInstallSheet = false
+    /// C31：2FA 弹着时安装页暂缓打开的待处理标志（反方向）。
+    @State private var showInstallSheetPending = false
+    /// U-UI：文件页/源页“签名”动作要求打开设置里的企业证书页时置位；
+    /// SettingsView 的企业区 NavigationLink 认它，打开后自己清掉。
+    @State private var settingsEnterpriseRequest = false
+    /// P0-2 (0.9.185): the error popup's "View log" asks for the
+    /// activity log; SettingsView's log section scrolls to it, then
+    /// clears the flag itself (settingsEnterpriseRequest 同款）.
+    @State private var settingsLogRequest = false
+    /// P1-1/P1-4 (0.9.186): a "Go to Settings" action asks for the
+    /// Account section; SettingsView scrolls to it, then clears the
+    /// flag itself (settingsLogRequest 同款）.
+    @State private var settingsAccountRequest = false
+    /// P1-4 (0.9.186): a failed refresh whose next step is the
+    /// Certificates page; SettingsView's tools NavigationLink opens
+    /// it, then clears the flag itself (enterpriseRequest 同款）.
+    @State private var settingsCertRequest = false
     @StateObject private var sourcesManager = SourcesManager()
     @StateObject private var jitManager = JITManager()
     /// What the sign-in sheet showed last, so it keeps its content while it
     /// slides away after the sign-in clears it.
     @State private var shownSignInSheet: SignInSheet?
-    @State private var page: Page = .install
 
     var body: some View {
         // `.tabItem`/`.tag` rather than iOS 18's `Tab`, to keep iOS 17.
+        // U-UI：五栏——文件 / 应用 / 源 / 下载 / 设置（截图顺序）。
+        // 图标全是仓内已用过的 SF Symbol（storefront 见 SideBySideView:86，
+        // square.grid.2x2 见 SideBySideView:2521，arrow.down.circle 见旧 Tools 行，
+        // gearshape 见旧 Tools 行，folder.fill 见旧文件 tab）。
         TabView(selection: tabSelection) {
-            ContentView()
-                .tabItem { Label(L("Install"), systemImage: "square.and.arrow.down") }
-                .tag(Page.install)
-            ToolsView(pairingManager: pairingManager,
-                      certManager: certManager,
-                      locationManager: locationManager,
-                      entitlementsManager: entitlementsManager,
-                      appsManager: appsManager,
-                      sideBySideManager: sideBySideManager,
-                      sourcesManager: sourcesManager,
-                      jitManager: jitManager)
-                .tabItem { Label(L("Tools"), systemImage: "wrench.and.screwdriver") }
-                .tag(Page.tools)
-            AboutView()
-                .tabItem { Label(L("About"), systemImage: "info.circle") }
-                .tag(Page.about)
+            FilesTabView()
+                .blueTopBar()
+                .tabItem { Label(L("File"), systemImage: "folder") }
+                .tag(Page.files)
+            NavigationStack { AppsView(manager: appsManager) }
+                .blueTopBar()
+                .tabItem { Label(L("Apps"), systemImage: "square.grid.2x2") }
+                .tag(Page.apps)
+                .badge(appsManager.expiringSoon > 0 ? Text("\(appsManager.expiringSoon)") : nil)
+            NavigationStack { SourcesView() }
+                .blueTopBar()
+                .tabItem { Label(L("Sources"), systemImage: "storefront") }
+                .tag(Page.sources)
+                // F-D (0.9.156): the Apps tab's expiring-soon badge, but for
+                // updates — 0 shows nothing, like the Apps tab.
+                .badge(sourcesManager.availableUpdateCount > 0 ? Text("\(sourcesManager.availableUpdateCount)") : nil)
+            NavigationStack { DownloadsListView() }
+                .blueTopBar()
+                .tabItem { Label(L("Download"), systemImage: "arrow.down.circle") }
+                .tag(Page.downloads)
+            SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest, logRequest: $settingsLogRequest, accountRequest: $settingsAccountRequest, certRequest: $settingsCertRequest)
+                .tabItem { Label(L("Settings"), systemImage: "gearshape") }
+                .tag(Page.settings)
         }
-        // A link's install or pairing file ends up on the Install tab, so its
+        .environmentObject(certWorkspace)
+        // F-2 (0.9.179): the share-in certificate choice sheet.
+        .modifier(SigningChoiceSheetModifier())
+        // F-3 (0.9.164): a history row's "Show in Downloads" — switch to the
+        // Downloads tab; DownloadsListView scrolls to the file itself.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealDownload)) { _ in
+            page = .downloads
+        }
+        // P0-2 (0.9.185): the error popup's "View log" — the install
+        // sheet would cover the tab, so close it first (the 2FA
+        // handling below does the same), then switch to Settings
+        // and let the log section scroll itself into view.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealLog)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsLogRequest = true
+        }
+        // P1-1/P1-4 (0.9.186): the install checklist's and the failed
+        // refresh row's "Go to Settings" — same shape as revealLog,
+        // landing on the Account section instead of the log.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealAccount)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsAccountRequest = true
+        }
+        // P1-4 (0.9.186): the failed refresh row's "Go to the
+        // Certificates page" — same shape, opening that page.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealCertificates)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsCertRequest = true
+        }
+        // U-UI：文件页/源页把 IPA 交给企业证书页时（CertWorkspace.openEnterpriseSign），
+        // 切到设置 tab 并让企业区自动打开；标志由这里清掉，只触发一次。
+        .onChange(of: certWorkspace.openEnterpriseSign) { _, open in
+            guard open else { return }
+            certWorkspace.openEnterpriseSign = false
+            page = .settings
+            settingsEnterpriseRequest = true
+        }
+        // Animate the backdrop to the new tab's level.
+        .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
+        // A link's install or pairing file ends up on the install sheet, so its
         // popup comes up over that.
         .onChange(of: engine.pendingLink) { _, link in
-            if link != nil { page = .install }
+            if link != nil { openInstallSheet() }
+        }
+        // A share / “Open with” IPA import lands here too: the run it started
+        // (or the guide it stopped on) lives on the install sheet, so jump
+        // there instead of leaving the user to go find it by hand.
+        .onChange(of: engine.sharedIPAReady) { _, ready in
+            if ready { openInstallSheet(); engine.sharedIPAReady = false }
         }
         // A certificate a link brought is checked and imported by the same
         // manager as the Certificates page.
-        .onChange(of: engine.certificateToImport) { _, request in
-            guard let request else { return }
+        // Zero-arg form: the two-arg (#35) and one-arg (#36) rejections were
+        // cascades of the missing CertManager.importCertificate below, not
+        // the onChange itself; the zero-arg form is kept because it is the
+        // form proven to type-check here. It reads the new value directly,
+        // which is behaviorally identical.
+        .onChange(of: engine.certificateToImport) {
+            guard let request = engine.certificateToImport else { return }
             engine.certificateToImport = nil
             certManager.importCertificate(request)
         }
+        .fullScreenCover(isPresented: $showInstallSheet) {
+            ContentView()
+                .popupStack(installEntries, onBackdropTap: installBackdropTap) { entry in
+                    card(for: entry)
+                }
+        }
+        // U-UI：安装进行中/刚跑完时各 tab 底部浮一颗 pill，点开就是
+        // 原来的安装页（ContentView 原样搬进 sheet，逻辑不动）；
+        // 没跑过时不显示，不占地方。文案复用 L("Install")，0 新 key。
+        .overlay(alignment: .bottom) {
+            if engine.isRunning || engine.overallProgress > 0 || engine.finished {
+                Button { openInstallSheet() } label: {
+                    HStack(spacing: 6) {
+                        if engine.isRunning {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                        Text(L("Install"))
+                        Image(systemName: "chevron.up")
+                            .font(.caption2.weight(.bold))
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.topBarFill))
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 8)
+            }
+        }
         // Over the tab bar too, so the whole app dims behind the popups.
-        .popupStack(entries, onBackdropTap: backdropTap) { entry in
+        .popupStack(showInstallSheet ? otherEntries : entries,
+                    onBackdropTap: showInstallSheet ? otherBackdropTap : backdropTap) { entry in
             card(for: entry)
         }
         .onChange(of: popups) { old, new in
@@ -117,6 +298,15 @@ struct RootView: View {
         // The Install tab's revoke-and-retry runs through this same manager
         // (declared below the popups, which use it too).
         .environmentObject(certManager)
+        .environmentObject(pairingManager)
+        .environmentObject(locationManager)
+        .environmentObject(entitlementsManager)
+        .environmentObject(appsManager)
+        .environmentObject(sideBySideManager)
+        // 0.9.140: the JIT and Sources pages live in Settings now (their
+        // old Tools tab is gone), so their managers come from here too.
+        .environmentObject(sourcesManager)
+        .environmentObject(jitManager)
         // When the active Apple ID changes, drop all four cached Apple sessions
         // (Side by Side's included) so none is reused for the new account.
         .onChange(of: accounts.revision) { _, _ in
@@ -125,12 +315,18 @@ struct RootView: View {
             entitlementsManager.signOut()
             sideBySideManager.signOut()
         }
+        .tint(Theme.topBarFill)
+        // 外观只听 App 入口的 SIDAppearance 档（SideInstallerApp 的
+        // .preferredColorScheme），这里不再硬编码 .dark，否则主界面
+        // 永远深色、设置页却跟浅色档走，两边割裂。
         // The sources are checked for updates once when SideInstaller opens,
         // as SideInstallerApp checks SideInstaller itself, so the Sources tile
         // can show how many there are.
         .task { await sourcesManager.checkAtLaunch(apps: appsManager) }
-        .tint(Theme.accent)
-        .preferredColorScheme(.dark)
+        // B-2 (0.9.157): the badge's recount wiring lives in
+        // `SourcesBadgeRecountModifier` — inline here it pushed the
+        // body's chain past what the compiler can type-check.
+        .modifier(SourcesBadgeRecountModifier(sourcesManager: sourcesManager, appsManager: appsManager))
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
             get: { signInSheet != nil },
@@ -152,6 +348,15 @@ struct RootView: View {
             }
         }
         .onChange(of: engine.twoFactor) { old, phase in
+            // C31：2FA 来了先落安装页（全屏 sheet 盖住 TabView 时 2FA sheet
+            // 会被 UIKit 静默丢弃）；2FA 清掉后把暂缓的安装页补开。
+            if phase != nil {
+                if showInstallSheet { showInstallSheetPending = true }
+                showInstallSheet = false
+            } else if showInstallSheetPending {
+                showInstallSheetPending = false
+                showInstallSheet = true
+            }
             // A code is wanted, or the one entered was turned down.
             if let phase, phase.isAsking {
                 if old?.signIn != phase.signIn {
@@ -160,6 +365,16 @@ struct RootView: View {
                     SoundEffects.play(.error)
                 }
             }
+        }
+    }
+
+    /// C31：安装页与 2FA sheet 不能同时 present——2FA 弹着时只记 pending，
+    /// 等 2FA 清掉再补开安装页（否则 UIKit 静默丢弃 present）。
+    private func openInstallSheet() {
+        if engine.twoFactor != nil {
+            showInstallSheetPending = true
+        } else {
+            showInstallSheet = true
         }
     }
 
@@ -217,6 +432,19 @@ struct RootView: View {
         }
     }
 
+    /// cover 里 backdrop 点按：只关 install 组里不阻塞的项。
+    private var installBackdropTap: (() -> Void)? {
+        let closable = installEntries.flatMap(\.items).filter { !blocks($0) }
+        guard !closable.isEmpty else { return nil }
+        return { SoundEffects.play(.dismiss); closable.forEach(close) }
+    }
+    /// TabView 层 backdrop 点按：只关非 install 组里不阻塞的项。
+    private var otherBackdropTap: (() -> Void)? {
+        let closable = otherEntries.flatMap(\.items).filter { !blocks($0) }
+        guard !closable.isEmpty else { return nil }
+        return { SoundEffects.play(.dismiss); closable.forEach(close) }
+    }
+
     /// Plays the sound for popups that just came up: an error over a success
     /// over a request for the user, when several come up at once.
     private func playSound(forShown items: [PopupItem]) {
@@ -245,7 +473,9 @@ struct RootView: View {
             engine.isRunning ? .attention : nil
         // Waiting on the user: a code to type, steps to follow, a go-ahead.
         case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
-             .install(.link), .pairing(.pairingCode), .pairing(.pairInSettings):
+             .install(.pairingImportMismatch), .install(.link), .install(.cellularDownload),
+             .install(.downgrade),
+             .pairing(.pairingCode), .pairing(.pairInSettings):
             .attention
         }
     }
@@ -275,6 +505,19 @@ struct RootView: View {
         return entries
     }
 
+    /// Install 组进全屏 cover 里渲染（TabView 层的 overlay 被 cover 盖住）；
+    /// 其余组留在 TabView 层。组要么全是 install、要么全不是，不会拆散一组。
+    private var installEntries: [PopupEntry] {
+        entries.filter { $0.items.allSatisfy(isInstall) }
+    }
+    private var otherEntries: [PopupEntry] {
+        entries.filter { !$0.items.allSatisfy(isInstall) }
+    }
+    private func isInstall(_ item: PopupItem) -> Bool {
+        if case .install = item { return true }
+        return false
+    }
+
     /// The group a popup comes up in, if it's ever up with others.
     private func group(of item: PopupItem) -> PopupGroupKind? {
         switch item {
@@ -289,7 +532,8 @@ struct RootView: View {
         case .install(.success), .install(.liveContainerImport):
             .installFinished
         // Up on its own, waiting for the go-ahead to sign, or to act on a link.
-        case .install(.appIDCost), .install(.link):
+        case .install(.appIDCost), .install(.pairingImportMismatch), .install(.link),
+             .install(.cellularDownload), .install(.downgrade):
             nil
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage
@@ -421,7 +665,7 @@ struct TwoFactorSheet: View {
                 }
                 Section {
                     Text(instructions)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     if prompt.expectsCode {
                         TextField(L("6-digit code"), text: $code)
                             .keyboardType(.numberPad)
@@ -439,7 +683,7 @@ struct TwoFactorSheet: View {
                         HStack(spacing: 8) {
                             ProgressView()
                             Text(status(for: pending))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 } footer: {
@@ -548,185 +792,4 @@ struct TwoFactorSheet: View {
 enum ToolPopup: Hashable {
     case error(String)
     case success(String)
-}
-
-/// The Tools tab: a menu of utility pages. Owns the `NavigationStack` they're
-/// pushed onto, so those pages don't declare their own.
-struct ToolsView: View {
-    /// Observed so labels redraw when the language changes.
-    @EnvironmentObject private var loc: Localizer
-    /// Passed in (owned by `RootView`) so pages keep their state across tabs.
-    @ObservedObject var pairingManager: PairingManager
-    @ObservedObject var certManager: CertManager
-    @ObservedObject var locationManager: LocationManager
-    @ObservedObject var entitlementsManager: EntitlementsManager
-    @ObservedObject var appsManager: SideloadedAppsManager
-    @ObservedObject var sideBySideManager: SideBySideManager
-    @ObservedObject var sourcesManager: SourcesManager
-    @ObservedObject var jitManager: JITManager
-
-    @State private var showSettings = false
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    header.cascadeItem(0)
-                    LazyVGrid(columns: Self.columns, spacing: 12) {
-                        NavigationLink {
-                            SideBySideView(manager: sideBySideManager)
-                        } label: {
-                            ToolTile(image: "SideBySideLogo", title: L("Side by Side"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(1)
-                        // The Pairing page generates a pairing file on-device, which
-                        // needs iOS 27+. Older iOS imports it on the Install screen.
-                        if Engine.deviceCanSelfPair {
-                            NavigationLink {
-                                PairingView(manager: pairingManager)
-                            } label: {
-                                ToolTile(image: "PairingLogo", title: L("Pairing"))
-                            }
-                            .buttonStyle(.plain, sound: .tick)
-                            .cascadeItem(2)
-                        }
-                        NavigationLink {
-                            JITView(manager: jitManager)
-                        } label: {
-                            ToolTile(image: "JITLogo", title: L("JIT"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(2))
-                        NavigationLink {
-                            CertsView(manager: certManager)
-                        } label: {
-                            ToolTile(image: "CertsLogo", title: L("Certificates"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(3))
-                        NavigationLink {
-                            EntitlementsView(manager: entitlementsManager)
-                        } label: {
-                            ToolTile(image: "EntitlementsLogo", title: L("Entitlements"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(4))
-                        NavigationLink {
-                            LocationView(manager: locationManager)
-                        } label: {
-                            ToolTile(image: "LocationLogo", title: L("Location spoofing"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(5))
-                        NavigationLink {
-                            AppsView(manager: appsManager)
-                        } label: {
-                            ToolTile(image: "AppsLogo", title: L("Sideloaded apps"))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(6))
-                        NavigationLink {
-                            SourcesView(manager: sourcesManager, appsManager: appsManager)
-                        } label: {
-                            ToolTile(image: "SourcesLogo", title: L("Sources"),
-                                     count: sourcesManager.updateCount(installed: appsManager.entries))
-                        }
-                        .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(rowIndex(7))
-                    }
-                }
-                // No bottom padding: the tab bar's inset already clears the last
-                // row of tiles, and the extra 20pt would make a page that fits scroll.
-                .padding([.horizontal, .top], 20)
-                .pageColumn()
-            }
-            // Still unless the tiles don't all fit on the screen.
-            .scrollBounceBehavior(.basedOnSize)
-            .background(AppBackground())
-            .toolbar { settingsToolbarItem(isPresented: $showSettings) }
-            .sheet(isPresented: $showSettings) { SettingsView() }
-        }
-    }
-
-    /// Two square tiles to a row.
-    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
-
-    /// Cascade index for rows below Pairing, shifted by one when that row is shown.
-    private func rowIndex(_ position: Int) -> Int {
-        Engine.deviceCanSelfPair ? position + 1 : position
-    }
-
-    /// Just the title: the tiles below carry the iconography on this page.
-    private var header: some View {
-        Text(L("Tools"))
-            .font(.largeTitle.weight(.medium))
-            .frame(maxWidth: .infinity)
-            .padding(.top, 8)
-    }
-}
-
-/// One Tools menu tile: a square with the logo above the name. Pages without
-/// logo art pass an SF Symbol, drawn on a plain tile at the same size.
-private struct ToolTile: View {
-    var image: String? = nil
-    var icon: String? = nil
-    var title: String
-    /// Shows a Beta badge in the top corner.
-    var beta: Bool = false
-    /// A count in the top corner, such as the updates Sources found. 0 hides it.
-    var count: Int = 0
-
-    var body: some View {
-        let logo = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        let tile = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-        return VStack(spacing: 12) {
-            glyph
-                .frame(width: 64, height: 64)
-                .clipShape(logo)
-                // The art's black tile would melt into the card without it.
-                .overlay(logo.strokeBorder(Theme.hairline, lineWidth: 1))
-            Text(title)
-                .font(.body.weight(.medium))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .overlay(alignment: .topTrailing) {
-            if beta {
-                BetaBadge()
-                    .padding(12)
-            }
-            if count > 0 {
-                Text("\(count)")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(minWidth: 24, minHeight: 24)
-                    .padding(.horizontal, count > 9 ? 4 : 0)
-                    .background(Capsule().fill(Theme.warning))
-                    .padding(12)
-                    .accessibilityLabel(count == 1 ? L("%d update", count) : L("%d updates", count))
-            }
-        }
-        .cardSurface(in: tile)
-        .contentShape(tile)
-    }
-
-    @ViewBuilder
-    private var glyph: some View {
-        if let image {
-            Image(image)
-                .logoArt()
-        } else {
-            ZStack {
-                Rectangle().fill(Theme.raised)
-                Image(systemName: icon ?? "questionmark")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
 }

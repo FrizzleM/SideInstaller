@@ -1,34 +1,71 @@
 import SwiftUI
+import UIKit
 
 /// The app's shared visual language: a ramp of night blues, three blues
 /// with a job each, and the cards, buttons and headers every screen is
 /// composed from.
 ///
-/// The surfaces are navy so dark they read as night, and the blues are kept
-/// apart by what they do: `navy` for the logo art and the wash at the top of
-/// a page, `blue` for what's filled behind white (the main button), `accent`
-/// for what's drawn on the dark (progress, links, the selection). Depth comes
-/// from a step between surfaces and a hairline edge.
+/// In dark mode the surfaces are navy so dark they read as night, and the
+/// blues are kept apart by what they do: `navy` for the logo art and the
+/// wash at the top of a page, `blue` for what's filled behind white (the
+/// main button), `accent` for what's drawn on the dark (progress, links,
+/// the selection). Depth comes from a step between surfaces and a hairline
+/// edge. In light mode `card` and `raised` step down to the system
+/// backgrounds instead, so the dark text on them stays readable — a fixed
+/// navy under black text was unreadable (Files page, 2026-11-22).
 enum Theme {
     // MARK: Ramp
 
-    /// The page behind everything: a navy so deep it reads as black until a
-    /// card sits on it.
-    static let page = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
-    /// A card on the page.
-    static let card = Color(red: 13 / 255, green: 21 / 255, blue: 36 / 255)
+    /// A card on the page. Dark keeps the night navy; light uses the
+    /// system's secondary background, so the black text on it stays
+    /// readable — a fixed navy under black text was unreadable in
+    /// light mode (Files page screenshot, 2026-11-22: the file-row
+    /// card and the file-management card were dark navy with near-
+    /// black text, while the rest of the page was light).
+    static let card = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 13 / 255, green: 21 / 255, blue: 36 / 255, alpha: 1)
+            : UIColor.secondarySystemBackground
+    })
     /// One step above a card: popups, which float over the dimmed app.
-    static let raised = Color(red: 20 / 255, green: 30 / 255, blue: 49 / 255)
+    /// Dark keeps the night navy; light is the system background, so
+    /// popup text (.primary, black in light mode) stays readable —
+    /// the same fixed-navy disease as `card`, confirmed by reading
+    /// the code (no screenshot, but the surface and the text colour
+    /// are the same pair). The two plain icon tiles that use this as
+    /// a glyph backdrop go light with it, which stays legible.
+    static let raised = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 20 / 255, green: 30 / 255, blue: 49 / 255, alpha: 1)
+            : UIColor.systemBackground
+    })
     /// The pale blue that controls and edges are drawn in, faintly, so they
     /// stay in the ramp's hue instead of greying it.
     static let ice = Color(red: 185 / 255, green: 211 / 255, blue: 249 / 255)
-    /// A control's fill, a step up from whatever it sits on.
-    static let control = ice.opacity(0.07)
-    /// The edge of a card or control.
-    static let hairline = ice.opacity(0.1)
-    /// Captions, meta and quiet icons: a slate blue, at least 4.5:1 on a
-    /// popup and more on a card.
-    static let muted = Color(red: 127 / 255, green: 141 / 255, blue: 165 / 255)
+    /// A control's fill, a step up from whatever it sits on. Dark keeps the
+    /// pale-blue wash; light uses black at 5%, so a control stays a step up
+    /// from the card without tinting it blue.
+    static let control = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 185 / 255, green: 211 / 255, blue: 249 / 255, alpha: 0.07)
+            : UIColor(white: 0, alpha: 0.05)
+    })
+    /// The edge of a card or control. Dark keeps the pale-blue hairline;
+    /// light uses black at 12%.
+    static let hairline = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 185 / 255, green: 211 / 255, blue: 249 / 255, alpha: 0.1)
+            : UIColor(white: 0, alpha: 0.12)
+    })
+    /// Captions, meta and quiet icons: a slate blue. Dark keeps the old
+    /// value (at least 4.5:1 on a popup, more on a card); light uses a
+    /// deeper slate (#5A6678, 5.82:1 on white, 5.22:1 on a card) — the
+    /// old value was only 3.36:1 on white in light mode.
+    static let muted = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 127 / 255, green: 141 / 255, blue: 165 / 255, alpha: 1)
+            : UIColor(red: 90 / 255, green: 102 / 255, blue: 120 / 255, alpha: 1)
+    })
 
     // MARK: Colour
 
@@ -39,14 +76,58 @@ enum Theme {
     /// at 4.8:1.
     static let blue = Color(red: 38 / 255, green: 105 / 255, blue: 237 / 255)
     /// The light blue drawn on the dark: progress, the selection, links and
-    /// a card's label icon. At least 6:1 on every surface above.
-    static let accent = Color(red: 96 / 255, green: 167 / 255, blue: 253 / 255)
+    /// a card's label icon. Dark keeps the old value (at least 6:1 on a card);
+    /// light uses a deeper blue (#1F5BD0, 6.06:1 on white, 5.43:1 on a card) —
+    /// the old value was only 2.49:1 on white in light mode.
+    static let accent = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 96 / 255, green: 167 / 255, blue: 253 / 255, alpha: 1)
+            : UIColor(red: 31 / 255, green: 91 / 255, blue: 208 / 255, alpha: 1)
+    })
+    static let accent2 = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 1)
+            : UIColor(red: 77 / 255, green: 141 / 255, blue: 255 / 255, alpha: 1) // 浅色 #4D8DFF，与 accent 拉开一档
+    })
+    /// Deep-navy halo behind each header icon, matching the icon art (#011A5C).
+    static let glow = Color(red: 1/255, green: 26/255, blue: 92/255)
+
+    /// The signature diagonal gradient used for the logo, CTA and accents.
+    static var brand: LinearGradient {
+        LinearGradient(colors: [accent, accent2],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    /// A diagonal gradient built from any tint, for tinted glyphs.
+    static func gradient(_ color: Color) -> LinearGradient {
+        LinearGradient(colors: [color, color.opacity(0.72)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
     /// Done, connected, granted.
-    static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
+    static let positive = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 76/255, green: 195/255, blue: 138/255, alpha: 1)   // 深色保持 #4CC38A，深卡 8.24:1
+        : UIColor(red: 30/255, green: 125/255, blue: 50/255, alpha: 1) }) // 浅色 #1E7D32，白底 5.20:1 / 浅卡 4.66:1
     /// Something needs the user, or will soon.
-    static let warning = Color(red: 229 / 255, green: 161 / 255, blue: 64 / 255)
+    static let warning = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 229/255, green: 161/255, blue: 64/255, alpha: 1)   // 深色保持 #E5A140
+        : UIColor(red: 140/255, green: 94/255,  blue: 0,     alpha: 1) }) // 浅色 #8C5E00，白底 5.65:1 / 浅卡 5.06:1
     /// Failed, missing, can't be undone.
-    static let negative = Color(red: 229 / 255, green: 72 / 255, blue: 77 / 255)
+    static let negative = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 229/255, green: 72/255,  blue: 77/255, alpha: 1)   // 深色保持 #E5484D
+        : UIColor(red: 200/255, green: 30/255,  blue: 30/255, alpha: 1) }) // 浅色 #C81E1E，白底 5.74:1 / 浅卡 5.14:1
+    /// 顶栏/药丸/安装 pill 的填充：浅色沿用现浅 accent2，深色用 Theme.blue。
+    /// 不能直接改 accent2 深色分支——accent2 同时是深色正文色（深卡 7.67:1）。
+    static let topBarFill = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 38/255, green: 105/255, blue: 237/255, alpha: 1)   // 深色 #2669ED，白字 4.85:1
+        : UIColor(red: 31/255, green: 91/255,  blue: 208/255, alpha: 1) }) // 浅色 #1F5BD0，白字 6.06:1
+    /// 徽章类深填充（圆点/绿 pill 用，白字均过 5:1，双模式通用固定值）。
+    static let badgePositive = Color(red: 30/255,  green: 125/255, blue: 50/255)  // #1E7D32，白字 5.20:1
+    static let badgeWarning  = Color(red: 140/255, green: 94/255,  blue: 0)       // #8C5E00，白字 5.65:1
+    /// Tools 行深瓦色（B-11）：白字图标均过 4.5:1，双模式通用固定值。
+    /// 绿/橙复用徽章深填充，蓝复用 Theme.blue。
+    static let tilePurple = Color(red: 107/255, green: 33/255,  blue: 168/255)  // #6B21A8，白字 8.72:1
+    static let tileTeal   = Color(red: 14/255,  green: 116/255, blue: 144/255)  // #0E7490，白字 5.36:1
+    static let tileCyan   = Color(red: 3/255,   green: 105/255, blue: 161/255)  // #0369A1，白字 5.93:1
 
     // MARK: Shape
 
@@ -55,7 +136,27 @@ enum Theme {
     /// Corner radius of a card.
     static let cardRadius: CGFloat = 20
     /// Corner radius of a popup.
-    static let popupRadius: CGFloat = 24
+    static let popupRadius: CGFloat = 20
+    /// Corner radius of a small chip or badge.
+    static let smallRadius: CGFloat = 8
+
+    // MARK: Spacing (0.9.187 UI redo: the one spacing scale)
+    /// Standard gap between sections and cards.
+    static let spacing: CGFloat = 16
+    /// Wide gap: page padding and card stacks.
+    static let spacingLarge: CGFloat = 20
+    /// Tight gap: inside a row or a card.
+    static let spacingSmall: CGFloat = 12
+
+    // MARK: Type scale (0.9.187 UI redo)
+    /// Card and page titles.
+    static let titleFont: Font = .headline
+    /// Emphasised body text, e.g. a row's name.
+    static let bodyFont: Font = .subheadline
+    /// Secondary text, e.g. a row's detail line.
+    static let detailFont: Font = .footnote
+    /// Smallest text, e.g. a caption or a tag.
+    static let captionFont: Font = .caption
 
     /// The widest a page's column grows, its padding included. A phone is
     /// narrower than this; a wider window, such as an open iPhone Duo (about
@@ -78,18 +179,127 @@ extension View {
 
 // MARK: - Background
 
+// MARK: - Backdrop level
+
+/// Shared backdrop darkness level and its animation between tabs.
+///
+/// Each page draws its own `AppBackground`, and pages overlap during a tab
+/// change, so the state lives here: start level, target level and start time.
+/// Every backdrop computes its value from the clock, so all copies show the
+/// same frame.
+@MainActor
+enum Backdrop {
+    /// Opacity of the black overlay on the mesh: bright (Install, About) or
+    /// dark (Tools).
+    enum Level: Double, CaseIterable {
+        case bright = 0
+        case dark   = 0.55
+    }
+
+    /// Duration of a full bright ↔ dark transition.
+    private static let fullTravel: TimeInterval = 0.55
+
+    /// Largest gap between levels. Shorter moves get proportionally less time,
+    /// so all transitions run at the same speed.
+    private static let span = (Level.allCases.map(\.rawValue).max() ?? 1)
+                            - (Level.allCases.map(\.rawValue).min() ?? 0)
+
+    private static var origin = Level.bright.rawValue
+    private static var target = Level.bright.rawValue
+    /// Far enough in the past that the first frame is at rest on `bright`.
+    private static var departed = -Double.greatestFiniteMagnitude
+    /// Duration of the current move, scaled to its distance.
+    private static var travel = fullTravel
+
+    /// Starts animating to `level` from the current value, so switching tabs
+    /// mid-transition reverses smoothly. No-op if already heading to `level`.
+    static func settle(on level: Level) {
+        guard target != level.rawValue else { return }
+        let now = Date.timeIntervalSinceReferenceDate
+        origin = wash(at: now)
+        target = level.rawValue
+        departed = now
+        // Scale duration by distance, so a mid-transition reversal isn't slow.
+        travel = fullTravel * min(1, abs(target - origin) / span)
+    }
+
+    /// The wash at `t`, on a smoothstep so it both leaves and arrives at rest.
+    static func wash(at t: TimeInterval) -> Double {
+        guard travel > 0 else { return target }
+        let p = min(max((t - departed) / travel, 0), 1)
+        return origin + (target - origin) * (p * p * (3 - 2 * p))
+    }
+}
+
 /// The page every screen sits on: the night-blue page with a wash of navy at
 /// the top, where each page's logo tile and title sit, gone by the middle of
 /// a phone's screen. Still: nothing in it moves.
+
 struct AppBackground: View {
+    // 浅色下也得可读：以前底恒黑，浅色时 .primary 是黑色，黑字压黑底
+    // （关于页截图就是这样）。底色跟随浅/深色，浅色用系统底色 + 淡蓝晕，
+    // 深色保持原来的黑底蓝晕；工具页的深浅过渡在浅色下只压 1/4，避免压灰。
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        Theme.page
-            .overlay(alignment: .top) {
-                EllipticalGradient(colors: [Theme.navy.opacity(0.4), Theme.navy.opacity(0)],
-                                   center: .top, startRadiusFraction: 0, endRadiusFraction: 1)
-                    .frame(height: 480)
+        // A-3（SIDE-32）：10Hz 就够——动画只是缓慢摇摆，不必逐帧重算
+        // MeshGradient + blur；点仍由时钟推导，运动连续不跳变。
+        TimelineView(.animation(minimumInterval: 0.1, paused: false)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let light = colorScheme == .light
+            ZStack {
+                light ? Color(.systemBackground) : Color.black
+                mesh(at: t)
+                    .blur(radius: 24)
+                    // Low enough to read as a deep tint rather than a light.
+                    .opacity(light ? 0.12 : 0.2)
+                // Off the same clock as the mesh, so every page's copy of this
+                // backdrop is at the identical point of the transition.
+                Color.black.opacity(Backdrop.wash(at: t) * (light ? 0.25 : 1))
             }
             .ignoresSafeArea()
+    }
+}
+
+    /// The blue layer: the swaying mesh, or on iOS 17 (no `MeshGradient`) a
+    /// radial bloom that follows the mesh's centre point.
+    @ViewBuilder
+    private func mesh(at t: TimeInterval) -> some View {
+        let points = meshPoints(at: t)
+        if #available(iOS 18.0, *) {
+            MeshGradient(width: 3, height: 3, points: points, colors: meshColors)
+        } else {
+            let centre = points[4]
+            RadialGradient(colors: [Theme.accent2, Theme.accent, Theme.glow],
+                           center: UnitPoint(x: CGFloat(centre.x), y: CGFloat(centre.y)),
+                           startRadius: 0, endRadius: 600)
+        }
+    }
+
+    /// Deep-navy corners with brighter blue blooms through the middle.
+    private let meshColors: [Color] = [
+        Theme.glow,    Theme.accent,   Theme.glow,
+        Theme.accent2, Theme.accent,   Theme.accent2,
+        Theme.glow,    Theme.accent2,  Theme.glow,
+    ]
+
+    /// A 3×3 grid of control points: corners pinned so the gradient fills the
+    /// screen, the rest swaying on out-of-phase sine waves.
+    private func meshPoints(at t: TimeInterval) -> [SIMD2<Float>] {
+        func osc(_ base: Double, _ amp: Double, _ speed: Double, _ phase: Double) -> Float {
+            Float(base + amp * sin(t * speed + phase))
+        }
+        return [
+            SIMD2<Float>(0, 0),
+            SIMD2<Float>(osc(0.5, 0.18, 0.625, 0.0), 0),
+            SIMD2<Float>(1, 0),
+            SIMD2<Float>(0, osc(0.5, 0.18, 0.55, 1.0)),
+            SIMD2<Float>(osc(0.5, 0.12, 0.75, 2.0), osc(0.5, 0.12, 0.675, 3.0)),
+            SIMD2<Float>(1, osc(0.5, 0.18, 0.60, 4.0)),
+            SIMD2<Float>(0, 1),
+            SIMD2<Float>(osc(0.5, 0.18, 0.65, 5.0), 1),
+            SIMD2<Float>(1, 1),
+        ]
     }
 }
 
@@ -97,16 +307,83 @@ struct AppBackground: View {
 
 /// The container every section sits in.
 struct PanelCard<Content: View>: View {
+    /// Inner padding: 20 by default; tight list rows use 16.
+    var padding: CGFloat = 20
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
+            .padding(padding)
             .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }
 
+/// A `PanelCard` washed in a tint, for guidance, errors and success.
+struct CalloutCard<Content: View>: View {
+    var tint: Color
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .fill(tint.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .strokeBorder(tint.opacity(0.35), lineWidth: 1)
+            )
+    }
+}
+
+/// 触感反馈集中一处（全仓唯一 helper，别每处各写一套）：主操作
+/// .medium，其余 .light；完成/失败走 notification。只在用户手势
+/// 触发处调用（点按动作里），别在后台回调里乱震；系统级触感
+/// 开关自带，不另起设置项。
+enum CZFHaptics {
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+
+    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        UINotificationFeedbackGenerator().notificationOccurred(type)
+    }
+}
+
+/// 大按钮按压态（plain 样式本身不给按压反馈，点着像没点）：
+/// 按下时整块微缩 + 变淡，松手复原；只改观感，不改点击行为。
+/// 签名页红/蓝大按钮用，别的 plain 按钮不动。
+struct CZFPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+/// 0.9.188：与 CZFPressButtonStyle 二选一统一后的留存者——一个按钮
+/// 本身不画任何东西、只把按压态报出来，给按钮外画的表面用（安装页
+/// 的 installSurface：蓝底与按压缩放都在按钮外面，按钮自己画反馈
+/// 够不着外皮）。CZFPressButtonStyle 留给自己画按压反馈的按钮；
+/// 两者不是一回事，不再各处私有一份。
+struct PressReportingButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in isPressed = pressed }
+    }
+}
+
+/// What a card is made of: a pane of glass with nothing in it. The backdrop
+/// shows through untouched, under the faintest wash, and the pane is drawn by
+/// its rim: lit along the top, dim down the sides, catching a little light
+/// again at the foot. Drawn by hand, since the system's glass and materials
+/// all frost what's behind them, which over this backdrop reads as gray.
 /// What a card is made of: a step up from the page, and a hairline edge.
 private struct CardSurface<S: InsettableShape>: ViewModifier {
     var shape: S
@@ -170,7 +447,6 @@ struct PopupCard<Content: View>: View {
         .frame(maxWidth: 460)
         .background(shape.fill(isTile ? Color.clear : Theme.raised))
         .overlay(shape.strokeBorder(Theme.hairline, lineWidth: 1))
-        .shadow(color: .black.opacity(isTile ? 0 : 0.5), radius: 24, x: 0, y: 12)
         .accessibilityElement(children: .contain)
         .accessibilityAction(.escape, requestClose)
         .alert(L("Closing this popup will end the process. Are you sure?"),
@@ -248,7 +524,6 @@ struct PopupGroupCard<Content: View>: View {
         .frame(maxWidth: 460)
         .background(shape.fill(Theme.raised).opacity(isGrouped ? 1 : 0))
         .overlay(shape.strokeBorder(Theme.hairline.opacity(isGrouped ? 1 : 0), lineWidth: 1))
-        .shadow(color: .black.opacity(isGrouped ? 0.5 : 0), radius: 24, x: 0, y: 12)
         .accessibilityElement(children: .contain)
         .accessibilityAction(.escape, requestClose)
         .alert(L("Closing this popup will end the process. Are you sure?"),
@@ -293,17 +568,96 @@ private struct PopupCloseButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Theme.control))
-                .contentShape(Circle())
-        }
         // The card plays the sound, which depends on whether it asks first.
-        .buttonStyle(.plain)
-        .accessibilityLabel(L("Close"))
+        IconCircleButton(systemImage: "xmark", sound: nil, action: action)
+            .accessibilityLabel(L("Close"))
+    }
+}
+
+// MARK: - Shared components (0.9.137)
+
+/// The shared search field: a magnifier on a control fill, used wherever a
+/// list is filtered by name. Replaces the four hand-copied grey search boxes
+/// (Files, Sources ×2, Enterprise library picker).
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Theme.muted)
+            TextField(placeholder, text: $text)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .textFieldStyle(.plain)
+            // F-1 (0.9.180): one-tap clear — every list with a search
+            // field used to need selecting the text to empty it.
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.muted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Clear"))
+            }
+        }
+        .padding(8)
+        .background(Theme.control)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+    }
+}
+
+/// A page's empty state: a 40pt icon, a headline and a muted footnote.
+struct EmptyState: View {
+    var title: String
+    var message: String
+    var systemImage: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 40))
+                .foregroundStyle(Theme.muted)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A small round icon button: a 32pt circle with a 44pt hit target, for the
+/// close, chevron and info buttons on cards and headers.
+struct IconCircleButton: View {
+    var systemImage: String
+    /// Nil plays no sound (the popup card plays its own on close).
+    var sound: UISound? = .tap
+    var action: () -> Void
+
+    var body: some View {
+        Group {
+            if let sound {
+                Button(action: action) { label }
+                    .buttonStyle(.plain, sound: sound)
+            } else {
+                Button(action: action) { label }
+                    .buttonStyle(.plain)
+            }
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private var label: some View {
+        Image(systemName: systemImage)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.muted)
+            .frame(width: 32, height: 32)
+            .background(Circle().fill(Theme.control))
+            .contentShape(Rectangle())
     }
 }
 
@@ -523,6 +877,7 @@ struct NumberedSteps: View {
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(minHeight: 44, alignment: .top)
             }
         }
     }
@@ -548,7 +903,7 @@ struct PairingCodeDigits: View {
     }
 
     private var key: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
     }
 }
 
@@ -566,7 +921,7 @@ struct PairingCodePopup: View {
                 PairingCodeDigits(pin: pin)
                 Text(caption)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -586,8 +941,9 @@ struct SectionTitle: View {
     var body: some View {
         Label {
             Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.muted)
         } icon: {
             Image(systemName: systemImage)
                 .font(.subheadline)
@@ -602,6 +958,9 @@ struct SectionTitle: View {
 struct StatusDot: View {
     var text: String
     var color: Color
+    /// The text colour. Defaults to Theme.muted; a page that needs the
+    /// system secondary label can pass .secondary instead.
+    var textColor: Color = Theme.muted
     /// A state that needs nothing from the user, shown with a muted dot.
     var idle = false
 
@@ -612,11 +971,35 @@ struct StatusDot: View {
                 .frame(width: 6, height: 6)
             Text(text)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(textColor)
                 .lineLimit(1)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A compact, colour-coded status capsule shown under the header.
+struct StatusPill: View {
+    var text: String
+    var systemImage: String
+    var color: Color
+    /// Wears a translucent glass capsule instead of the tinted fill, for an
+    /// idle state that shouldn't read as a status chip.
+    var glass: Bool = false
+
+    var body: some View {
+        let label = Label(text, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+        // Liquid Glass needs iOS 26+; fall back to the tinted capsule.
+        if glass, #available(iOS 26.0, *) {
+            label.glassEffect(.regular, in: Capsule())
+        } else {
+            label.background(Capsule().fill(color.opacity(0.16)))
+        }
     }
 }
 
@@ -628,7 +1011,7 @@ struct BetaBadge: View {
             .foregroundStyle(Theme.accent)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
             .fixedSize()
     }
@@ -657,6 +1040,8 @@ struct BrandHeader<Accessory: View>: View {
     var beta: Bool = false
     /// A line tucked under the title, close enough to read as one block.
     var subtitle: String? = nil
+    /// Breathe/pulse the icon while a run is in flight.
+    var animateIcon: Bool = false
     @ViewBuilder var accessory: () -> Accessory
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -684,7 +1069,7 @@ struct BrandHeader<Accessory: View>: View {
                     if let subtitle {
                         Text(subtitle)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 accessory()
@@ -707,6 +1092,11 @@ struct BrandHeader<Accessory: View>: View {
             Image(image)
                 .logoArt()
                 .clipShape(tile)
+                // A breathe while a run is in flight, mirroring `.pulse`.
+                .scaleEffect(animateIcon ? 1.04 : 1)
+                .animation(animateIcon ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                                       : .default,
+                           value: animateIcon)
                 // The art's dark tile would melt into the page without it.
                 .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))
         } else {
@@ -716,6 +1106,7 @@ struct BrandHeader<Accessory: View>: View {
                 Image(systemName: icon)
                     .font(.system(size: glyphSide * 32 / 72))
                     .foregroundStyle(.white)
+                    .symbolEffect(.pulse, isActive: animateIcon)
             }
         }
     }
@@ -743,26 +1134,32 @@ extension View {
 
 // MARK: - Buttons
 
-/// The full-width call to action: filled `blue` under a white label, the one
+/// The full-width call to action: filled `tint` under a white label, the one
 /// solid colour on a page. Plays `sound` as it fires.
+/// 0.9.188：tint 通道（默认蓝）——签名页的企业红按钮走同一套大按钮，
+/// 不再手写 background + 阴影；现有调用方不传 tint，仍是蓝色。
 struct PrimaryButtonStyle: PrimitiveButtonStyle {
     var sound: UISound = .press
+    var tint: Color = Theme.blue
 
     func makeBody(configuration: Configuration) -> some View {
-        SoundingButtonStyle(base: PrimaryButtonLook(), sound: sound)
+        SoundingButtonStyle(base: PrimaryButtonLook(tint: tint), sound: sound)
             .makeBody(configuration: configuration)
     }
 }
 
 /// How `PrimaryButtonStyle` draws its button.
 private struct PrimaryButtonLook: ButtonStyle {
+    var tint: Color
+
     func makeBody(configuration: Configuration) -> some View {
-        PrimaryButtonBody(configuration: configuration)
+        PrimaryButtonBody(configuration: configuration, tint: tint)
     }
 }
 
 private struct PrimaryButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let tint: Color
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
@@ -774,7 +1171,7 @@ private struct PrimaryButtonBody: View {
             .tint(.white)
             .frame(maxWidth: .infinity, minHeight: 52)
             .padding(.horizontal, 20)
-            .background(shape.fill(isEnabled ? Theme.blue : Theme.control))
+            .background(shape.fill(isEnabled ? tint : Theme.control))
             .contentShape(shape)
             .modifier(PressFeedback(isPressed: configuration.isPressed))
     }
@@ -884,4 +1281,41 @@ private struct CascadeItem: ViewModifier {
 extension View {
     /// Give an object its place in the entrance cascade (0 appears first).
     func cascadeItem(_ index: Int) -> some View { modifier(CascadeItem(index: index)) }
+}
+
+// MARK: - Restored from the fork (2026-10-25 merge recovery)
+// 290310a took Theme.swift from the upstream side, dropping the fork's
+// appearance enum below; restored verbatim from the fork @ 3e560dd.
+
+/// 界面外观：跟随系统 / 浅色 / 深色。设置页与 App 入口共用同一
+/// UserDefaults 键（SIDAppearance），入口处统一用 preferredColorScheme 生效。
+enum AppAppearance: String, CaseIterable {
+    case system, light, dark
+
+    /// 传给 preferredColorScheme 的值；nil 表示跟随系统。
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .system: return L("Follow System")
+        case .light:  return L("Light")
+        case .dark:   return L("Dark")
+        }
+    }
+}
+
+/// U-UI：截图式蓝顶栏（复用 Theme.accent2 #4DAEFF，不发明新色）。
+extension View {
+    func blueTopBar() -> some View {
+        self
+            .toolbarBackground(Theme.topBarFill, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+    }
 }

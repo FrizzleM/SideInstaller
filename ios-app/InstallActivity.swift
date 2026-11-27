@@ -262,7 +262,8 @@ final class InstallActivity {
             ?? Step.allCases.first { engine.stepStates[$0] == .active }
             ?? Step.allCases.first { engine.stepStates[$0] != .done }
         return State(stage: .running,
-                     title: engine.isCancelling ? L("Cancelling") : L("Installing %@", buildName),
+                     // B-5 只改了文案没改锁屏面：取消中也显示“等本次安装收尾”。
+                     title: engine.isCancelling ? L("Waiting for this install to finish…") : L("Installing %@", buildName),
                      detail: step?.title(for: source) ?? "", progress: progress)
     }
 
@@ -443,7 +444,7 @@ final class InstallActivity {
             // Not from the main thread, the header says.
             Task.detached { [weak self] in
                 do {
-                    try await BGTaskScheduler.shared.submitTaskRequest(request)
+                    try BGTaskScheduler.shared.submit(request)
                 } catch {
                     await self?.taskRefused(identifier, error)
                 }

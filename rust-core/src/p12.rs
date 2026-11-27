@@ -14,17 +14,20 @@ use der::{
     oid::ObjectIdentifier,
     Decode, Encode,
 };
-use p12_keystore::{
-    EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12ImportPolicy, PrivateKeyChain,
-};
+use p12_keystore::{KeyStore, KeyStoreEntry, Pkcs12ImportPolicy};
+#[cfg(test)]
+use p12_keystore::{EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain};
 use pkcs12::{
     cms::content_info::ContentInfo, AuthenticatedSafe, CertBag, Pfx, PKCS_12_CERT_BAG_OID,
     PKCS_12_KEY_BAG_OID, PKCS_12_X509_CERT_OID,
 };
 use rsa::{
-    pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    pkcs8::DecodePrivateKey,
     RsaPrivateKey,
 };
+#[cfg(test)]
+use rsa::pkcs8::EncodePrivateKey;
+#[cfg(test)]
 use sha2::{Digest, Sha256};
 
 /// A password-protected PKCS#12 archive of `key` and its certificate, for
@@ -40,6 +43,7 @@ use sha2::{Digest, Sha256};
 /// without a password. A Mac refuses it, as it refuses OpenSSL's own archives
 /// without a password. An unencrypted archive (SideSign's shape) would be
 /// worse: iOS refuses that too.
+#[cfg(test)]
 pub(crate) fn archive(
     cert_der: &[u8],
     key: &RsaPrivateKey,

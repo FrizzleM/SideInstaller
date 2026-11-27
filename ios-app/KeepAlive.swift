@@ -167,17 +167,12 @@ final class KeepAlive: NSObject {
             default: break
             }
         }
-        if #available(iOS 27.0, *) {
-            // While it plays, this app never deactivates the session itself.
-            observe(AVAudioSession.didBecomeInactiveNotification) { me, note in
-                let context = note.userInfo?[AVAudioSession.deactivationContextKey]
-                    as? AVAudioSession.DeactivationContext
-                if context?.source != .app { me.interruptionBegan() }
-            }
-            observe(AVAudioSession.resumptionRecommendationNotification) { me, _ in
-                me.interruptionEnded()
-            }
-        }
+        // iOS 27 的 AVAudioSession 新通知（didBecomeInactive /
+        // resumptionRecommendation / deactivationContext）暂不接：
+        // 跑道的 Xcode 26.6 自带 iOS 26.5 SDK，符号根本不存在，
+        // #available 是运行时判断、救不了编译期缺符号；等工作流
+        // 升到带 iOS 27 SDK 的 Xcode 再接回来。行为不丢：下面
+        // 的 interruption / routeChange 两路本来就覆盖了这块。
         // AirPods connecting, headphones unplugged, CarPlay.
         observe(AVAudioSession.routeChangeNotification) { me, note in
             let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
@@ -212,6 +207,21 @@ final class KeepAlive: NSObject {
         Engine.shared.log(message)
     }
 
+    /// 外部静音音频持有 session 的计数（v62 起停用：企业安装改走
+    /// Engine，安装期的 InstallAudioKeeper 留着不用，不再有外部
+    /// holder 调这里；计数 API 留着不删，免得以后外部音频 holder
+    /// 又要重写）：只动计数、不启动全局 engine；调用方须成对
+    /// 调用（start 成功时 retain、stop 时 release）。归零时才释放
+    /// session，避免全局最后一个 holder 停掉时误杀正在跑的音频。
+    static func retainAudioSession() {
+        audioHolders += 1
+    }
+
+    static func releaseAudioSession() {
+        audioHolders -= 1
+        if audioHolders == 0 { releaseSession() }
+    }
+
     /// Deactivates the session and puts it back in a category that Silent
     /// Mode mutes: `.playback` would let `SoundEffects` play through it.
     private static func releaseSession() {
@@ -230,13 +240,28 @@ final class KeepAlive: NSObject {
     }()
     private var locationRunning = false
 
+    /// 定位不可用时为真（被拒/受限/系统定位总开关关了）：这时只有
+    /// 音频保活在撑，锁屏续签可能被挂起。AutoRefreshService 记日志、
+    /// 设置页明示（Seal 被拒降级同款，只是它还多一句提醒）。
+    var locationUnavailable = false
+
     func startLocation() {
         guard !locationRunning else { return }
         locationRunning = true
         location.requestAlwaysAuthorization()
+        // 已经明确被拒/受限时不等回调，直接标降级；系统定位总开关
+        // 关了也一样（下面 locationServicesEnabled 为假）。
+        switch location.authorizationStatus {
+        case .denied, .restricted:
+            locationUnavailable = true
+        default:
+            break
+        }
         if CLLocationManager.locationServicesEnabled() {
             location.allowsBackgroundLocationUpdates = true
             location.startUpdatingLocation()
+        } else {
+            locationUnavailable = true
         }
     }
 
@@ -256,11 +281,20 @@ final class KeepAlive: NSObject {
 extension KeepAlive: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
-        if status == .authorizedAlways || status == .authorizedWhenInUse {
-            MainActor.assumeIsolated {
-                guard locationRunning else { return }
+        MainActor.assumeIsolated {
+            guard locationRunning else { return }
+            switch status {
+            case .authorizedAlways, .authorizedWhenInUse:
+                locationUnavailable = false
                 manager.allowsBackgroundLocationUpdates = true
                 manager.startUpdatingLocation()
+            case .denied, .restricted:
+                // 定位被拒：降级为仅音频保活，并明说锁屏续签可能
+                // 被挂起（Seal 同款降级 + 明示）。
+                locationUnavailable = true
+                Engine.shared.log("Keep-alive: location denied — audio-only keep-alive; lock-screen renewal may be suspended.")
+            default:
+                break
             }
         }
     }

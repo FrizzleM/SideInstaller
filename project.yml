@@ -13,8 +13,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.9.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.9.190"
+    CURRENT_PROJECT_VERSION: "185"
     TARGETED_DEVICE_FAMILY: "1,2"
     # aws-lc-rs / idevice are arm64-only here; drop x86_64 sim slice.
     EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
@@ -30,17 +30,44 @@ targets:
     platform: iOS
     sources:
       - path: ios-app
+      # Tunnel addresses shared with the TunnelProv extension.
+      - path: TunnelProv/TunnelConstants.swift
+      # CIDR validation shared with the TunnelProv extension (the
+      # settings UI validates the built-in tunnel's addresses with it).
+      - path: TunnelProv/CIDRValidator.swift
     dependencies:
       - framework: SideInstallerFFI.xcframework
         embed: false
+      # GCDWebServer（企业安装回环服务，vendored 在 ios-app/GCDWebServer/）
+      # 上游 podspec 的 iOS 依赖：CoreServices（MIME 类型）+ CFNetwork。
+      # 系统 SDK 框架必须用 sdk:（XcodeGen 生成 SDK 引用，不找文件）；
+      # framework: 会被当成仓库里的文件，CI 报错 No such file or directory。
+      - sdk: CoreServices.framework
+      - sdk: CFNetwork.framework
       # Embedded as PlugIns/SideInstallerLiveActivity.appex.
       - target: SideInstallerLiveActivity
+      # Embedded as PlugIns/TunnelProv.appex (built-in loopback tunnel).
+      - target: TunnelProv
+    # Creating/starting our own packet-tunnel VPN configuration needs
+    # the Network Extension entitlement on the app too, not just the
+    # extension. Whether it survives depends on the final signing —
+    # the same requirement LocalDevVPN has always had.
+    entitlements:
+      path: ios-app/SideInstaller.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+        com.apple.developer.networking.vpn.api:
+          - allow-vpn
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller
         INFOPLIST_FILE: ios-app/Info.plist
         # idevice's static lib pulls in C++ symbols (aws-lc); link libc++.
-        OTHER_LDFLAGS: "-lc++"
+        # GCDWebServer 的 Request/Response 用 zlib（gzip），上游 podspec 的 iOS library 就是 z。
+        OTHER_LDFLAGS: "-lc++ -lz"
+        # Swift 调 GCDWebServer（ObjC）走桥接头；只有主 App 靶用，扩展靶不设。
+        SWIFT_OBJC_BRIDGING_HEADER: ios-app/SideInstaller-Bridging-Header.h
         GENERATE_INFOPLIST_FILE: NO
     # `xcodebuild test -scheme SideInstaller` runs SideInstallerTests too. A
     # build or archive of the scheme still builds the app alone.
@@ -66,13 +93,12 @@ targets:
   # Draws the pairing Live Activity: the code Settings asks for, in the Dynamic
   # Island and on the Lock Screen. A Live Activity's views have to live in a
   # widget extension; the app starts and updates it (PairingLiveActivity.swift).
-  # Also draws an install's progress below iOS 26 (InstallActivity.swift).
   SideInstallerLiveActivity:
     type: app-extension
     platform: iOS
     sources:
       - path: ios-live-activity
-      # What the activities show, shared with the app.
+      # What the activity shows, shared with the app.
       - path: ios-app/PairingActivityAttributes.swift
       - path: ios-app/InstallActivityAttributes.swift
     settings:
@@ -81,5 +107,30 @@ targets:
         # install the app. Change both together.
         PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.LiveActivity
         INFOPLIST_FILE: ios-live-activity/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+
+  # The built-in loopback tunnel, ported from the open-source
+  # LocalDevVPN (same 10.7.0.1 peer address minimuxer expects, same
+  # packet-reflection trick). Lets Side+ open the tunnel itself
+  # instead of handing over to a separately installed LocalDevVPN;
+  # that app remains the fallback when the built-in tunnel can't
+  # start (e.g. the entitlement didn't survive signing).
+  TunnelProv:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TunnelProv
+    entitlements:
+      path: TunnelProv/TunnelProv.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+    settings:
+      base:
+        # Must stay the app's identifier plus ".TunnelProv" — the app
+        # looks its provider up by this exact bundle ID.
+        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.TunnelProv
+        INFOPLIST_FILE: TunnelProv/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES

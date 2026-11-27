@@ -113,6 +113,8 @@ enum PairingTargets {
 
     /// Match the installed apps against `PairingTargetApp.all` by display name,
     /// mapping sideloaded StikDebug to its own entry. Keeps the table's order.
+    /// Dedup is by bundle ID, so two installs of the same display name signed
+    /// by different teams each get their own row.
     static func match(installed apps: [DeviceConnection.InstalledApp]) -> [InstalledPairingTarget] {
         var out: [InstalledPairingTarget] = []
         var seen = Set<String>()
@@ -131,7 +133,7 @@ enum PairingTargets {
                 entry = PairingTargetApp.all.first { $0.name == display && $0.bundleIDContains == nil }
             }
 
-            guard let entry, seen.insert(entry.name).inserted else { continue }
+            guard let entry, seen.insert(app.bundleID).inserted else { continue }
             out.append(InstalledPairingTarget(app: entry, bundleID: app.bundleID))
         }
 

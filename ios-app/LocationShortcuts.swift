@@ -323,7 +323,7 @@ enum TravelModeOption: String, AppEnum {
 struct PlayGPXRouteIntent: AppIntent, ForegroundContinuableIntent {
     static let title: LocalizedStringResource = "Play GPX Route"
     static let description = IntentDescription(
-        "Moves this iPhone's location along a GPX file's track, route or waypoints, as Play a GPX route does, then leaves it at the last point. A file with a single point just sets the location there.",
+        "Moves this iPhone's location along a GPX file's track, route or waypoints, as Play a GPX route does, then leaves it at the last point — or starts again from the beginning when Loop is on. A file with a single point just sets the location there.",
         categoryName: "Location Spoofing",
         searchKeywords: ["spoof", "gpx", "track", "route", "walk", "joystick"])
 
@@ -340,6 +340,15 @@ struct PlayGPXRouteIntent: AppIntent, ForegroundContinuableIntent {
     @Parameter(title: "Speed",
                description: "Left empty, it follows the file's own times when it has them, and walks otherwise.")
     var speed: RouteSpeedOption?
+
+    /// F-1 (0.9.164): loop the route from the beginning when it finishes,
+    /// instead of stopping at the last point. Off by default, like the
+    /// page's switch — and setting it here sets the page's switch too,
+    /// so the loop is visible (and stoppable) from the page.
+    @Parameter(title: "Loop",
+               description: "When on, the route starts again from the beginning when it finishes, instead of stopping at the last point.",
+               default: false)
+    var loop: Bool
 
     static var parameterSummary: some ParameterSummary {
         Summary("Play \(\.$file)") {
@@ -362,6 +371,7 @@ struct PlayGPXRouteIntent: AppIntent, ForegroundContinuableIntent {
                 return L("Location set to %@.", route.name)
             }
             let chosen = speed?.speed ?? (route.times == nil ? .walk : .recorded)
+            manager.routeLoop = loop
             try await manager.play(route, at: chosen)
             return Self.started(distance: route.distance, duration: route.duration(at: manager.routeSpeed))
         }

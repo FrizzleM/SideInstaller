@@ -8,10 +8,15 @@ import SideInstallerFFI
 struct SavedAccount: Identifiable, Codable, Equatable {
     let id: UUID
     var appleID: String
+    /// Team ID a successful sign-in as this account reported, if known yet.
+    /// Nil means "not recorded", never "has no team": archives saved before
+    /// team recording decode without this key and get nil.
+    var teamID: String?
 
-    init(id: UUID = UUID(), appleID: String) {
+    init(id: UUID = UUID(), appleID: String, teamID: String? = nil) {
         self.id = id
         self.appleID = appleID
+        self.teamID = teamID
     }
 
     /// The email as sent to Apple; a stray space breaks the SRP proof.
@@ -47,6 +52,10 @@ final class AccountStore: ObservableObject {
     @Published private(set) var teams: [String: DeveloperTeam] = [:]
 
     private static let accountsKey = "savedAppleAccounts"
+    /// Where a damaged accounts archive is stashed before anything rewrites
+    /// it (B3, 0.9.145): the original bytes, kept for recovery, never read
+    /// back by the app.
+    private static let corruptAccountsKey = "savedAppleIDs.corrupt"
     private static let activeKey = "activeAppleAccountID"
     private static let teamsKey = "signingTeamByAppleID"
     /// Keychain service every saved password is filed under.
@@ -61,9 +70,26 @@ final class AccountStore: ObservableObject {
 
     private init() {
         let defaults = UserDefaults.standard
-        if let data = defaults.data(forKey: Self.accountsKey),
-           let decoded = try? JSONDecoder().decode([SavedAccount].self, from: data) {
-            accounts = decoded
+        if let data = defaults.data(forKey: Self.accountsKey) {
+            if let decoded = try? JSONDecoder().decode([SavedAccount].self, from: data) {
+                accounts = decoded
+            } else {
+                // B3 (0.9.145): a damaged archive used to load as an empty
+                // list, and the next persist() overwrote it for good. Keep
+                // the entries that still decode, and stash the damaged blob
+                // before anything rewrites it. The success path above — and
+                // every read/write of a good archive — is untouched.
+                let recovered = Self.decodeAccountsLeniently(from: data)
+                accounts = recovered.accounts
+                defaults.set(data, forKey: Self.corruptAccountsKey)
+                if let total = recovered.total {
+                    NSLog("[AccountStore] saved Apple IDs archive is damaged (%d of %d entries recovered); the original is kept under %@.",
+                          recovered.accounts.count, total, Self.corruptAccountsKey)
+                } else {
+                    NSLog("[AccountStore] saved Apple IDs archive is damaged (unreadable); the original is kept under %@.",
+                          Self.corruptAccountsKey)
+                }
+            }
         }
         if let raw = defaults.string(forKey: Self.activeKey), let id = UUID(uuidString: raw),
            accounts.contains(where: { $0.id == id }) {
@@ -76,6 +102,22 @@ final class AccountStore: ObservableObject {
             teams = decoded
         }
         Self.keepPasswordsOnThisDevice()
+    }
+
+    /// Decodes the accounts archive entry by entry, so one damaged entry
+    /// doesn't take the rest down with it (B3, 0.9.145). Returns the entries
+    /// that still decode, and how many the archive held, when it parses as
+    /// an array at all. Only called when the whole-array decode already
+    /// failed; a good archive never reaches it.
+    private static func decodeAccountsLeniently(from data: Data) -> (accounts: [SavedAccount], total: Int?) {
+        guard let raw = try? JSONSerialization.jsonObject(with: data),
+              let items = raw as? [Any] else { return ([], nil) }
+        let good = items.compactMap { item -> SavedAccount? in
+            guard let dict = item as? [String: Any],
+                  let itemData = try? JSONSerialization.data(withJSONObject: dict) else { return nil }
+            return try? JSONDecoder().decode(SavedAccount.self, from: itemData)
+        }
+        return (good, items.count)
     }
 
     // MARK: - The active account
@@ -99,6 +141,23 @@ final class AccountStore: ObservableObject {
 
     /// True when `account` is the one in use.
     func isActive(_ account: SavedAccount) -> Bool { account.id == activeID }
+
+    /// The saved account whose recorded team matches, if any. Refresh-all
+    /// uses this to find which Apple ID can renew a given team's apps.
+    func account(forTeam teamID: String) -> SavedAccount? {
+        accounts.first { $0.teamID == teamID }
+    }
+
+    /// Records the team ID a successful sign-in reported, on the account
+    /// that signed in (the active one). Called from Engine's sign-in success
+    /// path, on the main thread. A no-op when nothing changed, so a repeat
+    /// sign-in doesn't rewrite the archive for nothing.
+    func noteTeamID(_ teamID: String) {
+        guard let active, active.teamID != teamID,
+              let idx = accounts.firstIndex(where: { $0.id == active.id }) else { return }
+        accounts[idx].teamID = teamID
+        persist()
+    }
 
     /// True when `appleID` is one of the saved accounts, active or not.
     func isSaved(_ appleID: String) -> Bool {

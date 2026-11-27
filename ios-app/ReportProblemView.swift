@@ -28,6 +28,10 @@ struct ReportProblemView: View {
     @State private var issueToOpen: ProblemReport.IssueDraft?
     /// True for a moment after “Copy the full log”.
     @State private var copiedLog = false
+    /// B-2 (0.9.159): the task that clears `copiedLog` — a second tap
+    /// cancels the first one's, so its late write can't clear the new
+    /// "Copied" feedback early.
+    @State private var copyLogTask: Task<Void, Never>?
 
     /// An issue with nothing in it can't be acted on (#27, #37, #67), so a few
     /// words are asked for first.
@@ -38,12 +42,16 @@ struct ReportProblemView: View {
     var body: some View {
         let report = ProblemReport.current(engine)
         NavigationStack {
-            Form {
-                descriptionSection
-                includedSection(report)
-                crashSection
-                sendSection(report)
+            ScrollView {
+                VStack(spacing: 16) {
+                    descriptionSection
+                    includedSection(report)
+                    crashSection
+                    sendSection(report)
+                }
+                .padding(20)
             }
+            .background(AppBackground())
             .navigationTitle(L("Report a problem"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -74,81 +82,101 @@ struct ReportProblemView: View {
     // MARK: What happened
 
     private var descriptionSection: some View {
-        Section {
-            TextField(L("What were you doing, and what went wrong?"), text: $description, axis: .vertical)
-                .lineLimit(4...12)
-        } header: {
-            Text(L("What happened?"))
-        } footer: {
-            Text(L("Say what you tapped, what you expected and what happened instead. English is best, but any language is fine."))
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L("What happened?"))
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                TextField(L("What were you doing, and what went wrong?"), text: $description, axis: .vertical)
+                    .lineLimit(4...12)
+                    .textFieldStyle(.plain)
+                    .fieldBackground()
+                Text(L("Say what you tapped, what you expected and what happened instead. English is best, but any language is fine."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+            }
         }
     }
 
     // MARK: What goes along
 
     private func includedSection(_ report: ProblemReport) -> some View {
-        Section {
-            ForEach(report.details) { detail in
-                LabeledContent(L(detail.label), value: detail.shown ?? detail.value)
-            }
-            if let error = report.error {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Error"))
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L("Included"))
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                ForEach(report.details) { detail in
+                    LabeledContent(L(detail.label), value: detail.shown ?? detail.value)
                 }
+                if let error = report.error {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("Error"))
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                LabeledContent(L("Activity log"), value: L("%d lines", report.logLines.count))
+                Text(L("Your Apple ID, device name, serial numbers and keys are taken out of the log first."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
             }
-            LabeledContent(L("Activity log"), value: L("%d lines", report.logLines.count))
-        } header: {
-            Text(L("Included"))
-        } footer: {
-            Text(L("Your Apple ID, device name, serial numbers and keys are taken out of the log first."))
         }
     }
 
     // MARK: Crash logs
 
     private var crashSection: some View {
-        Section {
-            ForEach(ownCrashes.crashes) { crash in
-                crashToggle(id: crash.id, title: "SideInstaller",
-                            detail: "\(Self.dateText(crash.date)) · \(crash.summary)")
-            }
-            ForEach(deviceCrashes ?? []) { crash in
-                crashToggle(id: crash.id, title: crash.app,
-                            detail: crash.date.map(Self.dateText) ?? crash.name)
-            }
-            if lookingForCrashes {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text(L("Looking for crash logs …"))
-                        .foregroundStyle(.secondary)
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L("Crash logs"))
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                ForEach(ownCrashes.crashes) { crash in
+                    crashToggle(id: crash.id, title: "SideInstaller",
+                                detail: "\(Self.dateText(crash.date)) · \(crash.summary)")
                 }
-            } else {
-                Button {
-                    Task { await lookForCrashes() }
-                } label: {
-                    Label(deviceCrashes == nil ? L("Look for crash logs on this iPhone") : L("Look again"),
-                          systemImage: "magnifyingglass")
+                ForEach(deviceCrashes ?? []) { crash in
+                    crashToggle(id: crash.id, title: crash.app,
+                                detail: crash.date.map(Self.dateText) ?? crash.name)
                 }
-                .disabled(engine.isRunning)
-            }
-            if let crashLookError {
-                Text(crashLookError)
+                if lookingForCrashes {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(L("Looking for crash logs …"))
+                            .foregroundStyle(Theme.muted)
+                    }
+                } else {
+                    Button {
+                        Task { await lookForCrashes() }
+                    } label: {
+                        Label(deviceCrashes == nil ? L("Look for crash logs on this iPhone") : L("Look again"),
+                              systemImage: "magnifyingglass")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.accent)
+                    .buttonStyle(.plain, sound: .tap)
+                    .disabled(engine.isRunning)
+                }
+                if let crashLookError {
+                    Text(crashLookError)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.negative)
+                } else if deviceCrashes?.isEmpty == true {
+                    Text(L("No crash logs from SideStore, LiveContainer or Madeira in the last %d days.",
+                           DeviceCrashLog.maxAgeDays))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                Text(L("iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN."))
                     .font(.footnote)
-                    .foregroundStyle(Theme.negative)
-            } else if deviceCrashes?.isEmpty == true {
-                Text(L("No crash logs from SideStore, LiveContainer or Madeira in the last %d days.",
-                       DeviceCrashLog.maxAgeDays))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
-        } header: {
-            Text(L("Crash logs"))
-        } footer: {
-            Text(L("iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN."))
         }
     }
 
@@ -159,7 +187,7 @@ struct ReportProblemView: View {
                 Text(title)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(2)
             }
         }
@@ -172,6 +200,8 @@ struct ReportProblemView: View {
     @MainActor
     private func lookForCrashes() async {
         guard !lookingForCrashes else { return }
+        // C-5（防御）：将来内层加取消检查时，取消的 lookup 不渲染错误。
+        guard !Task.isCancelled else { return }
         lookingForCrashes = true
         crashLookError = nil
         defer { lookingForCrashes = false }
@@ -182,7 +212,7 @@ struct ReportProblemView: View {
         } catch is CancellationError {
             // Mobile Data Mode's popup was closed: nothing to report.
         } catch {
-            crashLookError = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            crashLookError = userFacingErrorMessage(error)
         }
     }
 
@@ -197,42 +227,45 @@ struct ReportProblemView: View {
     // MARK: Send
 
     private func sendSection(_ report: ProblemReport) -> some View {
-        Section {
-            Button {
-                openIssue(report)
-            } label: {
-                Label(L("Open a GitHub issue"), systemImage: "arrow.up.right.square")
-                    .font(.body.weight(.medium))
-            }
-            .disabled(!canSend)
-            Button {
-                copyLog(report)
-            } label: {
-                Label(copiedLog ? L("Copied") : L("Copy the full log"),
-                      systemImage: copiedLog ? "checkmark" : "doc.on.doc")
-            }
-            .disabled(!canSend)
-            Button {
-                share(report)
-            } label: {
-                Label(L("Share the report"), systemImage: "square.and.arrow.up")
-            }
-            .disabled(!canSend)
-            Button {
-                previewText = fileText(report)
-            } label: {
-                Label(L("Preview the report"), systemImage: "doc.text.magnifyingglass")
-            }
-            if let saveError {
-                Text(saveError)
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    openIssue(report)
+                } label: {
+                    Label(L("Open a GitHub issue"), systemImage: "arrow.up.right.square")
+                }
+                Button {
+                    copyLog(report)
+                } label: {
+                    Label(copiedLog ? L("Copied") : L("Copy the full log"),
+                          systemImage: copiedLog ? "checkmark" : "doc.on.doc")
+                }
+                Button {
+                    share(report)
+                } label: {
+                    Label(L("Share the report"), systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    previewText = fileText(report)
+                } label: {
+                    Label(L("Preview the report"), systemImage: "doc.text.magnifyingglass")
+                }
+                if let saveError {
+                    Text(saveError)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.negative)
+                }
+                Text(canSend
+                     ? L("The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.",
+                         ProblemReport.reportsFolder(onMyIPhone: L("Files › On My iPhone")))
+                     : L("Describe the problem above first."))
                     .font(.footnote)
-                    .foregroundStyle(Theme.negative)
+                    .foregroundStyle(Theme.muted)
             }
-        } footer: {
-            Text(canSend
-                 ? L("The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.",
-                     ProblemReport.reportsFolder(onMyIPhone: L("Files › On My iPhone")))
-                 : L("Describe the problem above first."))
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(canSend ? Theme.accent : Theme.muted)
+            .buttonStyle(.plain, sound: .tap)
+            .disabled(!canSend)
         }
     }
 
@@ -265,9 +298,14 @@ struct ReportProblemView: View {
         let issue = issueDraft(report)
         UIPasteboard.general.string = issue.pasteText ?? report.fileText(
             description: description, deviceCrashes: pickedDeviceCrashes, ownCrashes: pickedOwnCrashes)
+        // B-2 (0.9.159): a second tap first cancels the first task — without
+        // the handle, the first task's late write clears the feedback the
+        // second tap just showed.
+        copyLogTask?.cancel()
         copiedLog = true
-        Task {
+        copyLogTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
             copiedLog = false
         }
     }
@@ -314,7 +352,7 @@ private struct ReportPreview: View {
                 ForEach(Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()),
                         id: \.offset) { _, line in
                     Text(line)
-                        .font(.system(.caption2, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

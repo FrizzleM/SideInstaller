@@ -3101,6 +3101,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "der 0.8.1",
+ "flate2",
  "hex",
  "idevice",
  "idevice-ffi",
@@ -3117,7 +3118,9 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "x509-cert 0.2.5",
  "x509-cert 0.3.0",
+ "zip",
 ]
 
 [[package]]

@@ -4,12 +4,14 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).pairing</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).install.*</string>
+		<string>com.frizzle.sideinstaller.autorefresh</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>SideInstaller</string>
+	<string>SideInstaller 🅥</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -64,8 +66,6 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>localdevvpn</string>
-		<string>sidestore</string>
-		<string>livecontainer</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
@@ -74,13 +74,15 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_sideinstallerprobe._tcp</string>
 		<string>_stikpairprobe._tcp</string>
 		<string>_remotepairing._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SideInstaller advertises an on-device pairing service so this iPhone can pair with it, and connects to the local lockdown daemon to install apps.</string>
+	<string>SideInstaller advertises an on-device pairing service so this iPhone can pair with it, connects to the local lockdown daemon to install apps, and can serve a file-transfer page to devices on your Wi-Fi.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>SideInstaller can use location to keep running while you approve pairing in Settings.</string>
+	<string>SideInstaller can use location to keep running while you approve pairing in Settings, and to stay alive in the background so automatic refresh can re-sign your apps before they expire.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SideInstaller can use location to keep running while you approve pairing in Settings.</string>
 	<key>NSSupportsLiveActivities</key>
@@ -88,6 +90,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>fetch</string>
 		<string>location</string>
 	</array>
 	<key>UIFileSharingEnabled</key>

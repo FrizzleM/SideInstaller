@@ -1,0 +1,78 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # 每天 UTC 04:00（北京时间 12:00）检查一次上游更新
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+jobs:
+  sync:
+    name: Sync with upstream SideInstaller
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/FrizzleM/SideInstaller.git
+          git fetch upstream
+
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+            echo "已是最新，无上游新提交"
+          else
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "发现上游新提交："
+            git log --oneline HEAD..upstream/main | head -20
+          fi
+
+      - name: Merge upstream
+        if: steps.check.outputs.has_update == 'true'
+        id: merge
+        run: |
+          if git merge upstream/main --no-edit; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort || true
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push merged changes and trigger build
+        if: steps.check.outputs.has_update == 'true' && steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin main
+          # GITHUB_TOKEN 的 push 不会触发构建，用 workflow_dispatch 补发一次构建。
+          # 必须带 --repo：加了 upstream 远端后 gh 默认优先认 upstream，
+          # 不带会打到 FrizzleM 仓库去（2026-10-21 首次同步就这么 404 的）。
+          gh workflow run build-unsigned-ipa.yml --ref main --repo "${{ github.repository }}" || echo "::warning::补发构建失败，请手动触发构建"
+
+      - name: Notify on merge conflict
+        if: steps.check.outputs.has_update == 'true' && steps.merge.outputs.merged == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "上游同步冲突：需要手动合并" \
+            --body "上游 SideInstaller（FrizzleM）有新提交，但与本仓库的定制改动产生冲突，自动合并失败。请手动合并 upstream/main 并解决冲突。" \
+            || true
+          echo "::error::上游合并冲突，需要手动处理"
+          exit 1

@@ -41,7 +41,8 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
     /// Full name, for titles and the log.
     var displayName: String {
         switch self {
-        case .sideInstaller: return "SideInstaller"
+        case .sideInstaller: return "SideInstaller 🅥"
+        case .liveContainer: return "LiveContainer 🅥 + SideStore"
         case .custom:        return L("Custom .ipa")
         default:             return source?.displayName ?? "SideInstaller"
         }
@@ -160,12 +161,25 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 /// the app on their iPhone holds them.
 final class SideBySideManager: ObservableObject {
 
-    /// Unsigned IPA from SideInstaller's latest GitHub release.
+    /// Unsigned IPA from this fork's latest GitHub release
+    /// (wozofa-ship-it/SideInstaller): the SideInstaller 🅥 build, not
+    /// upstream FrizzleM's. A release must exist there; until the first one
+    /// is published this download 404s.
     static let releaseIPA = URL(string:
-        "https://github.com/FrizzleM/SideInstaller/releases/latest/download/SideInstaller.ipa")!
+        "https://github.com/wozofa-ship-it/SideInstaller/releases/latest/download/SideInstaller.ipa")!
 
     /// What the release asset is called, and what the download is saved as.
     static let ipaFileName = "SideInstaller.ipa"
+
+    /// Unsigned IPA of our LiveContainer build: the fork's rolling nightly
+    /// release (wozofa-ship-it/LiveContainer-zh, tag `update`, refreshed by
+    /// CI on every push to main), not upstream LiveContainer's. The tag never
+    /// moves, so this URL always serves the latest push.
+    static let liveContainerIPA = URL(string:
+        "https://github.com/wozofa-ship-it/LiveContainer-zh/releases/download/update/LiveContainer+SideStore.ipa")!
+
+    /// What the LiveContainer asset is called, and what the download is saved as.
+    static let liveContainerFileName = "LiveContainer+SideStore.ipa"
 
     // MARK: Pages
 
@@ -277,8 +291,39 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var targetOSVersion: String?
     /// How much of the download has arrived (0…1), while that step is running.
     @Published private(set) var downloadProgress: Double = 0
+    /// B1 (0.9.155): bytes arrived so far on a download whose total the
+    /// server never stated — non-nil only then, so the card and the step
+    /// detail can go indeterminate plus a byte count instead of a 0% that
+    /// never moves. Reset with the run and at each download start.
+    @Published private(set) var downloadBytesWritten: Int64?
+    /// F-2 (0.9.157): the download step's speed in bytes per second, and
+    /// the estimated seconds left — the progress card shows them like the
+    /// source rows do (F-C). Speed is 0 until two samples arrive; the
+    /// estimate is nil while the total is unknown or no speed is known
+    /// yet. The total the server promised, -1 while unknown: drives the
+    /// "x of y" in the card's detail line.
+    @Published private(set) var downloadSpeed: Double = 0
+    @Published private(set) var estimatedTimeRemaining: TimeInterval?
+    @Published private(set) var downloadTotalBytes: Int64 = -1
+    /// The last sample `noteDownloadDetail` measured speed from.
+    private var downloadSpeedSampler = DownloadSpeedSampler()
+    /// What a download that fell back to an older local copy should say:
+    /// set in `downloadBuild` when the fetch fails and a copy an earlier
+    /// run left behind stands in (C14, C7's pattern on the Install tab).
+    /// Shown under the progress card until the next run clears it.
+    @Published private(set) var downloadFallbackNotice: String?
+    /// What a hand-off step that failed quietly should say: set in
+    /// `handOffSplitPairing` / `handOffAnisette` when the newer-format
+    /// pairing or the anisette settings couldn't be written (C23, C14's
+    /// pattern on the same page). Shown under the progress card until
+    /// the next run clears it. The run still succeeds — these steps are
+    /// best-effort.
+    @Published private(set) var handOffNotice: String?
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
+    /// The signed app's own version (CFBundleShortVersionString), for the
+    /// install history; nil when the signed app carries none.
+    @Published private(set) var installedAppVersion: String?
     /// True while their iPhone has to pair from its own Settings, which it
     /// never prompts for by itself.
     @Published private(set) var pairingInSettings = false
@@ -543,6 +588,10 @@ final class SideBySideManager: ObservableObject {
                 try await signApp(app)
                 try await install(ip: address)
                 if let setsUp { try await setUp(setsUp, ip: address, appleID: credentials.id) }
+                // SIDE-33 B-3：末步边界复核取消——取消落在 install（无 setUp 时）
+                // 或 setUp 的 FFI 等待期间时，拦在 finishSuccess() 之前，
+                // 不报成功、不清对方会话与配对记录。
+                try Task.checkCancellation()
                 finishSuccess()
             } catch let error where error is CancellationError || Task.isCancelled {
                 // A blocking call that was under way when Cancel was tapped can
@@ -551,17 +600,33 @@ final class SideBySideManager: ObservableObject {
                 // Back to the summary it started from, as if it hadn't run.
                 for step in SideBySideStep.allCases { stepStates[step] = .pending }
                 downloadProgress = 0
+                downloadBytesWritten = nil
+                clearDownloadSpeed()
                 go(to: .ready)
             } catch {
-                let message = short(error)
+                let message = userFacingErrorMessage(error)
                 lastError = message
                 engine.log("⛔️ Side by Side stopped: \(message)")
                 failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 Engine 管线——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): 签名前失败时 `signedBundleID` 还是 nil，
+                // 就读本次挑的 IPA（`custom?.file`）的包名；非自定义路
+                // `custom` 为 nil，仍留 nil，走回名字匹配。
+                InstallHistoryStore.recordFailure(appName: installedAppName ?? runName,
+                                                  version: installedAppVersion,
+                                                  identity: credentials.id,
+                                                  reason: message,
+                                                  bundleID: signedBundleID ?? custom.flatMap { IPALibrary.appInfo(at: $0.file)?.bundleID })
             }
             pairingInSettings = false
             pairingPIN = nil
             setTrustWait(false)
             remembersTheirIPhone = PrivateStore.hasPeerPairings
+            // C20：同 Engine 三路——签好的包解在 tmp/<名>_extracted，
+            // 收尾删掉它再置 nil（helper 在 Engine.swift，internal）。
+            if let signed = signedAppPath { Engine.discardSignedBundle(at: signed) }
+            signedAppPath = nil
             isRunning = false
             isCancelling = false
             UIApplication.shared.isIdleTimerDisabled = false
@@ -588,11 +653,14 @@ final class SideBySideManager: ObservableObject {
     /// pointer isn't `Sendable`.
     func signOut() {
         signedInAs = nil
-        // Freed on `signQueue`, which owns `signSession`. It's serial, so this
-        // can't race the next sign-in.
+        // C19：抓调用时那一个指针。`signQueue` 是串行的，释放块一定排
+        // 在已入队的登录块后面——块内重读当前 session 会把切账号后才
+        // 登好的新 session 也释放掉；只释放抓到的那一个。
+        let freed = signSession
         signQueue.async { [weak self] in
-            guard let self, let session = self.signSession else { return }
-            si_sign_session_free(session)
+            guard let self, let freed = freed else { return }
+            guard self.signSession == freed else { return }
+            si_sign_session_free(freed)
             self.signSession = nil
         }
         // The key was made for this session, and a later one would make
@@ -663,6 +731,10 @@ final class SideBySideManager: ObservableObject {
     private func resetRun() {
         for step in SideBySideStep.allCases { stepStates[step] = .pending }
         downloadProgress = 0
+        downloadBytesWritten = nil
+        clearDownloadSpeed()
+        downloadFallbackNotice = nil
+        handOffNotice = nil
         lastError = nil
         finished = false
         pairingInSettings = false
@@ -673,6 +745,7 @@ final class SideBySideManager: ObservableObject {
         targetSummary = nil
         targetOSVersion = nil
         installedAppName = nil
+        installedAppVersion = nil
     }
 
     @MainActor
@@ -692,6 +765,13 @@ final class SideBySideManager: ObservableObject {
     private func finishSuccess() {
         finished = true
         let name = installedAppName ?? runName
+        // F5 (0.9.143) 一键路同款：成功才记一条安装历史（App 名、版本、
+        // Apple ID、时间），上限 100 条；记在 signOut() 之前，用的还是
+        // 本次运行的 Apple ID。
+        InstallHistoryStore.record(appName: name,
+                                   version: installedAppVersion,
+                                   identity: credentials?.id ?? "",
+                                   bundleID: signedBundleID)
         engine.log("✅ Side by Side done: \(name) is on their iPhone. One trust step left, on their side.")
         // Theirs pairs itself and signs itself in, or SideStore now holds the
         // record and signs in itself: this iPhone has no more use for the
@@ -1054,7 +1134,7 @@ final class SideBySideManager: ObservableObject {
         } catch PairingController.PairingError.busy {
             throw EngineError.message(L("SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again."))
         } catch let PairingController.PairingError.failed(message) {
-            throw EngineError.message(L("Pairing with their iPhone didn't finish: %@", message))
+            throw EngineError.message(L("Pairing with their iPhone didn't finish: %@", friendlyRustError(message)))
         }
     }
 
@@ -1072,8 +1152,15 @@ final class SideBySideManager: ObservableObject {
             for (key, value) in info { values[key] = value; engine.log("  \(key) = \(value)") }
         }
         let name = values["DeviceName"] ?? L("device")
-        let version = values["ProductVersion"]
-        let summary = version.map { "\(name) · iOS \($0)" } ?? name
+        // B-1 (0.9.159): lockdownd gave no ProductVersion — stop here instead
+        // of connecting with a nil version and letting the download and
+        // sign steps silently fall back to this iPhone's iOS. Their iPhone
+        // may be older, and a too-new IPA would burn an App ID before the
+        // install fails on their iPhone — the pre-check exists to prevent.
+        guard let version = values["ProductVersion"] else {
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
+        let summary = "\(name) · iOS \(version)"
         return ConnectedTarget(summary: summary,
                                osVersion: version,
                                udid: values["UniqueDeviceID"],
@@ -1091,7 +1178,17 @@ final class SideBySideManager: ObservableObject {
     /// when the record is one it can't use (`handOffToAltStore`).
     @MainActor
     private func checkCompatibility(of app: SideBySideApp) throws {
-        guard app != .altStore, let version = targetOSVersion, let path = pairRecordPath else { return }
+        guard app != .altStore else { return }
+        // B-1 (0.9.159): with no version the iOS 26.4+ lockdown check below
+        // can't run — and a version-less run must not slip past it. Block
+        // when a pairing record exists (the check's subject); with no
+        // record there is nothing for the check to judge. Connect normally
+        // stops earlier, in `describeTarget`, so this is the second gate.
+        guard let version = targetOSVersion else {
+            guard pairRecordPath != nil else { return }
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
+        guard let path = pairRecordPath else { return }
         let kind = PairingFileKind.of(path: path)
         guard kind.hasLockdown, !kind.hasRemotePairing, Self.version(version, isAtLeast: 26, 4) else { return }
         guard app.source != nil else {
@@ -1103,10 +1200,13 @@ final class SideBySideManager: ObservableObject {
         throw EngineError.message(ErrorHelp.explained(L("Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.", version, app.displayName)))
     }
 
-    /// What to say when the link to their iPhone didn't come up. The error's
+    /// What to say when the link to their iPhone didn't come up. RsdUnreachable
+    /// takes the two Side by Side arms below; PairVerify, HostsRefused, Timeout
+    /// and TlsHandshake take this function's own Side by Side wording (the error's
     /// own advice is about the Install tab's loopback VPN, which Side by Side
-    /// doesn't use. `typed` is true when `ip` was typed in here, rather than
-    /// the address their iPhone paired from.
+    /// doesn't use); Other and unknown kinds reuse `error.advice`, which is a
+    /// generic sentence with no VPN wording. `typed` is true when `ip` was typed
+    /// in here, rather than the address their iPhone paired from.
     private static func tunnelAdvice(_ error: DeviceConnection.TunnelError, ip: String,
                                      typed: Bool = false) -> String {
         switch error.kind {
@@ -1115,7 +1215,18 @@ final class SideBySideManager: ObservableObject {
         case TunnelFailureRsdUnreachable:
             return unreachableAdvice(ip: ip, typed: typed)
         default:
-            return L("The link to their iPhone didn't come up: %@", error.underlying.description)
+            switch error.kind {
+            case TunnelFailurePairVerify:
+                return L("Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.")
+            case TunnelFailureHostsRefused:
+                return L("Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.")
+            case TunnelFailureTimeout:
+                return L("Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.")
+            case TunnelFailureTlsHandshake:
+                return L("Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.")
+            default:
+                return error.advice
+            }
         }
     }
 
@@ -1188,7 +1299,7 @@ final class SideBySideManager: ObservableObject {
                 setStep(.signIn, .done)
                 return
             } catch let error as EngineError {
-                let failure = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? L("Sign-in failed.")
                 // A cancelled 2FA prompt isn't the server's fault.
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
@@ -1336,18 +1447,85 @@ final class SideBySideManager: ObservableObject {
         discardDownload()
         setStep(.download, .active)
         downloadProgress = 0
+        downloadBytesWritten = nil
+        clearDownloadSpeed()
         let file: URL
         if let source = app.source {
-            file = try await downloadBuild(source, channel: channel)
+            if source == .liveContainer {
+                file = try await downloadLiveContainer()
+            } else {
+                file = try await downloadBuild(source, channel: channel)
+            }
         } else {
             file = try await downloadSideInstaller()
         }
         downloadedIPA = file
         downloadedKey = key
-        ownsDownload = app.source == nil
+        ownsDownload = app.source == nil || app == .liveContainer
+        // B1 (0.9.156): the download is done — clear the byte count here,
+        // at the one place all three download paths return through, so the
+        // progress card stops showing the old count plus a spinner and the
+        // % comes back for the signing/install steps.
+        downloadBytesWritten = nil
+        clearDownloadSpeed()
         downloadProgress = 1
         engine.log("\(app.displayName) IPA ready at \(file.path) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(file.path)), countStyle: .file))).")
         setStep(.download, .done)
+    }
+
+    /// F-2 (0.9.157): folds one (bytes, total) sample into the speed and
+    /// the time left. Same EMA as `IPADownloader.noteProgress`, via the
+    /// shared sampler.
+    @MainActor
+    private func noteDownloadDetail(bytes: Int, total: Int) {
+        downloadSpeedSampler.note(bytes: Int64(bytes), total: Int64(total))
+        downloadSpeed = downloadSpeedSampler.speed
+        estimatedTimeRemaining = downloadSpeedSampler.estimatedTimeRemaining
+        downloadTotalBytes = Int64(total)
+    }
+
+    /// F-2 (0.9.157): forget the last download's speed, estimate and
+    /// total, for the next one.
+    @MainActor
+    private func clearDownloadSpeed() {
+        downloadSpeedSampler.reset()
+        downloadSpeed = 0
+        estimatedTimeRemaining = nil
+        downloadTotalBytes = -1
+    }
+
+    /// Our LiveContainer build's latest release, into a staging folder of its
+    /// own — the fork's rolling nightly release, not upstream's. Same shape as
+    /// `downloadSideInstaller`: no channel (the `update` tag always holds the
+    /// latest push), no Documents copy to reuse, so a failed download is an
+    /// error rather than a fall back to a stale copy.
+    @MainActor
+    private func downloadLiveContainer() async throws -> URL {
+        engine.log("Fetching the latest LiveContainer 🅥 release from \(Self.liveContainerIPA.absoluteString) …")
+        do {
+            let file = try await SideStoreDownloader.fetchDirect(
+                Self.liveContainerIPA, named: Self.liveContainerFileName,
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, so the card can go indeterminate.
+                onBytes: { bytes in
+                    Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                },
+                // F-2 (0.9.157): the speed/ETA sample, like the Install tab's.
+                onProgressDetail: { bytes, total in
+                    Task { @MainActor in self.noteDownloadDetail(bytes: bytes, total: total) }
+                }) { fraction in
+                    Task { @MainActor in self.downloadProgress = fraction }
+                }
+            // Validate now, so an error page or truncated download doesn't fail
+            // later during signing.
+            guard IPALibrary.looksLikeIPA(file) else {
+                try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                throw EngineError.message(L("The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute."))
+            }
+            return file
+        } catch let error as SideStoreDownloader.DownloadError {
+            throw EngineError.message(L("Couldn't download %@: %@", "LiveContainer 🅥 + SideStore", error.description))
+        }
     }
 
     /// SideInstaller's latest release, into a staging folder of its own.
@@ -1356,7 +1534,16 @@ final class SideBySideManager: ObservableObject {
         engine.log("Fetching the latest SideInstaller release from \(Self.releaseIPA.absoluteString) …")
         do {
             let file = try await SideStoreDownloader.fetchDirect(
-                Self.releaseIPA, named: Self.ipaFileName) { fraction in
+                Self.releaseIPA, named: Self.ipaFileName,
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, so the card can go indeterminate.
+                onBytes: { bytes in
+                    Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                },
+                // F-2 (0.9.157): the speed/ETA sample, like the Install tab's.
+                onProgressDetail: { bytes, total in
+                    Task { @MainActor in self.noteDownloadDetail(bytes: bytes, total: total) }
+                }) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
             // Validate now, so an error page or truncated download doesn't fail
@@ -1386,21 +1573,57 @@ final class SideBySideManager: ObservableObject {
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.downloadProgress = fraction }
         }
+        // B1 (0.9.155): the byte count for a transfer whose total the
+        // server never stated — the downloader only calls this then.
+        let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
+            Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
+        }
+        // F-2 (0.9.157): the (bytes, total) sample for the speed and the
+        // time left — the fraction has no bytes, the byte count has no
+        // total, so neither report above can sample it.
+        let detailReport: @Sendable (Int, Int) -> Void = { [weak self] bytes, total in
+            Task { @MainActor in self?.noteDownloadDetail(bytes: bytes, total: total) }
+        }
         // Their iOS, not this iPhone's, decides which AltStore version goes on.
-        let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
-            ?? ProcessInfo.processInfo.operatingSystemVersion
+        // B-1 (0.9.159): unknown is not this iPhone's version — connect
+        // normally stops earlier, in `describeTarget`, so reaching here
+        // without one is a second gate, not a fallback.
+        guard let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion) else {
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
-                                                             runningOn: theirOS) { [weak self] line in
-                    self?.engine.log(line)
+                try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                    try await SideStoreDownloader.$reportProgressDetail.withValue(detailReport) {
+                        try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
+                                                                     runningOn: theirOS) { [weak self] line in
+                            self?.engine.log(line)
+                        }
+                    }
                 }
             }
             return URL(fileURLWithPath: path)
         } catch {
-            if Task.isCancelled { throw CancellationError() }
+            // B1 (0.9.156): a failed or cancelled download leaves no byte
+            // count behind — the fallback copy below and the error after it
+            // both return through here.
+            downloadBytesWritten = nil
+            clearDownloadSpeed()
+            // F-G (0.9.156): a cellular decline arrives as CancellationError
+            // with the task itself not cancelled — rethrow it as a cancel
+            // instead of reporting "Couldn't download …" for a no the user
+            // just said on purpose.
+            if Task.isCancelled || error is CancellationError { throw CancellationError() }
             // Offline or blocked: a copy an earlier run left behind will do.
             if let onDisk {
+                // C14: the run goes on with the older local copy — say so
+                // under the progress card instead of silently succeeding.
+                let when = (try? FileManager.default.attributesOfItem(atPath: onDisk.url.path))?[.modificationDate] as? Date
+                let dateText = when?.formatted(
+                    Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale)) ?? ""
+                downloadFallbackNotice = L("Couldn't download %@: %@", source.displayName, short(error))
+                    + " — " + onDisk.url.lastPathComponent
+                    + (dateText.isEmpty ? "" : " (" + L("Downloaded %@", dateText) + ")")
                 engine.log("⚠️ Download failed (\(short(error))), using \(onDisk.url.lastPathComponent) already in Documents instead.")
                 return onDisk.url
             }
@@ -1430,6 +1653,22 @@ final class SideBySideManager: ObservableObject {
                                       : app.source == nil ? L("No SideInstaller IPA downloaded.")
                                                           : L("No SideStore IPA downloaded."))
         }
+        // F-1 (0.9.158): the IPA's own minimum, against their iPhone — not
+        // this one. Block before signing, so a too-new IPA doesn't burn an
+        // App ID first. A fresh download of a known build was already
+        // filtered by `downloadLatest(runningOn:)`; this also covers a
+        // fallback copy from Documents and the custom IPA.
+        if let info = IPALibrary.appInfo(at: ipa) {
+            // B-1 (0.9.159): unknown is not this iPhone's version — same
+            // second gate as the download above.
+            guard let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion) else {
+                throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+            }
+            let theirOSText = targetOSVersion ?? engine.osVersionText
+            if let reason = Engine.minOSBlockReason(info: info, runningOn: theirOS, osText: theirOSText) {
+                throw EngineError.message(reason)
+            }
+        }
         // Their UDID is registered with the team before the profile is asked
         // for, or Apple refuses it with error 8220.
         let udid = targetUDID ?? ""
@@ -1438,13 +1677,21 @@ final class SideBySideManager: ObservableObject {
             engine.log("⚠️ No UDID captured from their iPhone, so signing may fail with error 8220.")
         }
         setStep(.sign, .active)
-        let path = try await onSignQueue {
-            try self.performSign(session: session, ipa: ipa.path, udid: udid, deviceName: name)
+        let path: String
+        do {
+            path = try await onSignQueue {
+                try self.performSign(session: session, ipa: ipa.path, udid: udid, deviceName: name)
+            }
+        } catch {
+            // A21-2：签名失败也留 `_extracted`——清掉再往上抛。
+            Engine.discardExtraction(forIPA: ipa.path)
+            throw error
         }
         signedAppPath = path
         let info = Self.bundleInfo(at: path)
         signedBundleID = info?.id
         installedAppName = info?.name ?? (app == .custom ? runName : app.homeScreenName)
+        installedAppVersion = info?.version
         setStep(.sign, .done)
     }
 
@@ -1477,9 +1724,9 @@ final class SideBySideManager: ObservableObject {
             if Engine.isUnderageError(message) { throw Self.explained(.underage) }
             if Engine.isEmailUnverifiedError(message) { throw Self.explained(.emailUnverified) }
             if Engine.isDeviceRegistrationError(message) {
-                throw EngineError.message(L("Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@", message))
+                throw EngineError.message(L("Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@", friendlyRustError(message)))
             }
-            throw EngineError.message(L("Signing failed: %@", message))
+            throw EngineError.message(L("Signing failed: %@", friendlyRustError(message)))
         }
     }
 
@@ -1488,16 +1735,17 @@ final class SideBySideManager: ObservableObject {
         .message(ErrorHelp.explained(error.errorDescription ?? String(describing: error)))
     }
 
-    /// The bundle id and Home Screen name (display name, else bundle name) of
-    /// the signed `.app`.
-    private static func bundleInfo(at path: String) -> (id: String?, name: String?)? {
+    /// The bundle id, Home Screen name (display name, else bundle name) and
+    /// version of the signed `.app`.
+    private static func bundleInfo(at path: String) -> (id: String?, name: String?, version: String?)? {
         let plist = (path as NSString).appendingPathComponent("Info.plist")
         guard let data = FileManager.default.contents(atPath: plist),
               let dict = (try? PropertyListSerialization.propertyList(from: data, options: [],
                                                                       format: nil)) as? [String: Any]
         else { return nil }
         let name = (dict["CFBundleDisplayName"] as? String) ?? (dict["CFBundleName"] as? String)
-        return (dict["CFBundleIdentifier"] as? String, name?.isEmpty == false ? name : nil)
+        return (dict["CFBundleIdentifier"] as? String, name?.isEmpty == false ? name : nil,
+                dict["CFBundleShortVersionString"] as? String)
     }
 
     // MARK: - Step 5: install over AFC + installation_proxy
@@ -1560,7 +1808,7 @@ final class SideBySideManager: ObservableObject {
             }
         } catch {
             throw EngineError.message(L("%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.",
-                                        app.displayName, short(error), app.homeScreenName))
+                                        app.displayName, error is DeviceConnection.FFIError ? L("the connection to this iPhone failed") : short(error), app.homeScreenName))
         }
         setStep(.setUp, .done)
     }
@@ -1728,6 +1976,11 @@ final class SideBySideManager: ObservableObject {
             }
             engine.log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
         } catch {
+            // C23：只记日志不够——对方日后遇到要配对文件时，这边没有
+            // 任何提示能把两件事连起来；run 页留一句（run 照常成功）。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.")].compactMap { $0 }.joined(separator: "\n")
+            }
             engine.log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
         }
     }
@@ -1745,6 +1998,11 @@ final class SideBySideManager: ObservableObject {
             guard !changes.isEmpty else { return }
             engine.log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046 and HTTP 503s: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
         } catch {
+            // C23：只记日志不够——对方日后遇到登录失败时，这边没有
+            // 任何提示能把两件事连起来；run 页留一句（run 照常成功）。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.")].compactMap { $0 }.joined(separator: "\n")
+            }
             engine.log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046 or HTTP 503, turn off On-device Anisette and Auto Rotation in its settings, pick “SideStore (New)”, and set its client info to say “Mac OS X” where it says “macOS”.")
         }
     }
@@ -1761,12 +2019,19 @@ final class SideBySideManager: ObservableObject {
             engine.log("Not handing \(app.displayName) the signing certificate: it belongs to an Apple ID saved on this iPhone, and its private key shouldn't stay on theirs. \(app.displayName) asks to resign itself the first time it signs in.")
             return nil
         }
-        guard Self.importsAccountConfigSilently(signedApp: signed) else {
-            engine.log("This SideStore build asks for a file password before importing Account.sideconf, so nothing is handed over, the same as iLoader. It offers to resign itself on first sign-in instead.")
-            return nil
-        }
         do {
-            return try await onSignQueue { try Self.accountConfig(session: session) }
+            // S18：这步检查 mmap + 全文扫描已签二进制，放主线程上会冻
+            // 界面一次；挪进 onSignQueue，与下一句 accountConfig 同队列。
+            // 闭包只回 nil（检查不过）或抛错，日志仍在主线程上记。
+            let config: String? = try await onSignQueue { () -> String? in
+                guard Self.importsAccountConfigSilently(signedApp: signed) else { return nil }
+                return try Self.accountConfig(session: session)
+            }
+            guard let config = config else {
+                engine.log("This SideStore build asks for a file password before importing Account.sideconf, so nothing is handed over, the same as iLoader. It offers to resign itself on first sign-in instead.")
+                return nil
+            }
+            return config
         } catch {
             engine.log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
             return nil
@@ -1797,7 +2062,7 @@ final class SideBySideManager: ObservableObject {
         }
         let payload = json.map { String(cString: $0) } ?? ""
         json.map { si_string_free($0) }
-        guard !payload.isEmpty else { throw EngineError.message("empty account config") }
+        guard !payload.isEmpty else { throw EngineError.message(L("empty account config")) }
         return payload
     }
 
@@ -1868,21 +2133,39 @@ final class SideBySideManager: ObservableObject {
 
     /// Bridge a blocking device call to async, serialized on this tool's queue.
     private func onDeviceQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            deviceQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                deviceQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
     /// The same, on the signing queue: isideload's session isn't thread-safe.
     private func onSignQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            signQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                signQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 }
@@ -1920,7 +2203,7 @@ struct SideBySideView: View {
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 16) {
                     Color.clear.frame(height: 0).id(Self.top)
                     // Pages overlap while one gives way to the next.
                     ZStack(alignment: .top) {
@@ -2125,7 +2408,7 @@ struct SideBySideView: View {
                     Text(manager.isImportingIPA ? L("Importing…") : L("Use a custom .ipa instead"))
                 }
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
@@ -2157,7 +2440,7 @@ struct SideBySideView: View {
                         if manager.customIPA != nil {
                             Text(SideBySideApp.custom.displayName)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -2169,7 +2452,7 @@ struct SideBySideView: View {
                             Image(systemName: manager.customIPA == nil
                                   ? "square.and.arrow.down" : "checkmark.circle")
                                 .contentTransition(.symbolEffect(.replace))
-                                .foregroundStyle(manager.customIPA == nil ? Color.secondary : Theme.accent)
+                                .foregroundStyle(manager.customIPA == nil ? Theme.muted : Theme.accent)
                         }
                         Text(manager.isImportingIPA ? L("Importing…")
                              : manager.customIPA?.file.lastPathComponent ?? L("Import .ipa"))
@@ -2200,7 +2483,7 @@ struct SideBySideView: View {
                         L("SideInstaller recognizes this as %@ and sets it up just like its own download.", $0.displayName)
                     } ?? L("Signed with the Apple ID and installed as it is, without a pairing file."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 }
@@ -2212,7 +2495,7 @@ struct SideBySideView: View {
     private var channelCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Release"), systemImage: "tag")
+                SectionTitle(title: L("Release"), systemImage: "tag")
                 Picker(L("Release"), selection: $manager.channel) {
                     ForEach(ReleaseChannel.allCases) { channel in
                         Text(channel.displayName).tag(channel)
@@ -2297,7 +2580,7 @@ struct SideBySideView: View {
                 }
                 Text(addressHint)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2505,7 +2788,7 @@ struct SideBySideView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text(value)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
@@ -2545,6 +2828,19 @@ struct SideBySideView: View {
                 failureCard(message).transition(.cardAppear)
             }
             progressCard.cascadeItem(1)
+            // C14: a download that fell back to an older local copy says so
+            // here, under the card, until the next run clears it.
+            if let notice = manager.downloadFallbackNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
+            // C23: a hand-off step that failed quietly says so here too.
+            if let notice = manager.handOffNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
         }
         .animation(.smooth(duration: 0.35), value: manager.pairingInSettings)
         .animation(.smooth(duration: 0.35), value: manager.pairingPIN)
@@ -2593,7 +2889,7 @@ struct SideBySideView: View {
                         PairingCodeDigits(pin: pin)
                         Text(L("Type this into the prompt on their iPhone."))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 12)
@@ -2613,7 +2909,7 @@ struct SideBySideView: View {
                         ProgressView().controlSize(.small)
                         Text(L("Waiting for their iPhone…"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     .transition(.opacity)
                 }
@@ -2642,7 +2938,7 @@ struct SideBySideView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -2658,17 +2954,30 @@ struct SideBySideView: View {
                         .font(.headline)
                         .contentTransition(.opacity)
                     Spacer(minLength: 4)
-                    Text("\(Int(manager.overallProgress * 100))%")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(progressTint)
-                        .contentTransition(.numericText(value: manager.overallProgress))
-                        .animation(.smooth(duration: 0.3), value: manager.overallProgress)
+                    // B1 (0.9.155): total unknown — byte count instead of a
+                    // 0% that never moves.
+                    if let bytes = manager.downloadBytesWritten {
+                        Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(progressTint)
+                    } else {
+                        Text("\(Int(manager.overallProgress * 100))%")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(progressTint)
+                            .contentTransition(.numericText(value: manager.overallProgress))
+                            .animation(.smooth(duration: 0.3), value: manager.overallProgress)
+                    }
                     if manager.isRunning {
                         cancelButton
                             .transition(.opacity)
                     }
                 }
-                InstallProgressBar(progress: manager.overallProgress, tint: progressTint)
+                if manager.downloadBytesWritten != nil {
+                    ProgressView()
+                        .tint(progressTint)
+                } else {
+                    InstallProgressBar(progress: manager.overallProgress, tint: progressTint)
+                }
                 VStack(spacing: 0) {
                     ForEach(Array(steps.enumerated()), id: \.element) { index, step in
                         SideBySideStepRow(title: step.title(for: manager.runApp),
@@ -2683,7 +2992,9 @@ struct SideBySideView: View {
 
     /// The header says the run stopped, so then the card says where.
     private var progressTitle: String {
-        if manager.isCancelling { return L("Cancelling") }
+        // B-5：取消安装不是立刻停——要等设备上正在跑的安装收尾，
+        // 文案说清在等，别让用户以为点取消没反应。
+        if manager.isCancelling { return L("Waiting for this install to finish…") }
         let steps = manager.runSteps
         if let failed = steps.firstIndex(where: { manager.stepStates[$0] == .failed }) {
             return L("Step %@ of %@", "\(failed + 1)", "\(steps.count)")
@@ -2705,10 +3016,11 @@ struct SideBySideView: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
-                .contentShape(Circle())
+                .padding(8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain, sound: .tap)
         .disabled(manager.isCancelling)
@@ -2727,6 +3039,30 @@ struct SideBySideView: View {
             if manager.waitingForTrust { return L("Waiting for them to tap Trust…") }
             return L("Looking for their iPhone…")
         case .download:
+            // F-2 (0.9.157): the speed and time left ride the step's
+            // detail line, in the source rows' second-line shape; until
+            // two samples arrive it reads as before.
+            if manager.downloadSpeed > 0 {
+                let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(manager.downloadSpeed), countStyle: .file))
+                if manager.downloadTotalBytes > 0 {
+                    let bytes = Int64(manager.downloadProgress * Double(manager.downloadTotalBytes))
+                    let of = L("%@ of %@",
+                               ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file),
+                               ByteCountFormatter.string(fromByteCount: manager.downloadTotalBytes, countStyle: .file))
+                    if let eta = manager.estimatedTimeRemaining {
+                        return "\(speed) • \(of) • \(L("%@ left", Self.etaText(eta)))"
+                    }
+                    return "\(speed) • \(of)"
+                }
+                if let bytes = manager.downloadBytesWritten {
+                    return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))"
+                }
+                return speed
+            }
+            // B1 (0.9.155): total unknown — byte count instead of 0%.
+            if let bytes = manager.downloadBytesWritten {
+                return L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+            }
             return L("%d%% downloaded", Int(manager.downloadProgress * 100))
         case .install:
             return L("%d%% uploaded", Int(engine.installProgress * 100))
@@ -2737,11 +3073,25 @@ struct SideBySideView: View {
         }
     }
 
+    /// "3:42", or "1:12:33" past the hour, for a remaining-time estimate —
+    /// the source rows' shape (SourcesView.etaText).
+    private static func etaText(_ eta: TimeInterval) -> String {
+        let total = Int(eta.rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
+    }
+
     /// Why the run stopped, and the ways on: again as it was, or with
     /// something changed. Untitled: the header above says it stopped.
+    /// 0.9.188：与主安装页 InstallPopup.errorButtons 同款外皮——外层
+    /// VStack 间距 16 与 PopupCard 的错误内容一致，按钮组纵向间距 12
+    /// 与 errorButtons 的纵向排布一致；Report / Try again / CopyLogs
+    /// 的语义与按钮样式（Secondary + CopyLogs 条件）本来就同款，
+    /// 条目与跳转不动（见本文件不动清单）。
     private func failureCard(_ message: String) -> some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.spacing) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.title3)
@@ -2751,14 +3101,10 @@ struct SideBySideView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { retryButtons }
-                    VStack(spacing: 12) { retryButtons }
-                }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { reportButtons(message) }
-                    VStack(alignment: .leading, spacing: 12) { reportButtons(message) }
-                }
+                // The button groups stay vertical: no swapping between a
+                // row and a column when the width changes.
+                VStack(spacing: Theme.spacingSmall) { retryButtons }
+                VStack(alignment: .leading, spacing: Theme.spacingSmall) { reportButtons(message) }
             }
         }
     }
@@ -2774,7 +3120,6 @@ struct SideBySideView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-        .controlSize(.large)
     }
 
     /// Report this problem, and Copy logs unless the message says how to fix it.
@@ -2796,7 +3141,7 @@ struct SideBySideView: View {
         VStack(spacing: 16) {
             VStack(spacing: 16) {
                 Image(systemName: "checkmark.seal")
-                    .font(.system(size: 48))
+                    .font(.system(size: 40))
                     .foregroundStyle(Theme.positive)
                     .frame(height: 72)
                 Text(L("%@ is on their iPhone", manager.installedAppName ?? manager.runName))
@@ -2813,7 +3158,7 @@ struct SideBySideView: View {
 
             PanelCard {
                 VStack(alignment: .leading, spacing: 16) {
-                    sectionTitle(L("Finish on their iPhone"), systemImage: "hand.tap")
+                    SectionTitle(title: L("Finish on their iPhone"), systemImage: "hand.tap")
                     NumberedSteps(steps: finishSteps)
                 }
             }
@@ -2835,7 +3180,7 @@ struct SideBySideView: View {
 
             Label(L("This iPhone no longer keeps a pairing with theirs."), systemImage: "lock.shield")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
                 .cascadeItem(3)
@@ -2892,7 +3237,7 @@ struct SideBySideView: View {
                     StageDots(current: number, total: Stage.numberedCount)
                     Text(L("Step %@ of %@", "\(number)", "\(Stage.numberedCount)"))
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -2901,7 +3246,7 @@ struct SideBySideView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2916,9 +3261,8 @@ struct SideBySideView: View {
         }
     }
 
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        SectionTitle(title: title, systemImage: systemImage)
-    }
+    // 0.9.188：本地 sectionTitle 已并入 Theme SectionTitle（原来只是
+    // 一层透传），调用处直接用 SectionTitle。
 }
 
 // MARK: - Pieces
@@ -2937,7 +3281,7 @@ private struct AppGlyph: View {
                     Rectangle().fill(Theme.raised)
                     Image(systemName: app.symbol)
                         .font(.system(size: size * 0.44))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
         }
@@ -2974,7 +3318,7 @@ private struct AppChoiceCard: View {
                         .minimumScaleFactor(0.8)
                     Label(detail, systemImage: app.requirementSymbol)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(selected ? Theme.accent : .secondary)
+                        .foregroundStyle(selected ? Theme.accent : Theme.muted)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
@@ -3018,16 +3362,16 @@ private struct OptionRow: View {
             HStack(spacing: 16) {
                 Image(systemName: symbol)
                     .font(.system(size: 17))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.control))
+                    .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.control))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                     Text(detail)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(wrapsDetail ? nil : 2)
                         .truncationMode(.middle)
                         .multilineTextAlignment(.leading)
@@ -3080,7 +3424,7 @@ private struct StageDots: View {
         HStack(spacing: 8) {
             ForEach(1...total, id: \.self) { index in
                 Capsule()
-                    .fill(index <= current ? Theme.accent : Theme.ice.opacity(0.14))
+                    .fill(index <= current ? Theme.accent : Theme.muted.opacity(0.35))
                     .frame(width: index == current ? 24 : 8, height: 8)
             }
         }
@@ -3112,7 +3456,8 @@ private struct SideBySideStepRow: View {
                 HStack(spacing: 8) {
                     Text(title)
                         .font(.subheadline)
-                        .foregroundStyle(state == .pending ? .secondary : .primary)
+                        .lineLimit(1)
+                        .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer(minLength: 4)
                     if state == .waiting {
                         Text(L("Action needed"))
@@ -3125,7 +3470,7 @@ private struct SideBySideStepRow: View {
                 if let detail {
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .contentTransition(.numericText())
                         .transition(.opacity)
                 }

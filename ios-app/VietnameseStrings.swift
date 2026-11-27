@@ -8,15 +8,55 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "Ngày hết hạn",
+    "Signed date": "Ngày ký",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "iPhone này không còn đủ dung lượng trống để tải IPA này — cần %@, nhưng chỉ còn %@. Hãy giải phóng dung lượng rồi thử lại.",
+    "Free space: %@": "Dung lượng trống: %@",
+    "Apple ID":
+        "Apple ID",
     "Cancel": "Hủy",
     "Copy": "Sao chép",
     "Copy logs": "Sao chép nhật ký",
     "Email": "Email",
+    "No unsigned IPA in the library.":
+        "Không có IPA chưa ký nào trong thư viện.",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "Sau khi quá trình cài đặt bắt đầu, chạm vào nút Cài ứng dụng ở phía dưới để xem tiến độ.",
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",
+    // U-UI (0.9.102): new tab bar / source + file list redesign.
+    "Apps": "Ứng dụng",
+    "Pick an IPA to install with your Apple ID.":
+        "Chọn một IPA để cài đặt bằng ID Apple của bạn.",
+    "Signing method":
+        "Phương thức ký",
+    "Sources": "Nguồn",
+    "AppStore": "AppStore",
+    "企业证书":
+        "Chứng chỉ doanh nghiệp",
+    "用 Apple ID 安装":
+        "Cài đặt bằng ID Apple",
+    "软件源": "Nguồn phần mềm",
+    "文件列表": "Danh sách tệp",
+    "筛选": "Lọc",
+    "正在刷新数据中…": "Đang làm mới dữ liệu…",
+    "最后更新：%@": "Cập nhật lần cuối: %@",
+    "应用文件夹库": "Thư viện thư mục ứng dụng",
+    "应用 - %@": "Ứng dụng - %@",
+    "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Chưa có IPA nào được tải xuống. Các IPA cài từ nguồn hoặc tệp sẽ được lưu đệm tại đây.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Xóa tất cả",
+    "清空全部 %d 个下载？": "Xóa tất cả %d lượt tải xuống?",
+    "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Chưa có tệp nào. Nhấn «Nhập tệp» ở trên để thêm IPA, hoặc tải xuống từ trang nguồn.",
+    "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Thư viện chưa có IPA nào chưa ký. Hãy nhập một IPA từ trang Tệp, hoặc nhấn «Nhập từ tệp» trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
+    "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Trước tiên, hãy chuẩn bị chứng chỉ, hồ sơ và mật khẩu trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
+    "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Chưa có IPA nào đã ký. Hãy ký một IPA bằng «Chỉ ký» trên trang chứng chỉ doanh nghiệp trong Cài đặt: nó sẽ được lưu tại đây, sẵn sàng cài đặt và chia sẻ.",
     "Installing": "Đang cài đặt",
-    "Cancelling": "Đang hủy",
     "Installed": "Đã cài đặt",
+    "Install history": "Lịch sử cài đặt",
+    "No installs yet.": "Chưa có lượt cài đặt nào.",
     "Something went wrong": "Đã xảy ra lỗi",
     "an app by Frizzle": "một ứng dụng của Frizzle",
     "device": "thiết bị",
@@ -58,8 +98,6 @@ let vietnameseStrings: [String: String] = [
     "Remove": "Xóa",
     "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
         "Chưa lưu Apple ID nào. Thêm một tài khoản và SideInstaller sẽ dùng nó cho mọi lần đăng nhập.",
-    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
-        "Được lưu trong keychain của iPhone này và chỉ gửi cho Apple khi đăng nhập. Vuốt một hàng để sửa mật khẩu hoặc xóa.",
     "Remove this Apple ID?": "Xóa Apple ID này?",
     "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
         "“%@” và mật khẩu đã lưu sẽ bị xóa khỏi iPhone này. Tài khoản Apple của bạn không thay đổi.",
@@ -84,7 +122,6 @@ let vietnameseStrings: [String: String] = [
     "Certificates": "Chứng chỉ",
     "Two-Factor Code": "Mã xác minh",
     "6-digit code": "Mã gồm 6 chữ số",
-    "Submit": "Gửi",
     "Enter the code Apple just sent to your trusted device.":
         "Nhập mã mà Apple vừa gửi đến thiết bị tin cậy của bạn.",
     "Enter the code Apple texted to %@.":
@@ -131,13 +168,10 @@ let vietnameseStrings: [String: String] = [
     "Tunnel connected": "Đã kết nối đường hầm",
     "Tunnel off": "Đường hầm đã tắt",
     "Update available": "Đã có bản cập nhật",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ vẫn đang được phát hành — hãy thử lại sau.",
     "SideInstaller %@ is available — you're on %@.":
         "Đã có SideInstaller %@ — bạn đang dùng bản %@.",
     "Get the latest version": "Tải phiên bản mới nhất",
-    "From the website": "Từ trang web",
-    "Sign it with your Apple ID": "Ký bằng Apple ID của bạn",
-    "Install it in LiveContainer": "Cài vào LiveContainer",
-    "LiveContainer isn't installed on this iPhone.": "LiveContainer chưa được cài trên iPhone này.",
     "Release": "Kênh",
     "Reinstall": "Cài đặt lại",
     "Install %@": "Cài đặt %@",
@@ -150,6 +184,8 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller nhận ra đây là %@ và thiết lập nó y như bản tự tải về.",
     "Downloading… %d%%": "Đang tải… %d%%",
+    "Downloading": "Đang tải xuống",
+    "Queued": "Đang chờ",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
@@ -184,6 +220,7 @@ let vietnameseStrings: [String: String] = [
         "Kết nối LocalDevVPN. Việc giả lập chạy qua đường hầm của nó, như mọi thứ khác ở đây.",
     "LocalDevVPN isn't connected. Connect it, then try again.":
         "LocalDevVPN chưa được kết nối. Hãy kết nối rồi thử lại.",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "Chưa kết nối VPN vòng lặp và tự động khởi động tunnel đang tắt. Hãy bật “Khởi động LocalDevVPN khi cần” trong Cài đặt rồi chạm Cài đặt lại.",
     "Connect LocalDevVPN": "Kết nối LocalDevVPN",
     "Install LocalDevVPN from the App Store and open it.":
         "Cài LocalDevVPN từ App Store rồi mở ứng dụng.",
@@ -210,6 +247,7 @@ let vietnameseStrings: [String: String] = [
     "Pairing file ready": "Tệp ghép nối đã sẵn sàng",
     "No pairing file": "Chưa có tệp ghép nối",
     "Pairing file": "Tệp ghép nối",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "Đang tạo tệp ghép nối. Hãy đợi hoàn tất rồi thử lại.",
     "Pairing…": "Đang ghép nối…",
     "Regenerate": "Tạo lại",
     "Generate pairing file": "Tạo tệp ghép nối",
@@ -245,21 +283,14 @@ let vietnameseStrings: [String: String] = [
     "Pairing file missing — import it first.": "Thiếu tệp ghép nối — hãy nhập trước.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ không phải tệp ghép nối. Hãy chọn tệp máy tính đã tạo — một .mobiledevicepairing hoặc .plist chứa bản ghi ghép nối của iPhone này.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ chưa được cài trên iPhone này nên không thể nhập chứng chỉ.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ không thể tự tạo tệp ghép nối — việc đó cần iOS %@. Hãy nhập một tệp tạo trên máy tính trong mục “Tệp ghép nối” rồi thử lại.",
 
     // MARK: - Pairing service status
 
-    "not paired": "chưa ghép nối",
     "connected": "đã kết nối",
-    "requesting Local Network…": "đang xin quyền Mạng cục bộ…",
-    "Local Network denied": "quyền Mạng cục bộ bị từ chối",
-    "waiting for device…": "đang chờ thiết bị…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "đang phát tín hiệu — mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển",
-    "enter PIN %@ in Settings": "nhập mã PIN %@ trong Cài đặt",
-    "paired: %@ (%dB)": "đã ghép nối: %@ (%d B)",
-    "failed: empty pairing file": "lỗi: tệp ghép nối rỗng",
     "failed: %@": "lỗi: %@",
     "Pairing is already in progress.": "Quá trình ghép nối đang diễn ra.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -274,6 +305,7 @@ let vietnameseStrings: [String: String] = [
     "Revoking": "Đang thu hồi",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@” sẽ bị thu hồi. Các ứng dụng đã ký bằng chứng chỉ này sẽ không mở được trên mọi thiết bị. Không thể hoàn tác.",
+    "Apps signed with this certificate:\n%@": "Ứng dụng đã ký bằng chứng chỉ này:\n%@",
     "Refreshing": "Đang làm mới",
     "Signing in": "Đang đăng nhập",
     "Refresh": "Làm mới",
@@ -289,20 +321,8 @@ let vietnameseStrings: [String: String] = [
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
 
     // Export: the certificate SideInstaller signs with, as a .p12
-    "This certificate has no serial number, so it can't be exported.":
-        "Chứng chỉ này không có số sê-ri nên không thể xuất.",
-    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
-        "Chỉ có thể xuất chứng chỉ mà SideInstaller dùng để ký: khóa riêng của mọi chứng chỉ khác nằm trên thiết bị đã yêu cầu nó từ Apple.",
-    "Couldn't export the certificate: %@": "Không thể xuất chứng chỉ: %@",
-    "Export certificate": "Xuất chứng chỉ",
-    "Password (optional)": "Mật khẩu (không bắt buộc)",
-    "Export": "Xuất",
+    "Import to %@": "Nhập vào %@",
     "Exporting": "Đang xuất",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
-        "Lưu chứng chỉ này và khóa riêng của nó thành tệp .p12, để một ứng dụng ký khác hoặc máy tính ký bằng nó. Hãy chọn mật khẩu (bạn sẽ cần nó để nhập tệp) hoặc để trống: các ứng dụng ký nhập được tệp không có mật khẩu, nhưng máy Mac thì không. Đừng đưa tệp cho ai.",
-    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
-        "SideInstaller chỉ có thể xuất chứng chỉ mà nó dùng để ký, và không chứng chỉ nào ở đây là nó: khóa riêng của một chứng chỉ nằm trên thiết bị đã yêu cầu nó từ Apple.",
-    "SideInstaller signs with this one": "SideInstaller ký bằng chứng chỉ này",
 
     // MARK: - SideStore's certificate (sidestore://certificate)
 
@@ -353,6 +373,7 @@ let vietnameseStrings: [String: String] = [
     "Location session closed — set it up again.": "Phiên vị trí đã đóng — hãy thiết lập lại.",
     "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
     "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
+    "Couldn't build the certificate link.": "Không thể tạo liên kết chứng chỉ.",
 
     // Location › saved places and GPX routes.
     "Saved places": "Địa điểm đã lưu",
@@ -362,8 +383,6 @@ let vietnameseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Chạm Lưu bên dưới bản đồ để giữ lại điểm dưới ghim. Chạm vào một địa điểm đã lưu để đặt ngay.",
     "Play a GPX route": "Phát lộ trình GPX",
-    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
-        "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn, rồi dừng ở điểm cuối.",
     "Import GPX file": "Nhập tệp GPX",
     "Couldn't read %@ as a GPX file.": "Không thể đọc %@ dưới dạng tệp GPX.",
     "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
@@ -429,8 +448,6 @@ let vietnameseStrings: [String: String] = [
         "Lộ trình này quá dài cho máy chủ lộ trình. Hãy rút ngắn hoặc chia nhỏ nó.",
     "The route server is busy. Try again in a minute.":
         "Máy chủ lộ trình đang bận. Hãy thử lại sau một phút.",
-    "The route server couldn't plan this route (%@).":
-        "Máy chủ lộ trình không lập được lộ trình này (%@).",
 
     // MARK: - Entitlements tab
 
@@ -460,25 +477,57 @@ let vietnameseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ không được hỗ trợ — SideInstaller cần iOS %@ trở lên.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
-        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Trong Công cụ › Chứng chỉ, hãy dùng chứng chỉ của SideStore hoặc thu hồi chứng chỉ đó, rồi gia hạn lại.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "Đã có một lần gia hạn đang chạy. Hãy đợi nó hoàn tất rồi thử lại.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Đang ký rồi. Hãy đợi ký xong rồi thử lại.",
+    "Still reading the device. Try again in a moment.":
+        "Vẫn đang đọc thiết bị. Hãy thử lại sau giây lát.",
+    "Load failed. Showing the last loaded list.":
+        "Tải danh sách thất bại. Đang hiển thị danh sách đã tải lần trước.",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "Đã bỏ qua: ứng dụng này không còn làm mới được sau khi bắt đầu. IPA có thể đã bị xóa.",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "Đã bỏ qua: hồ sơ ký của ứng dụng này không có nhóm nên không thể làm mới.",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Đã thu hồi, nhưng không thể làm mới danh sách chứng chỉ. Danh sách có thể lỗi thời cho đến khi tải lại.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Đã nhập, nhưng không thể làm mới danh sách chứng chỉ. Danh sách có thể lỗi thời cho đến khi tải lại.",
+    "Skipped: refresh stopped.":
+        "Đã bỏ qua: đã dừng gia hạn.",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "Không thể chuyển tệp ghép nối ở định dạng mới. SideStore có thể yêu cầu tệp ghép nối khi mở lần đầu.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "Không thể chuyển chứng chỉ ký. SideStore có thể yêu cầu ký lại khi đăng nhập lần đầu.",
+    "Cellular Install (OTA)":
+        "Cài đặt qua dữ liệu (OTA)",
+    "Pairing Install":
+        "Cài đặt qua ghép nối",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Tải hai tệp này lên R2 rồi cài đặt: %@ và %@. Tải lên qua cầu WebDAV https://r2-webdav.wozofa.workers.dev hoặc bảng điều khiển R2; .plist dạng text/xml, .ipa dạng application/octet-stream. Sau khi tải lên, chạm vào “Đã tải lên, bắt đầu cài đặt”.",
+    "Uploaded, Start Install":
+        "Đã tải lên, bắt đầu cài đặt",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Sau khi cài đặt, lần mở đầu tiên sẽ báo “Nhà phát triển doanh nghiệp không đáng tin cậy”: vào Cài đặt → Cài đặt chung → VPN & Quản lý thiết bị để tin cậy chứng chỉ, chạm “Cho phép và khởi động lại”, rồi mở lại ứng dụng.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "Cài đặt qua dữ liệu không mở được trình cài đặt hệ thống: hãy kiểm tra các liên kết R2 hoặc dùng cài đặt qua ghép nối.",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "Không thể đặt cài đặt anisette của SideStore. Nếu đăng nhập lỗi -80046, hãy tắt Anisette trên thiết bị và tính năng tự động xoay, và chọn “SideStore (New)”。",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "Lần làm mới trước (không gửi được thông báo): %@",
     "Getting ready": "Đang chuẩn bị",
     "Stopping after this app": "Sẽ dừng sau ứng dụng này",
     "Refreshing %@": "Đang gia hạn %@",
-    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
-        "Được ký bởi nhóm %@, không phải nhóm bạn đang đăng nhập — gia hạn ở đây sẽ cài thêm một bản thứ hai.",
     "Refreshed. Its seven days start again now.":
         "Đã gia hạn. Bảy ngày bắt đầu lại từ bây giờ.",
     "Nothing was refreshed.": "Không có ứng dụng nào được gia hạn.",
     "Refreshed %d of %d apps.": "Đã gia hạn %d trong %d ứng dụng.",
     "Refresh all apps?": "Gia hạn tất cả ứng dụng?",
     "Refresh all": "Gia hạn tất cả",
-    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
-        "%@ sẽ được ký lại bằng Apple ID của bạn và cài đè lên bản đang có trên thiết bị này. Ứng dụng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
-    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
-        "%d ứng dụng sẽ được ký lại bằng Apple ID của bạn và cài đè lên các bản đang có trên thiết bị này. Chúng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
+    "Renew this app": "Gia hạn ứng dụng này",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d ứng dụng có thể được ký lại từ một tệp IPA đã có trên iPhone này.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -498,6 +547,9 @@ let vietnameseStrings: [String: String] = [
     "No sideloaded apps": "Không có ứng dụng sideload nào",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "Không có gì trên thiết bị này được cài bằng hồ sơ cấp phép. Ứng dụng từ App Store không hết hạn nên không xuất hiện ở đây.",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "Không đọc được ứng dụng nào. Chạm vào Tải lại để đọc lại iPhone này; nếu vẫn không có gì, hãy ghép nối iPhone và bật Chế độ nhà phát triển trước.",
+    "No matching apps.": "Không có ứng dụng nào phù hợp.",
     "No matching profile": "Không có hồ sơ nào khớp",
     "Expires today": "Hết hạn hôm nay",
     "Expires tomorrow": "Hết hạn ngày mai",
@@ -507,7 +559,6 @@ let vietnameseStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "Được cấp cho các App ID mà không ứng dụng nào đã cài đang chạy trên đó.",
     "Older profiles": "Hồ sơ cũ hơn",
-    "Bundle identifier": "Định danh bundle",
     "App ID": "App ID",
     "Version": "Phiên bản",
     "Profile name": "Tên hồ sơ",
@@ -574,9 +625,8 @@ let vietnameseStrings: [String: String] = [
         "iPhone của họ ở %@ đã từ chối kết nối. Máy chỉ chấp nhận khi bật Chế độ nhà phát triển, và iOS yêu cầu xác nhận lại sau mỗi lần khởi động lại: trên iPhone của họ, hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
-    "The link to their iPhone didn't come up: %@":
-        "Không mở được kết nối tới iPhone của họ: %@",
     "%d%% downloaded": "Đã tải %d%%",
+    "%@ downloaded": "Đã tải %@",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",
     "Clear their details": "Xóa thông tin của họ",
@@ -591,6 +641,8 @@ let vietnameseStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "Cần LocalDevVPN trên iPhone của họ",
     "Couldn't download %@: %@": "Không tải được %@: %@",
+    "Couldn't find %@ in Downloads. Download it again first.": "Không tìm thấy %@ trong Tải xuống. Hãy tải lại trước.",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "IPA của %@ trong Tải về là một bản sao khác. ID gói của nó không khớp với mục lịch sử này. Hãy tải IPA của bản sao này trước.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -662,45 +714,40 @@ let vietnameseStrings: [String: String] = [
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "Chưa cài LocalDevVPN. Hãy tải từ App Store, rồi SideInstaller có thể khởi động giúp bạn.",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "Khi bật, các thao tác cần đường hầm sẽ thử đường hầm tích hợp trước rồi khởi động LocalDevVPN khi cần. Khi tắt, LocalDevVPN không bao giờ tự khởi động; đường hầm tích hợp vẫn khởi động khi cần, và công tắc pill thủ công không bị ảnh hưởng.",
 
-    "Downloaded IPAs": "Tệp IPA đã tải",
-    "%@ used": "Đã dùng %@",
     "imported": "đã nhập",
-    "No downloaded IPAs. Ones you install from the Install tab are cached here.":
-        "Chưa có tệp IPA nào được tải. Những tệp bạn cài từ tab Cài ứng dụng sẽ được lưu ở đây.",
     "Downloaded %@": "Đã tải vào %@",
     "Added %@": "Đã thêm %@",
-    "Delete this download?": "Xóa bản tải này?",
     "Delete": "Xóa",
-    "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
-        "“%@” (%@) sẽ bị xóa. Bạn có thể tải lại bất cứ lúc nào từ tab Cài ứng dụng.",
     "Couldn't delete %@: %@": "Không thể xóa %@: %@",
     "Server": "Máy chủ",
     "Custom…": "Tùy chỉnh…",
     "Server URL": "URL máy chủ",
     "Anisette Server": "Máy chủ Anisette",
     "Starts with %@": "Bắt đầu với %@",
-    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
-        "Chế độ Tự động bắt đầu với máy chủ đã đăng nhập thành công gần nhất, sau đó thử các máy chủ khác, ưu tiên những máy chủ có khả năng hoạt động cao nhất.",
-    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
-        "Chỉ máy chủ này được thử. Nếu nó lỗi, đăng nhập cũng thất bại: chọn Tự động để SideInstaller thử các máy chủ khác.",
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
         "Chỉ máy chủ đã chọn trong Cài đặt › Máy chủ Anisette được thử. Chọn Tự động ở đó để SideInstaller thử các máy chủ khác khi một máy chủ lỗi.",
     "Device IP": "IP thiết bị",
     "Advanced": "Nâng cao",
     "Clear": "Xóa hết",
+    "Clear install history?": "Xóa lịch sử cài đặt?",
     "Activity Log (%d)": "Nhật ký hoạt động (%d)",
+    "没有匹配的日志。": "Không có nhật ký phù hợp.",
     "Verbose logging": "Nhật ký chi tiết",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "Thêm các thông điệp trao đổi với iOS vào nhật ký, để tìm ra sự cố kết nối. Những lúc khác hãy để tắt, vì chúng nhanh chóng làm đầy nhật ký.",
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "Chế độ nhà phát triển",
+    "Developer disk image": "Ảnh đĩa nhà phát triển",
+    "Downloaded": "Đã tải xuống",
+    "Not downloaded": "Chưa tải xuống",
+    "Re-download": "Tải lại",
     "Show Developer Mode in Settings": "Hiện Chế độ nhà phát triển trong Cài đặt",
     "Turn on Developer Mode": "Bật Chế độ nhà phát triển",
     "Asking this iPhone…": "Đang hỏi iPhone này…",
-    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
-        "Cả hai đều cần một kết nối tới iPhone này đã hoạt động sẵn: LocalDevVPN cùng một tệp ghép nối, chẳng hạn tệp được nhập trên iOS 17.4 đến 26. Trên iOS 27, chính kết nối đó cần Chế độ nhà phát triển, nên chúng không thể khôi phục tùy chọn đã biến mất.",
     "Turn on Developer Mode?": "Bật Chế độ nhà phát triển?",
     "Turn On and Restart": "Bật và khởi động lại",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
@@ -712,6 +759,20 @@ let vietnameseStrings: [String: String] = [
         "Chế độ nhà phát triển sẽ được bật và iPhone này khởi động lại ngay bây giờ. Sau khi mở khóa, hãy chạm Bật.",
     "An install is already running. Wait for it to finish, then try again.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi thử lại.",
+    "An import is already running. Wait for it to finish, then try again.": "Đã có một quá trình nhập đang chạy. Hãy đợi nó hoàn tất rồi thử lại.",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.": "%@ sẽ được ký lại bằng ID Apple đã ký nó và cài đè lên bản sao trên thiết bị này. Dữ liệu được giữ nguyên và bảy ngày sẽ được tính lại từ đầu.",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.": "%d ứng dụng sẽ được ký lại, mỗi ứng dụng bằng ID Apple đã ký nó, và cài đè lên các bản sao trên thiết bị này. Dữ liệu được giữ nguyên và bảy ngày sẽ được tính lại từ đầu.",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.": "%d ứng dụng ở đây được ký bởi một nhóm không khớp với ID Apple đã lưu nào nên bị loại khỏi danh sách. Hãy chuyển sang ID Apple đã ký nó, đăng nhập một lần rồi tải lại, ứng dụng sẽ được thêm vào danh sách. Ứng dụng ký doanh nghiệp vẫn bị loại.",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.": "%d ứng dụng ở đây được ký bởi các nhóm không khớp với ID Apple đã lưu nào nên bị loại khỏi danh sách. Hãy chuyển sang ID Apple đã ký chúng, đăng nhập một lần rồi tải lại, các ứng dụng sẽ được thêm vào danh sách. Ứng dụng ký doanh nghiệp vẫn bị loại.",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.": "Các ứng dụng này được ký bằng %d ID Apple nên mỗi nhóm được ký bằng ID Apple của riêng mình.",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.": "Không thể đăng nhập với tên %@ (%@). Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.": "Đã bỏ qua: không có ID Apple đã lưu nào khớp với nhóm của ứng dụng này (%@). Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.": "Đã bỏ qua: đã đăng nhập với tên %@ nhưng nhóm của ứng dụng này là %@. Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Refreshing %@ as %@": "Đang gia hạn %@ với tên %@",
+    "Invalid device IP": "IP thiết bị không hợp lệ",
+    "The address was invalid, reset to 10.7.0.1.": "Địa chỉ không hợp lệ, đã đặt lại thành 10.7.0.1.",
+    "Bundle Identifier": "Mã định danh gói",
+    "rpath": "rpath",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS chỉ bật Chế độ nhà phát triển từ đây khi iPhone này không có mật mã. Hãy chạm “Hiện Chế độ nhà phát triển trong Cài đặt” rồi bật nó ở đó.",
     "This iPhone didn't take the Developer Mode request: %@":
@@ -729,6 +790,26 @@ let vietnameseStrings: [String: String] = [
     "Latest (%@)": "Mới nhất (%@)",
     "Couldn't load the other versions: %@": "Không thể tải các phiên bản khác: %@",
     "Try again": "Thử lại",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Xem nhật ký",
+    "免费名额：已装 %d/3": "Suất miễn phí: đã cài %d/3",
+    "App ID：已用 %d/%d": "App ID: đã dùng %d/%d",
+    "免费证书都支持": "Chứng chỉ miễn phí hỗ trợ tất cả",
+    "错误 (%d)": "Lỗi (%d)",
+    "Retry failed items": "Thử lại các mục thất bại",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "Kiểm tra trước khi cài đặt",
+    "去设置": "Mở Cài đặt",
+    "去连 LocalDevVPN": "Kết nối LocalDevVPN",
+    "签名账号": "Tài khoản ký",
+    "换团队": "Đổi nhóm",
+    "首次登录时选择": "Chọn ở lần đăng nhập đầu tiên",
+    "当前签名账号": "Tài khoản ký hiện tại",
+    "点一下切换签名账号": "Chạm để đổi tài khoản ký",
+    "续签需要验证码": "Cần mã xác minh để gia hạn",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "Gia hạn tự động cần mã xác minh của ID Apple. Mở SideInstaller, nhập mã và quá trình gia hạn sẽ tiếp tục.",
+    "重新登录": "Đăng nhập lại",
+    "去证书页看": "Xem trang chứng chỉ",
 
     "couldn't find the IPA in the %@ %@ release":
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",
@@ -736,7 +817,6 @@ let vietnameseStrings: [String: String] = [
     "bad asset URL": "URL tệp tải không hợp lệ",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub đang giới hạn số yêu cầu từ mạng này — GitHub không bị chặn, và giới hạn sẽ tự hết. Hãy thử lại %@.",
-    "GitHub answered HTTP %d%@": "GitHub đã trả về HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub hiện không cung cấp %@ — kho mã đã bị gỡ, chuyển đi hoặc chuyển thành riêng tư nên không có gì để tải. iPhone này và mạng của nó không có vấn đề gì.",
     "couldn't reach GitHub: %@": "không kết nối được tới GitHub: %@",
@@ -815,6 +895,8 @@ let vietnameseStrings: [String: String] = [
         "%@ không phải là IPA. Hãy chọn đúng tệp .ipa — nếu trông vẫn đúng thì có thể lượt tải đã lưu một trang lỗi, hoặc dừng giữa chừng.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Chưa nhập IPA nào. Hãy chạm “Nhập .ipa” và chọn một tệp.",
+    "No IPA on this iPhone":
+        "Không có IPA tương ứng trên iPhone này",
     "Couldn't import %@: %@": "Không thể nhập %@: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller không tải được liên kết đó. Hãy dán đầy đủ địa chỉ https:// mà tệp .ipa được tải về.",
@@ -829,6 +911,8 @@ let vietnameseStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Không thể đăng ký iPhone này%@ vào nhóm phát triển của Apple ID, nên Apple sẽ không cấp hồ sơ cấp phép. %@ — xem các bước ở trên.",
+    "Connect to Wi-Fi": "Kết nối Wi-Fi",
+    "Open Settings › Wi-Fi and join a network.": "Mở Cài đặt › Wi-Fi và tham gia một mạng.",
     "Then come back here — this continues automatically.":
         "Sau đó quay lại đây: quá trình sẽ tự tiếp tục.",
     "Tap Connect so the toggle turns on.": "Chạm vào Connect để công tắc bật lên.",
@@ -881,6 +965,15 @@ let vietnameseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Đang cài đặt %@",
     "Paused": "Đã tạm dừng",
+    "Ignore this version": "Bỏ qua phiên bản này",
+    "已忽略的更新": "Bản cập nhật đã bỏ qua",
+    "没有已忽略的更新。": "Không có bản cập nhật nào bị bỏ qua.",
+    "所有已忽略的版本都将重新提示更新。": "Tất cả phiên bản đã bỏ qua sẽ lại nhắc cập nhật.",
+    "Pause": "Tạm dừng",
+    "Pause all": "Tạm dừng tất cả",
+    "Resume": "Tiếp tục",
+    "Resume all": "Tiếp tục tất cả",
+    "Open": "Mở",
     "Open SideInstaller to finish the install.":
         "Mở SideInstaller để hoàn tất cài đặt.",
     "Check the App IDs it needs, then tap Install.":
@@ -937,8 +1030,6 @@ let vietnameseStrings: [String: String] = [
     "Open Apple Account":
         "Mở Apple Account",
     "No App IDs left this week": "Đã hết App ID trong tuần này",
-    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Mỗi ứng dụng mà SideInstaller ký đều cần một App ID, và các tiện ích mở rộng của nó dùng chung App ID đó. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Không thể xóa chúng sớm hơn. Hãy đợi một số hết hạn, rồi chạm vào Cài ứng dụng lần nữa.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -961,21 +1052,19 @@ let vietnameseStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Quay lại đây, chạm “Nhập tệp ghép nối” và chọn tệp. Sau đó mọi thứ hoạt động giống như trên iOS %@.",
     "Get jitterbugpair": "Tải jitterbugpair",
-    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
-        "Từ iOS 26.4, đó phải là tệp “Remote pairing”: iPhone này ngắt kết nối với các tệp lockdown, như tệp của jitterbugpair, khi chúng đi qua LocalDevVPN.",
-    "Get idevice_pair": "Tải idevice_pair",
-    "Make a remote pairing file": "Tạo một tệp “Remote pairing”",
-    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
-        "Tệp ghép nối bạn đã nhập là loại lockdown. Từ iOS 26.4, iPhone này ngắt kết nối với các tệp đó khi chúng đi qua LocalDevVPN, nên tệp này không kết nối được, và một tệp mới cùng loại cũng vậy.",
-    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
-        "Quay lại đây, chạm “Thay” trên thẻ “Tệp ghép nối” và chọn tệp đó.",
-    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
-        "Trên Mac, PC Windows hoặc Linux, mở idevice_pair, cắm iPhone này vào và chạm Tin cậy nếu được hỏi. Chọn iPhone này, chọn “Remote pairing”, bấm “Create” và giữ iPhone này ở trạng thái mở khóa cho đến khi xong.",
-    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
-        "Bấm “Save to file…” rồi gửi tệp sang iPhone này bằng AirDrop, iCloud Drive hoặc cáp. Tệp ghép nối xuất từ iLoader cũng dùng được.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "Bấm “Save to file…” rồi gửi tệp sang iPhone này bằng AirDrop, iCloud Drive hoặc cáp. Tệp ghép nối xuất từ iLoader cũng dùng được.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Quay lại đây, chạm “Thay” trên thẻ “Tệp ghép nối” và chọn tệp đó.",
+    "Get idevice_pair": "Tải idevice_pair",
+    "Make a remote pairing file": "Tạo một tệp “Remote pairing”",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Trên Mac, PC Windows hoặc Linux, mở idevice_pair, cắm iPhone này vào và chạm Tin cậy nếu được hỏi. Chọn iPhone này, chọn “Remote pairing”, bấm “Create” và giữ iPhone này ở trạng thái mở khóa cho đến khi xong.",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "Tệp ghép nối bạn đã nhập là loại lockdown. Từ iOS 26.4, iPhone này ngắt kết nối với các tệp đó khi chúng đi qua LocalDevVPN, nên tệp này không kết nối được, và một tệp mới cùng loại cũng vậy.",
     "A certificate already exists": "Đã có một chứng chỉ",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple sẽ không cấp chứng chỉ ký thứ hai cho Apple ID này. Thu hồi chứng chỉ sẵn có sẽ giúp quá trình cài đặt tiếp tục — nhưng không thể hoàn tác.",
@@ -1021,8 +1110,6 @@ let vietnameseStrings: [String: String] = [
         "Đặt lại thành 10.7.0.1, giá trị mặc định. Trong LocalDevVPN đó là giá trị ở Cài đặt › Device IP — không phải địa chỉ trên màn hình chính, vốn là đầu của chính đường hầm.",
     "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
         "Nếu bạn đã đổi địa chỉ của LocalDevVPN, hãy sao chép Device IP của nó vào đây — kể cả phần /32, nếu có hiển thị.",
-    "Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.":
-        "IP thiết bị đang là %@, một trong các địa chỉ của chính iPhone này, và iOS không cho ứng dụng kết nối tới các địa chỉ đó. Trong Cài đặt › Nâng cao, hãy đặt IP thiết bị thành địa chỉ ở Cài đặt › Device IP của LocalDevVPN (mặc định là 10.7.0.1), không phải địa chỉ sau “Connected to” trên màn hình chính của nó.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS đã từ chối kết nối tới %@ ngay trên iPhone này, trước khi bất cứ thứ gì được gửi đi. iOS làm vậy với các địa chỉ của chính iPhone này, như địa chỉ sau “Connected to” trên màn hình chính của LocalDevVPN. IP thiết bị, trong Cài đặt › Nâng cao, phải là địa chỉ ở Cài đặt › Device IP của LocalDevVPN (mặc định là 10.7.0.1). Nếu đã đúng như vậy, hãy tắt rồi bật lại LocalDevVPN, sau đó thử lại.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
@@ -1034,10 +1121,17 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - About
 
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
     "About": "Giới thiệu",
     "Version %@ (%@)": "Phiên bản %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
+    "Checking for updates…": "Đang kiểm tra cập nhật…",
+    "Checking for updates… Tap again to cancel.": "Đang kiểm tra cập nhật… Chạm lại để hủy.",
+    "You're up to date.": "Bạn đang dùng phiên bản mới nhất.",
+    "Couldn't check for updates. Check your connection and try again.":
+        "Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối và thử lại.",
 
     "Links": "Liên kết",
     "Source code": "Mã nguồn",
@@ -1080,16 +1174,16 @@ let vietnameseStrings: [String: String] = [
     "The developer disk image location spoofing mounts. Mirrored by doronz88.":
         "Ảnh đĩa nhà phát triển mà chức năng giả lập vị trí gắn kết. Được doronz88 lưu bản sao.",
 
-    "Where to get it": "Nơi tải ứng dụng",
-    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
-        "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
-    "Install page": "Trang cài đặt",
     "Terms": "Điều khoản",
 
     // MARK: - Madeira
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.":
         "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ cần iOS %@ trở lên. iPhone này đang chạy iOS %@.",
+    "Minimum iOS": "iOS tối thiểu",
+    "SHA-256": "SHA-256",
+    "Show all": "Hiển thị tất cả",
     "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn “In-app with pairing file”: SideInstaller đã đặt sẵn tệp ở đó, nên hãy chạm vào “Continue”.",
@@ -1197,6 +1291,7 @@ let vietnameseStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS chuyển các sự cố của chính SideInstaller cho ứng dụng vào lần mở tiếp theo. Nhật ký sự cố của SideStore, LiveContainer và Madeira được đọc từ iPhone này qua LocalDevVPN.",
     "Open a GitHub issue": "Mở issue trên GitHub",
+    "Share": "Chia sẻ",
     "Share the report": "Chia sẻ báo cáo",
     "Preview the report": "Xem trước báo cáo",
     "Report": "Báo cáo",
@@ -1294,6 +1389,137 @@ let vietnameseStrings: [String: String] = [
     "Open AltStore and sign in with the same Apple ID.":
         "Mở AltStore và đăng nhập bằng cùng Apple ID đó.",
 
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "Không tìm thấy tệp",
+    "Invalid path": "Đường dẫn không hợp lệ",
+    "Couldn't parse the upload": "Không thể xử lý tệp tải lên",
+    "No such page": "Không có trang này",
+    "Download": "Tải xuống",
+    "Download complete": "Đã tải xuống xong",
+    "%@ downloaded. You can install it from the Downloads page.": "Đã tải xuống %@. Bạn có thể cài đặt từ trang Tải xuống.",
+    "Delete this file?": "Xóa tệp này?",
+    "This directory is empty": "(Thư mục này trống)",
+    "SideInstaller LAN Transfer": "Truyền tệp LAN SideInstaller",
+    "SideInstaller File Transfer": "Truyền tệp SideInstaller",
+    "Upload": "Tải lên",
+    "File": "Tệp",
+    "Size": "Kích thước",
+    "Add": "Thêm",
+    "Add Source": "Thêm nguồn",
+    "Anyone on your LAN can access it without a password. Turn it off when done.": "Bất kỳ ai trong mạng LAN đều có thể truy cập mà không cần mật khẩu. Hãy tắt khi dùng xong.",
+    "Appearance": "Giao diện",
+    "Apple ID sign-in failed on %@. Last error: %@": "Đăng nhập Apple ID trên %@ không thành công. Lỗi cuối cùng: %@",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.": "Apple sẽ không cấp chứng chỉ ký cho Apple ID này: hệ thống báo đã tồn tại một chứng chỉ (lỗi 7460). Hãy thu hồi nó trong Công cụ › Chứng chỉ, rồi làm mới lại.",
+    "Auto Refresh": "Tự động làm mới",
+    "Built-in tunnel interface": "Giao diện tunnel tích hợp",
+    "Built-in tunnel: interface 10.7.1.1/32 and peer 10.7.0.1/32 by default. Address changes take effect the next time the tunnel connects.": "Tunnel tích hợp: mặc định giao diện 10.7.1.1/32 và peer 10.7.0.1/32. Thay đổi địa chỉ có hiệu lực vào lần kết nối tunnel tiếp theo.",
+    "Certificate password:": "Mật khẩu chứng chỉ:",
+    "Couldn't reach the device at %@:%d at all. The loopback VPN is most likely off, or Device IP isn't the address it carries: in LocalDevVPN that's the one under Settings › Device IP (10.7.0.1 by default), not the “Connected to” address on its main screen. First check that the phone and the computer are on the same Wi-Fi (the local tunnel needs a local network).": "Không thể kết nối tới thiết bị tại %@:%d. Rất có thể VPN loopback đang tắt, hoặc IP thiết bị không phải địa chỉ mà nó đang dùng: trong LocalDevVPN, đó là địa chỉ trong Cài đặt › IP thiết bị (mặc định 10.7.0.1), không phải địa chỉ \"Đã kết nối tới\" trên màn hình chính. Trước tiên hãy kiểm tra điện thoại và máy tính có cùng Wi-Fi không (tunnel nội bộ cần mạng nội bộ).",
+    "Dark": "Tối",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.": "Mọi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí có thể đăng ký 10 ID mỗi tuần, mỗi ID có hiệu lực 7 ngày.",
+    "Export certificate (p12)": "Xuất chứng chỉ (p12)",
+    "Follow System": "Theo hệ thống",
+    "Import failed": "Nhập không thành công",
+    "Light": "Sáng",
+    "Loading…": "Đang tải…",
+    "Location is not set to “Always”, so only silent audio is keeping the app alive — renewal from the lock screen may be suspended. Set Location to “Always” in Settings.": "Vị trí chưa được đặt thành \"Luôn luôn\", vì vậy chỉ âm thanh im lặng mới giữ ứng dụng chạy — việc gia hạn từ màn hình khóa có thể bị tạm dừng. Hãy đặt Vị trí thành \"Luôn luôn\" trong Cài đặt.",
+    "No IPA imported.": "Chưa nhập IPA nào.",
+    "No sources yet. Tap + to add one.": "Chưa có nguồn nào. Chạm + để thêm.",
+    "Refresh apps automatically in background": "Tự động làm mới ứng dụng trong nền",
+    "SideInstaller stays alive in the background (silent audio + location) and checks every 30 minutes. Apps whose signing expires within 3 days are re-signed automatically. Location access must be set to “Always” and the tunnel must stay connected (the built-in tunnel is enough). The system also wakes the app in the background from time to time to run a check — don't swipe it away from the app switcher.": "SideInstaller tiếp tục chạy trong nền (âm thanh im lặng + vị trí) và kiểm tra mỗi 30 phút. Các ứng dụng sắp hết hạn ký trong 3 ngày sẽ được ký lại tự động. Quyền truy cập vị trí phải đặt thành \"Luôn luôn\" và tunnel phải luôn được kết nối (tunnel tích hợp là đủ). Hệ thống cũng thỉnh thoảng đánh thức ứng dụng trong nền để chạy kiểm tra — đừng vuốt đóng nó trong trình chuyển đổi ứng dụng.",
+    "Skipped: not signed by the team you're signed in as, so a certificate-signed app is never re-signed here.": "Đã bỏ qua: không được ký bởi nhóm bạn đã đăng nhập, vì vậy ứng dụng đã ký bằng chứng chỉ sẽ không bao giờ được ký lại ở đây.",
+    "Source URL": "URL nguồn",
+    "That isn't a usable source link.": "Đó không phải là liên kết nguồn dùng được.",
+    "The built-in tunnel couldn't start. See the log for the reason, then try again.": "Không thể khởi động tunnel tích hợp. Xem nhật ký để biết lý do, rồi thử lại.",
+    "Transfer files to Documents over LAN": "Chuyển tệp tới Documents qua LAN",
+    "Tunnel peer (device IP)": "Peer của tunnel (IP thiết bị)",
+    "Tunnel standby": "Tunnel đang chờ",
+    "WebDAV failed to start": "Không khởi động được WebDAV",
+    "WebDAV file service": "Dịch vụ tệp WebDAV",
+    "Wi-Fi not connected": "Wi-Fi chưa kết nối",
+    "导出描述文件": "Xuất hồ sơ cấp phép",
+    "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Sau khi xuất, bạn có thể nhập cùng một chứng chỉ vào LiveContainer mà không cần tìm lại tệp gốc; mật khẩu không được xuất kèm, bạn sẽ nhập lại khi nhập.",
+    "Beta": "Beta",
+    "名字不能以. 开头": "Tên không được bắt đầu bằng dấu chấm",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "Bản chỉnh sửa",
+    "Archive": "Tệp lưu trữ",
+    "%@ (extracted)": "%@ (đã giải nén)",
+    "Source is too large": "Nguồn quá lớn",
+    "Folders can't be deleted": "Không thể xóa thư mục",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "Không đọc được nguồn này",
+    "Listing certificates failed: %@": "Liệt kê chứng chỉ thất bại: %@",
+    "Revoke failed: %@": "Thu hồi thất bại: %@",
+    "Couldn't parse p12 export result.": "Không phân tích được kết quả xuất p12.",
+    "Export failed: %@": "Xuất thất bại: %@",
+    "Listing App IDs failed: %@": "Liệt kê App ID thất bại: %@",
+    "Enabling entitlements failed: %@": "Bật quyền thất bại: %@",
+    "Waiting for this install to finish…": "Đang chờ lần cài đặt này hoàn tất…",
+    "This file is being installed. Wait until it finishes.": "Tệp này đang được cài đặt. Hãy chờ cho đến khi xong.",
+    "The device answered on the RSD port at %@, then the tunnel port it opened was unreachable on that same address — dropped or refused, across %@. The device is there; what's in front of it is forwarding some ports and not others. The tunnel opens on a fresh high port every attempt, so a rule-based proxy that forwards the RSD port alone can never cover it. Use a loopback VPN that blanket-forwards every port on the RSD subnet. Re-pairing won't help — the pairing is fine.": "Thiết bị đã trả lời trên cổng RSD tại %@, nhưng cổng đường hầm mà nó mở lại không thể truy cập tại cùng địa chỉ đó — bị hủy hoặc bị từ chối, trên %@. Thiết bị vẫn ở đó; thứ ở phía trước chỉ chuyển tiếp một số cổng chứ không phải tất cả. Đường hầm mở trên một cổng cao mới mỗi lần thử, vì vậy proxy dựa trên quy tắc chỉ chuyển tiếp cổng RSD sẽ không bao giờ bao quát được hết. Hãy dùng VPN loopback chuyển tiếp mọi cổng trên mạng con RSD. Ghép nối lại cũng không giúp được — bản thân việc ghép nối vẫn ổn.",
+    "The tunnel port never answered and never refused on any address (%@) — the connection is being swallowed rather than rejected. That's usually a VPN or firewall dropping traffic on the RSD subnet. Check the VPN is still up, then try again.": "Cổng đường hầm không bao giờ trả lời cũng không từ chối trên bất kỳ địa chỉ nào (%@) — kết nối đang bị nuốt mất thay vì bị từ chối. Thường là do VPN hoặc tường lửa đang hủy lưu lượng trên mạng con RSD. Kiểm tra xem VPN còn bật không, rồi thử lại.",
+    "Something accepted the tunnel connection but failed the encrypted handshake on top of it. Either another process holds that port, or this pairing file's key no longer matches the device. Pair again, and if that doesn't take, restart the loopback VPN.": "Có thứ gì đó đã chấp nhận kết nối đường hầm nhưng không hoàn thành được quá trình bắt tay mã hóa. Hoặc một tiến trình khác đang giữ cổng đó, hoặc khóa của tệp ghép nối này không còn khớp với thiết bị. Hãy ghép nối lại, và nếu vẫn không được, hãy khởi động lại VPN loopback.",
+    "The device rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with this iPhone again to get a fresh file.": "Thiết bị đã từ chối tệp ghép nối này: nó thuộc về một thiết bị khác, hoặc việc ghép nối đã bị thu hồi (đặt lại, khôi phục, hoặc Chế độ nhà phát triển đã tắt). Hãy ghép nối lại iPhone này để lấy một tệp mới.",
+    "The tunnel didn't come up, and the failure didn't match any known cause. The raw error is in the log.": "Đường hầm không mở được và lỗi không khớp với bất kỳ nguyên nhân nào đã biết. Lỗi gốc nằm trong nhật ký.",
+    "Diagnostics: remote pairing advertisement: %@; Developer Mode: %@.": "Chẩn đoán: quảng bá ghép nối từ xa: %@; Chế độ nhà phát triển: %@.",
+    "No anisette servers are configured.": "Chưa cấu hình máy chủ anisette nào.",
+    "Sign-in failed.": "Đăng nhập thất bại.",
+    "This folder can't be renamed or moved.": "Không thể đổi tên hoặc di chuyển thư mục này.",
+    "This file is being signed. Wait until it finishes.": "Tệp này đang được ký. Hãy chờ cho đến khi xong.",
+    "This file is being renewed. Wait until it finishes.": "Tệp này đang được gia hạn. Hãy chờ cho đến khi xong.",
+    "This only clears the list. Installed apps are not affected.": "Chỉ xóa danh sách. Các ứng dụng đã cài đặt không bị ảnh hưởng.",
+    "empty account config": "Cấu hình tài khoản trống",
+    "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
+    "%d 个文件": "%d tệp",
+    "%@ isn't listed": "%@ không có trong danh sách",
+    "the data couldn't be read": "Không thể đọc dữ liệu",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Không thể kết nối tới iPhone này. Kiểm tra kết nối rồi thử lại.",
+    "the connection to this iPhone failed": "kết nối tới iPhone này đã thất bại.",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "ID Apple này không có nhóm phát triển. Đăng nhập developer.apple.com một lần để tạo nhóm, rồi thử lại.",
+    "That certificate belongs to another Apple ID, or it was revoked.": "Chứng chỉ đó thuộc về một ID Apple khác, hoặc đã bị thu hồi.",
+    "That App ID is no longer on this team.": "ID ứng dụng đó không còn trong nhóm này.",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "Tệp đó không phải là tệp lưu trữ chứng chỉ (.p12). Kiểm tra lại tệp rồi thử lại.",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "ID Apple này chưa có chứng chỉ ký. Hãy cài đặt một ứng dụng trước — quá trình cài đặt sẽ tạo chứng chỉ.",
+    "Check the network connection and try again.": "Kiểm tra kết nối mạng rồi thử lại.",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple không chấp nhận lần đăng nhập này. Kiểm tra ID Apple và mật khẩu rồi thử lại.",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "Đăng nhập đang bị giới hạn. Đợi vài phút rồi thử lại.",
+    "Apple's service didn't answer. Try again in a bit.": "Dịch vụ của Apple không phản hồi. Thử lại sau một lát.",
+    "This iPhone is out of storage space. Free some space and try again.": "iPhone này đã hết dung lượng lưu trữ. Giải phóng dung lượng rồi thử lại.",
+    "A file this step needed is missing. Check the file library and try again.": "Thiếu một tệp cần cho bước này. Kiểm tra thư viện tệp rồi thử lại.",
+    "Something went wrong. Check the activity log and try again.": "Đã xảy ra lỗi. Kiểm tra nhật ký hoạt động rồi thử lại.",
+    "Couldn't read the certificate list.": "Không đọc được danh sách chứng chỉ.",
+    "Couldn't read what the import did.": "Không đọc được kết quả nhập.",
+    "Couldn't read the App ID list.": "Không đọc được danh sách ID ứng dụng.",
+    "Couldn't read Apple's reply.": "Không đọc được phản hồi của Apple.",
+    "瘦身改包解压失败。": "Giải nén để thu gọn gói không thành công.",
+    "瘦身改包压包失败。": "Nén để thu gọn gói không thành công.",
+    "Pairing file for another iPhone": "Tệp ghép nối của một iPhone khác",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "Tệp ghép nối này thuộc về một iPhone khác (UDID %@). iPhone đang kết nối là %@.",
+    "The route server couldn't plan this route.": "Máy chủ tuyến đường không thể lập tuyến đường này.",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "iPhone của họ đã kết nối nhưng ngừng phản hồi trước khi yêu cầu mã. Hãy ghép nối lại.",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Mã ghép nối chưa được nhập kịp thời. Hãy ghép nối lại và nhập mã ngay khi mã xuất hiện.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "iPhone của họ đã từ chối tệp ghép nối này: tệp thuộc về một thiết bị khác, hoặc việc ghép nối đã bị thu hồi (đặt lại, khôi phục, hoặc Chế độ nhà phát triển bị tắt). Hãy ghép nối lại với iPhone của họ để lấy một tệp mới.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "iPhone của họ đã phản hồi, nhưng không tới được cổng đường hầm mà nó đã mở — có thứ gì đó giữa hai iPhone chỉ cho một số cổng đi qua. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi (không phải mạng khách) không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Ghép nối lại cũng không giúp được gì — việc ghép nối vẫn ổn.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "iPhone của họ không bao giờ trả lời cổng đường hầm mà cũng không từ chối — kết nối đang bị nuốt mất chứ không phải bị từ chối. Thường là do mạng Wi-Fi hoặc tường lửa làm rớt lưu lượng trên đường đi. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không rồi thử lại.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "Đã có thứ gì đó chấp nhận kết nối đường hầm, nhưng quá trình bắt tay mã hóa phía trên đã thất bại. Hoặc một tiến trình khác đang giữ cổng đó, hoặc khóa của tệp ghép nối này không còn khớp với iPhone của họ nữa. Hãy ghép nối lại.",
+    "GitHub answered HTTP %d":
+        "GitHub đã trả về HTTP %d",
+    "The code was incorrect. Try again.":
+        "Mã không đúng. Thử lại.",
+    "A code was already sent and is still valid. Enter it.":
+        "Một mã đã được gửi và vẫn còn hiệu lực. Nhập mã đó.",
+    "That way isn't available. Choose another way.":
+        "Cách đó không khả dụng. Chọn cách khác.",
+    "That didn't work. Try another way.":
+        "Không được. Thử cách khác.",
     // MARK: - Developer team
 
     "Free · %@": "Miễn phí · %@",
@@ -1349,15 +1575,8 @@ let vietnameseStrings: [String: String] = [
 
     "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
         "Dán liên kết của một nguồn SideStore hoặc AltStore, hoặc của một tệp nguồn .json. Ứng dụng, bản cập nhật và ghi chú phát hành của nguồn sẽ hiện ở đây.",
-
-    "Sources":
-        "Nguồn",
     "Add a source":
         "Thêm nguồn",
-    "Add":
-        "Thêm",
-    "Apps":
-        "Ứng dụng",
     "Updates":
         "Cập nhật",
     "Update":
@@ -1370,8 +1589,6 @@ let vietnameseStrings: [String: String] = [
         "Sao chép liên kết",
     "Source options":
         "Tùy chọn nguồn",
-    "Loading…":
-        "Đang tải…",
     "What's new":
         "Có gì mới",
     "Version history":
@@ -1382,12 +1599,27 @@ let vietnameseStrings: [String: String] = [
         "%d bản cập nhật",
     "%d updates":
         "%d bản cập nhật",
+    "%d updates · Total size: %@": "%d bản cập nhật · Tổng dung lượng: %@",
+    "%d 个可更新": "Có %d bản cập nhật",
+    "全部更新进行中，等它跑完再批量安装。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "全部更新进行中，等它跑完再重装。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cài đặt lại.",
+    "全部更新进行中，等它跑完再重试。": "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới thử lại.",
+    "全部更新进行中，等它跑完再续签。": "Đang cập nhật tất cả ứng dụng. Vui lòng đợi xong rồi mới gia hạn.",
+    "An update-all batch is running. Wait for it to finish, then try again.":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi thử lại.",
+    "全部更新进行中，等它跑完再更新。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cập nhật.",
+    "上次刷新失败：%@": "Lần làm mới trước thất bại: %@",
+    "已停止更新：成功 %d 个，剩余 %d 个未更新。": "Đã dừng cập nhật: thành công %d, còn %d chưa cập nhật.",
     "%d source":
         "%d nguồn",
     "%d sources":
         "%d nguồn",
     "Update to %@":
         "Cập nhật lên %@",
+    "Update now": "Cập nhật ngay",
     "Install %@ %@?":
         "Cài %@ %@?",
     "Version %@ · from %@":
@@ -1428,6 +1660,7 @@ let vietnameseStrings: [String: String] = [
     "Couldn't reach the debugger on this iPhone: %@":
         "Không thể kết nối tới trình gỡ lỗi trên iPhone này: %@",
     "Enable JIT": "Bật JIT",
+    "Continue JIT for %@": "Tiếp tục JIT cho %@",
     "JIT is on for %@ until it quits.": "JIT đã bật cho %@ cho đến khi ứng dụng thoát.",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT đã bật. SideInstaller vẫn gắn vào trong khi %@ chạy: hãy để SideInstaller chạy nền, vì đóng nó sẽ kết thúc JIT.",
@@ -1445,6 +1678,157 @@ let vietnameseStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Trình gỡ lỗi đã mất kết nối với %@ (%@). Hãy mở lại nó bằng JIT.",
     "Universal": "Phổ quát",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "Cài đặt mục đã chọn",
+    "正在安装第 %d/%d 个：%@": "Đang cài đặt %d/%d: %@",
+    "批量安装完成：%d 个已安装。": "Cài đặt hàng loạt xong: đã cài %d.",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "Cài đặt hàng loạt xong: thành công %d, thất bại %d. Thất bại: %@",
+    "等 %d 个": "và %d mục nữa",
+    "其中 %d 个不是 IPA，已跳过。": "%d mục không phải IPA nên đã bỏ qua.",
+    "已有安装在进行，先等当前安装完成再批量安装。": "Đã có một lượt cài đặt đang chạy. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "已有安装在进行，先等当前安装完成再试。": "Đã có một lượt cài đặt đang chạy. Hãy đợi xong rồi thử lại.",
+    "正在签名，等它跑完再批量安装。": "Đang ký. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "Installed apps will be listed here.": "Các app đã cài sẽ được liệt kê ở đây.",
+    "以下 %d 个删除失败：%@": "Không xóa được %d tệp: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Bật",
+    "Names can't be empty, contain /, or start with .": "Tên không được để trống, chứa / hoặc bắt đầu bằng .",
+    "Export sources": "Xuất danh sách nguồn",
+    "Import sources": "Nhập danh sách nguồn",
+    "The clipboard has no source list to import.": "Bảng tạm không có danh sách nguồn để nhập.",
+    "Imported %d, already added %d, failed %d.": "Đã nhập %d, đã thêm %d, lỗi %d.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Cập nhật tất cả",
+    "正在更新第 %d/%d 个：%@": "Đang cập nhật %d/%d: %@",
+    "正在读取已装 App…": "Đang đọc các app đã cài…",
+    "全部更新完成：%d 个已更新。": "Cập nhật xong: đã cập nhật %d.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Cập nhật xong: thành công %d, thất bại %d. Thất bại: %@",
+    "移动": "Di chuyển",
+    "已移动 %d 个。": "Đã di chuyển %d.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "Đã di chuyển %d, thất bại %d. Thất bại: %@",
+    "导出日志": "Xuất nhật ký",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "còn %@",
+    "Download over cellular?": "Tải xuống bằng dữ liệu di động?",
+    "Size: %@": "Dung lượng: %@",
+    "Size unknown": "Không rõ dung lượng",
+    "You're on cellular data. This download will use your mobile data.": "Bạn đang dùng dữ liệu di động. Bản tải xuống này sẽ dùng dữ liệu di động của bạn.",
+    "Wi-Fi only downloads": "Chỉ tải xuống qua Wi-Fi",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Khi bật, bản tải xuống bằng dữ liệu di động sẽ hỏi trước, để một file IPA lớn không dùng dữ liệu di động của bạn.",
+    "Downloads": "Tải xuống",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "Chứng chỉ doanh nghiệp sắp hết hạn",
+    "The enterprise certificate expires on %@. Re-import it in time.": "Chứng chỉ doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "Hồ sơ cấp phép doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "Xóa IPA sau khi cài đặt",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Xóa IPA gốc sau khi cài đặt thành công. Các tệp dùng để gia hạn được giữ lại.",
+    "Install an older version?": "Cài đặt phiên bản cũ hơn?",
+    "Installed: %@ · This IPA: %@": "Đã cài: %@ · IPA này: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Không đọc được phiên bản iOS của iPhone bên kia. Hãy kết nối lại rồi thử lại — cài đặt mà không biết phiên bản có thể cài ứng dụng mà iPhone của họ không chạy được.",
+    "Development certificate expiring": "Chứng chỉ phát triển sắp hết hạn",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "Chứng chỉ phát triển \"%@\" hết hạn vào %@. Hãy gia hạn kịp thời, nếu không quá trình cài đặt sẽ thất bại.",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "IPA này yêu cầu %@, mà chứng chỉ Apple ID miễn phí không thể cung cấp. Các tính năng đó sẽ âm thầm ngừng hoạt động sau khi cài đặt.",
+    "Before you install": "Trước khi cài đặt",
+    "Reinstall all": "Cài đặt lại tất cả",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "Cài đặt lại tất cả xong: thành công %d, thất bại %d, đã bỏ qua %d.",
+    "Failed: %@": "Thất bại: %@",
+    "Still getting ready. Try again in a moment.": "Vẫn đang chuẩn bị. Hãy thử lại sau giây lát.",
+
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "Gỡ cài đặt",
+    "Uninstall %@?": "Gỡ cài đặt %@?",
+    "This removes %@ from this iPhone, including its data.": "Thao tác này sẽ xóa %@ khỏi iPhone này, bao gồm cả dữ liệu của nó.",
+    "SideInstaller can't uninstall itself.": "SideInstaller không thể tự gỡ cài đặt chính nó.",
+    "Clean up old versions": "Dọn các phiên bản cũ",
+    "Clean up %d old versions?": "Dọn %d phiên bản cũ?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "Chỉ giữ lại phiên bản mới nhất của mỗi ứng dụng. Không thể khôi phục các tệp đã xóa.",
+    "Cleaned up %d old versions.": "Đã dọn %d phiên bản cũ.",
+    "Clean up duplicates (%d)": "Dọn dẹp trùng lặp (%d)",
+    "Clean up duplicate IPAs": "Dọn dẹp IPA trùng lặp",
+    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "Tìm thấy %d nhóm IPA trùng lặp. %d bản sao cũ sẽ bị xóa. Bản sao được sửa đổi gần đây nhất trong mỗi nhóm được giữ lại. Thao tác này không thể hoàn tác.",
+    "Cleaned up %d duplicate IPAs.": "Đã dọn dẹp %d IPA trùng lặp.",
+    "Failed to delete %d files: %@": "Không thể xóa %d tệp: %@",
+    "%d renewal source files were skipped.": "Đã bỏ qua %d tệp nguồn gia hạn.",
+    "Including %d signed IPAs installed via enterprise install.": "Trong đó %d IPA đã ký được cài đặt qua cài đặt doanh nghiệp.",
+    "The source will be removed, along with its cached data and last checked time.": "Nguồn sẽ bị xóa, cùng với dữ liệu đã lưu trong bộ nhớ đệm và thời gian kiểm tra lần cuối.",
+    "No old versions to clean up.": "Không có phiên bản cũ để dọn.",
+    "%d files skipped (in use or needed for renewal).": "Đã bỏ qua %d tệp (đang dùng hoặc cần cho việc gia hạn).",
+    "%d files couldn't be deleted: %@": "Không thể xóa %d tệp: %@",
+    "上次巡检：%@": "Lần kiểm tra gần nhất: %@",
+    "Checked just now": "Vừa kiểm tra",
+    "Checked %d minutes ago": "Đã kiểm tra %d phút trước",
+    "Checked %d hours ago": "Đã kiểm tra %d giờ trước",
+    "Checked %d days ago": "Đã kiểm tra %d ngày trước",
+    "Pairing file installed into %@, but couldn't be written into %@.": "Đã cài tệp ghép nối vào %@, nhưng không thể ghi vào %@.",
+
+    // 0.9.164
+    "Loop route": "Lặp lại tuyến đường",
+    "Newer than installed %@": "Mới hơn bản đã cài %@",
+    "Older than installed %@": "Cũ hơn bản đã cài %@",
+    "Same as installed %@": "Giống bản đã cài %@",
+    "Show in Downloads": "Hiển thị trong Tải xuống",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Hết thời gian chờ vị trí cài đặt — tệp đã tải xuống đã bị xóa. Hãy thử lại.",
+    "Still installing — check the Install page for progress.": "Vẫn đang cài đặt — kiểm tra tiến trình trên trang Cài đặt.",
+    "Installing — tap to cancel": "Đang cài đặt — chạm để hủy",
+
+    // 0.9.166
+    "All": "Tất cả",
+    "Succeeded": "Thành công",
+    "Restore real location when done": "Khôi phục vị trí thực khi xong",
+    "移动“%@”？": "Di chuyển \"%@\"?",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Đây là IPA trên tab Cài đặt. Di chuyển nó sẽ làm trống ô đó — hãy cài đặt từ thư mục mới của nó.",
+    "Move": "Di chuyển",
+    "其中 %d 个因拒绝降级而跳过。": "Trong đó %d mục đã bỏ qua do từ chối hạ cấp.",
+
+    // 0.9.167
+    "Folder": "Thư mục",
+    "Export history": "Xuất lịch sử",
+    "No files match the current filter.": "Không có tệp nào khớp với bộ lọc hiện tại.",
+
+    // 0.9.174
+    "Retry all": "Thử lại tất cả",
+    "Skip": "Bỏ qua",
+    "Clear all": "Xóa tất cả",
+    "Clear all failed downloads?": "Xóa tất cả lượt tải xuống thất bại?",
+    "全部更新进行中，等它跑完再安装。": "Đang cập nhật tất cả ứng dụng. Vui lòng đợi xong rồi mới cài đặt.",
+    "其中 %d 个已跳过。": "Trong đó đã bỏ qua %d mục.",
+
+    // 0.9.178
+    "从未巡检": "Chưa từng chạy",
+    "上次自动续签：%@": "Lần tự động gia hạn gần nhất: %@",
+
+    // 0.9.179
+    "Choose how to sign": "Chọn cách ký",
+    "Enterprise signing keeps the Bundle ID unchanged.": "Ký bằng chứng chỉ doanh nghiệp giữ nguyên Bundle ID.",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Ký bằng ID Apple sẽ đổi Bundle ID thành “ID gốc.ID nhóm” nên ứng dụng được cài dưới dạng biểu tượng thứ hai.",
+    "Update to %@ · %@": "Cập nhật lên %@ · %@",
+
+    // 0.9.182
+    "从未自动续签": "Chưa từng tự động gia hạn",
+    "粘贴": "Dán",
+    "Recent links": "Liên kết gần đây",
+    "Clear recent links": "Xóa các liên kết gần đây",
+    "Copy Bundle ID": "Sao chép Bundle ID",
+
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "Tìm theo tên tệp / tên App / Bundle ID",
+    "系统文件": "Tệp hệ thống",
+    "其他文件": "Tệp khác",
 
     // MARK: - Mobile Data Mode (beta)
 
@@ -1512,4 +1896,6 @@ let vietnameseStrings: [String: String] = [
         "Dữ liệu di động",
     "Mobile Data Mode":
         "Chế độ dữ liệu di động",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, thiết bị sẽ di chuyển theo đó với tốc độ bạn chọn. Khi kết thúc, thiết bị ở lại điểm cuối cùng, trừ khi bạn đã bật khôi phục vị trí thực khi xong.",
 ]

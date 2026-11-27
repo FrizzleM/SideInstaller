@@ -126,7 +126,7 @@ struct GetSideloadedAppsIntent: AppIntent, ForegroundContinuableIntent {
     }
 }
 
-struct RefreshAllAppsIntent: AppIntent, ForegroundContinuableIntent {
+struct RefreshAllAppsReportIntent: AppIntent, ForegroundContinuableIntent {
     static let title: LocalizedStringResource = "Refresh All Apps"
     static let description = IntentDescription(
         "Signs every sideloaded app SideInstaller has the IPA of again with your Apple ID and installs it over itself, so its seven days start over, as Refresh all does. The apps keep their data. Runs over LocalDevVPN.",
@@ -298,10 +298,15 @@ struct InstallIPAIntent: AppIntent {
             try Shortcuts.requireNoInstall()
             let copy = try Shortcuts.temporaryCopy(of: file, defaultName: "App.ipa")
             defer { Shortcuts.discard(copy) }
-            engine.installSource = .custom
             engine.lastError = nil
-            await engine.importCustomIPA(from: copy)
-            if let error = engine.lastError { throw ShortcutError(error) }
+            // B-2 (0.9.160): the app's own three paths set the source only
+            // after the import succeeds (B-39-B2) — a failed import used
+            // to leave the Install tab on Custom with nothing imported.
+            // Import first; only a success earns the source switch.
+            guard await engine.importCustomIPA(from: copy) else {
+                throw ShortcutError(engine.lastError ?? L("The install didn't start. Open SideInstaller to see why."))
+            }
+            engine.installSource = .custom
             return try await Shortcuts.install(named: engine.customIPAName ?? copy.lastPathComponent)
         }
         return .result(dialog: Shortcuts.dialog(message))
@@ -329,11 +334,14 @@ struct InstallIPAFromURLIntent: AppIntent {
         let message = try await Shortcuts.run("Install IPA from URL") { () -> String in
             let engine = Engine.shared
             try Shortcuts.requireNoInstall()
-            engine.installSource = .custom
             engine.lastError = nil
+            // B-2 (0.9.160): same as InstallIPAIntent above — the source
+            // switches to Custom only after the import succeeds, so a
+            // failed download leaves the Install tab on its old source.
             guard await engine.importCustomIPA(fromLink: link.absoluteString) else {
                 throw ShortcutError(engine.lastError ?? L("The install didn't start. Open SideInstaller to see why."))
             }
+            engine.installSource = .custom
             return try await Shortcuts.install(named: engine.customIPAName ?? link.lastPathComponent)
         }
         return .result(dialog: Shortcuts.dialog(message))
@@ -346,13 +354,33 @@ extension Shortcuts {
         guard !Engine.shared.isRunning else {
             throw ShortcutError(L("An install is already running. Wait for it to finish, then try again."))
         }
+        // B-1 (0.9.173): an update-all batch owns the install slot too —
+        // the batch's downloads leave `isRunning` false between items,
+        // so this check alone would let a shortcut install slip in.
+        guard !Engine.shared.batchUpdateRunning else {
+            throw ShortcutError(L("An update-all batch is running. Wait for it to finish, then try again."))
+        }
     }
 
     /// Runs Install for the build already picked, and waits for it to finish.
     /// When it can't start, it says why, as the Install tab does.
     static func install(named name: String) async throws -> String {
         let engine = Engine.shared
-        let guideBefore = engine.guide
+        // B-2 (0.9.162): requireNoInstall() only ran before the import, and
+        // the import awaits — another install may have started in between
+        // (tapped in the app, or auto-refresh). Recheck at the last moment
+        // before runOneClick; no suspension point sits between the guard
+        // and the start, so nothing can slip in after it. Without this,
+        // the wait below takes someone else's run for this shortcut's and
+        // reports "%@ is installed." for an app never installed.
+        guard !engine.isRunning else {
+            throw ShortcutError(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        // B-1 (0.9.173): requireNoInstall() 同款——批跑的下载间隙
+        // `isRunning` 为 false，import 之后、起跑之前这段也要再拦一次。
+        guard !engine.batchUpdateRunning else {
+            throw ShortcutError(L("An update-all batch is running. Wait for it to finish, then try again."))
+        }
         engine.runOneClick()
         // A full-tunnel VPN's probe holds the start back half a second at most.
         var waited = 0.0
@@ -361,10 +389,14 @@ extension Shortcuts {
             waited += 0.1
         }
         guard engine.isRunning else {
-            if let error = engine.lastError { throw ShortcutError(error) }
-            if let guide = engine.guide, guide != guideBefore {
+            // B-2 (0.9.163): 向导优先于 lastError——runOneClick 入口已
+            // 清掉上一跑的 lastError/guide，所以这里剩下的向导就是这次
+            // 起跑守卫拦住的真原因（没账号/没配对文件），不再先报
+            // lastError 里的上一跑旧错。
+            if let guide = engine.guide {
                 throw ShortcutError(([guide.title] + guide.steps).joined(separator: "\n"))
             }
+            if let error = engine.lastError { throw ShortcutError(error) }
             throw ShortcutError(L("The install didn't start. Open SideInstaller to see why."))
         }
         // Stopping the shortcut leaves the install to finish in the app.

@@ -108,7 +108,11 @@ final class PairingController {
             case .zeroBytes:
                 return L("Pairing produced an empty file. Make sure you approved the pairing request, then try again.")
             case let .failed(message):
-                return message
+                // C-49-1: Rust's own words go through the mapper — the pairing
+                // page and the install pipelines show this description verbatim.
+                // The raw text stays in the log (finish() logs `message`, and
+                // runOneClick logs String(describing:)).
+                return friendlyRustError(message)
             }
         }
     }
@@ -247,13 +251,11 @@ final class PairingController {
         }
         running = true
         current = run
-        if run.isThisDevice { engine.pairingStatus = L("requesting Local Network…") }
         engine.log("RPPairing: requesting Local Network permission…")
 
         Task {
             guard await localNetwork.request() else {
                 engine.log("RPPairing: Local Network permission DENIED. Enable it in Settings › SideInstaller › Local Network, then retry.")
-                if run.isThisDevice { engine.pairingStatus = L("Local Network denied") }
                 end(run)
                 resolve(run, .failure(PairingError.localNetworkDenied))
                 return
@@ -266,7 +268,6 @@ final class PairingController {
             engine.log("RPPairing: Local Network granted. Starting keep-alive (silent audio).")
             keepAlive.startAudio()
             if run.isThisDevice {
-                engine.pairingStatus = L("waiting for device…")
                 // Now, while the app is still in front: an activity can't
                 // start later, and nor can the system ask about notifications.
                 overSettings.start()
@@ -376,14 +377,12 @@ final class PairingController {
             engine.log("RPPairing: pairing file written to \(path) (\(size) bytes)")
             if size == 0 {
                 engine.log("⚠️ pairing file is zero bytes — Connect will refuse to use it.")
-                engine.pairingStatus = L("failed: empty pairing file")
                 overSettings.finish(paired: false)
                 resolve(run, .failure(PairingError.zeroBytes))
             } else {
                 engine.pairingFilePath = path
                 // The new pairing file replaces any imported one.
                 engine.clearImportedPairingMark()
-                engine.pairingStatus = L("paired: %@ (%dB)", name, size)
                 // The merged file is now stale; the cached lockdown record is kept.
                 CompositePairingFile.invalidateMerged()
                 overSettings.finish(paired: true)
@@ -393,7 +392,10 @@ final class PairingController {
         case let .failure(message):
             // A cancelled run ends with “pairing cancelled”: not a failure.
             engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
-            engine.pairingStatus = L("failed: %@", message)
+            // B-3 (0.9.157): the 0.9.156 B3 fix wrote to `pairingStatus`
+            // here, but nothing ever read it — the field is deleted, so
+            // this branch writes nothing now. The failure still surfaces
+            // through the resolve below and the log above.
             overSettings.finish(paired: false)
             resolve(run, .failure(PairingError.failed(message)))
         }
@@ -423,7 +425,7 @@ final class PairingController {
     fileprivate func startAdvertising(serviceID: String, port: Int32, txt: [String: Data]) {
         // Cancelled before the host was ready: it's stopping, so don't
         // advertise it.
-        guard let run = current, !run.cancelled else { return }
+        guard current?.cancelled == false else { return }
         stopAdvertising()
         engine.log("RPPairing: advertising _remotepairing-pairable-host._tcp \(serviceID) on port \(port)")
         let service = NetService(
@@ -434,9 +436,6 @@ final class PairingController {
         service.setTXTRecord(NetService.data(fromTXTRecord: txt))
         service.publish()
         netService = service
-        if run.isThisDevice {
-            engine.pairingStatus = L("advertising — open Settings › Privacy & Security › Developer Mode")
-        }
     }
 
     fileprivate func presentPin(_ pin: String) {
@@ -447,7 +446,6 @@ final class PairingController {
             return
         }
         engine.log("RPPairing: PIN = \(pin) — confirm it on this device (Settings → Developer Mode → Pair with SideInstaller).")
-        engine.pairingStatus = L("enter PIN %@ in Settings", pin)
         // Displayed as a PIN card in the UI, and over Settings.
         engine.pairingPIN = pin
         overSettings.show(code: pin)
