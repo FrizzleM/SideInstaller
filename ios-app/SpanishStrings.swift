@@ -1903,7 +1903,6 @@ let spanishStrings: [String: String] = [
         "Datos móviles",
     "Mobile Data Mode":
         "Modo datos móviles",
-]
-
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Importa un archivo GPX, KML o GeoJSON, o una lista de coordenadas, y el dispositivo lo recorre a la velocidad elegida. Al terminar, se queda en el último punto, a menos que esté activada la restauración de la ubicación real.",
+]

@@ -1859,7 +1859,6 @@ let japaneseStrings: [String: String] = [
         "モバイルデータ通信",
     "Mobile Data Mode":
         "モバイルデータモード",
-]
-
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "GPX、KML、GeoJSON ファイル、または座標のリストをインポートすると、デバイスが選択した速度でそのルートを移動します。終了時は最後の地点に留まります。ただし、完了時に実際の位置に戻す設定がオンの場合は除きます。",
+]

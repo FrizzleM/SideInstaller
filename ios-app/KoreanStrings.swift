@@ -1860,7 +1860,6 @@ let koreanStrings: [String: String] = [
         "모바일 데이터",
     "Mobile Data Mode":
         "모바일 데이터 모드",
-]
-
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "GPX, KML 또는 GeoJSON 파일이나 좌표 목록을 가져오면 기기가 선택한 속도로 경로를 따라 이동합니다. 끝나면 마지막 지점에 머무릅니다. 단, 완료 시 실제 위치로 복원이 켜져 있는 경우는 제외합니다.",
+]

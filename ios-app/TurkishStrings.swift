@@ -1817,7 +1817,6 @@ let turkishStrings: [String: String] = [
         "Mobil veri",
     "Mobile Data Mode":
         "Mobil Veri Modu",
-]
-
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Bir GPX, KML veya GeoJSON dosyası ya da bir koordinat listesi içe aktarın; cihaz seçtiğiniz hızla rota boyunca hareket eder. Bittiğinde son noktada kalır; tamamlandığında gerçek konuma dönme açık değilse.",
+]

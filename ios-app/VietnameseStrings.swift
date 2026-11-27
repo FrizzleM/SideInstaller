@@ -1896,7 +1896,6 @@ let vietnameseStrings: [String: String] = [
         "Dữ liệu di động",
     "Mobile Data Mode":
         "Chế độ dữ liệu di động",
-]
-
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, thiết bị sẽ di chuyển theo đó với tốc độ bạn chọn. Khi kết thúc, thiết bị ở lại điểm cuối cùng, trừ khi bạn đã bật khôi phục vị trí thực khi xong.",
+]
