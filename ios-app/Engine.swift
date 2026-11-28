@@ -3941,7 +3941,9 @@ final class Engine {
             // A cancel during the re-dial stays a cancel: it must reach the
             // run's cancel branch, not the generic failure below (no failure
             // history, no lastError, no failed step).
-            throw
+            // (Bare `throw` does not compile in a `catch is …` clause —
+            // the error is not bound there — so rethrow a fresh one.)
+            throw CancellationError()
         } catch {
             throw EngineError.message(L("The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.", short(error)))
         }
