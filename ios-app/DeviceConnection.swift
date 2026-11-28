@@ -31,6 +31,15 @@ final class DeviceConnection {
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
 
+    /// How long a first refused probe waits for the listener to come up (L2,
+    /// 0.9.195): the listener rebuilds a few seconds after the tunnel does.
+    private static let pairingProbeWaitSeconds: TimeInterval = 30
+
+    /// Called on the device queue when the pairing-port probe wait (L2) starts
+    /// (true) and ends (false), so the run can say it's waiting for the
+    /// listener instead of looking stuck. Nil unless the Engine sets it.
+    var onListenerProbeWait: ((Bool) -> Void)?
+
     /// lockdownd's fixed port (unlike the ephemeral tunnel port `createListener`
     /// opens).
     static let lockdownPort: UInt16 = 62078
@@ -411,10 +420,51 @@ final class DeviceConnection {
         // RSD address, loopback, then these local interface addresses, all
         // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
+        // L1 (0.9.195): restores the R-1 retry 0.9.123 added (6084055) and
+        // the 0.9.139 upstream merge dropped — a refusal is retried, with a
+        // ~2 s backoff and a fresh Bonjour lookup each round, instead of
+        // failing the run on the first refused dial. Only a refusal is
+        // retried: anything else keeps its existing classification and fails
+        // at once. Runs on the device queue — blocking, like the dial
+        // itself — so the wait is a plain thread sleep; the pipeline's
+        // cancellation is honoured at the next checkpoint after `connect()`
+        // returns.
+        let maxAttempts = 3
+        let retryBackoff: TimeInterval = 2
+        // L2's wait runs once per connect, on the first refused probe.
+        var probeWaitUsed = false
         /// Nil when the tunnel came up on `port`.
-        func reach(_ port: UInt16) throws -> Miss? {
+        func reach(_ port: UInt16, attempt: Int? = nil) throws -> Miss? {
             if findsMovedPort {
-                let probe = Self.probeListener(deviceIP: deviceIP, port: port)
+                var probe = Self.probeListener(deviceIP: deviceIP, port: port)
+                // L2 (0.9.195): the first refused probe waits for the listener
+                // to come up — on mobile data alone iOS keeps it closed while
+                // the tunnel rebuilds, and it may answer a few seconds later.
+                // Re-probes every 2 s until it answers or 30 s pass; anything
+                // other than a refusal ends the wait, and the dial below still
+                // says why when the wait runs out.
+                if case .refused = probe.result, !probeWaitUsed {
+                    probeWaitUsed = true
+                    Engine.shared.log("Port \(port) refused the first probe — waiting up to \(Int(Self.pairingProbeWaitSeconds)) s for this iPhone's pairing listener to come up …")
+                    onListenerProbeWait?(true)
+                    let waitDeadline = Date().addingTimeInterval(Self.pairingProbeWaitSeconds)
+                    while Date() < waitDeadline {
+                        Thread.sleep(forTimeInterval: 2)
+                        probe = Self.probeListener(deviceIP: deviceIP, port: port)
+                        Engine.shared.log("Pairing-port probe on port \(port): \(probe.summary).")
+                        if case .refused = probe.result { continue }
+                        break
+                    }
+                    onListenerProbeWait?(false)
+                    switch probe.result {
+                    case .answered:
+                        Engine.shared.log("The pairing listener answered on port \(port) while waiting — dialling …")
+                    case .refused:
+                        Engine.shared.log("The pairing listener still refused port \(port) after \(Int(Self.pairingProbeWaitSeconds)) s — dialling to confirm the failure.")
+                    default:
+                        break
+                    }
+                }
                 switch probe.result {
                 case .took:
                     return .taken(probe.summary)
@@ -426,6 +476,9 @@ final class DeviceConnection {
                     // it says why.
                     break
                 }
+            }
+            if let attempt {
+                Engine.shared.log("Dialling remote pairing at \(deviceIP):\(port) (attempt \(attempt)/\(maxAttempts)) …")
             }
             guard let failure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: port,
                                                       hostname: hostname, candidates: candidates)
@@ -439,7 +492,39 @@ final class DeviceConnection {
             Engine.shared.log("Dialling port \(moved), where this iPhone's remote pairing listener was found before …")
             port = moved
         }
-        guard var miss = try reach(port) else { return }
+        // L1: the first reach is retried while it refuses, re-checking
+        // Bonjour each round for a moved port. The mobile-data early-throw
+        // below is only reached once this budget is spent.
+        var firstMiss: Miss? = nil
+        var attempt = 0
+        while attempt < maxAttempts {
+            attempt += 1
+            if let result = try reach(port, attempt: attempt) {
+                firstMiss = result
+            } else {
+                if attempt > 1 {
+                    Engine.shared.log("The tunnel opened on port \(port) after \(attempt) attempts.")
+                }
+                return
+            }
+            guard case .refused? = firstMiss else { break }
+            guard attempt < maxAttempts else { break }
+            if findsMovedPort {
+                let advert = NetworkStatus.ownRemotePairingAdvert()
+                lastAdvertSummary = advert.summary
+                if let moved = advert.port, moved != port {
+                    Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary). Dialling the advertised port \(moved) instead …")
+                    port = moved
+                } else {
+                    Engine.shared.log("Remote pairing refused; waiting \(Int(retryBackoff)) s before attempt \(attempt + 1)/\(maxAttempts) …")
+                }
+            } else {
+                Engine.shared.log("Remote pairing refused; waiting \(Int(retryBackoff)) s before attempt \(attempt + 1)/\(maxAttempts) …")
+            }
+            Thread.sleep(forTimeInterval: retryBackoff)
+        }
+        guard let finalMiss = firstMiss else { throw fail("no dial attempt was made") }
+        var miss = finalMiss
         // The ports the listener isn't on, which knocking skips.
         var passed: [UInt16] = []
         if port != Self.rsdPort, let notThere = miss.notThere {

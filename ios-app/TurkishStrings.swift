@@ -1816,6 +1816,13 @@ let turkishStrings: [String: String] = [
         "Uçak Modu açık ama LocalDevVPN bağlı değil. Onu aç ve yeniden bağla.",
     "Waiting for mobile data…":
         "Mobil veri bekleniyor…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "Aygıtın eşleme bağlantı noktası bekleniyor…",
+    "Install failed — see the steps below.":
+        "Yükleme başarısız — aşağıdaki adımlara bakın.",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "İmza atılmadan önce aygıt bağlantısı koptu ve yeniden bağlanma başarısız oldu (%@). İmza başlamadı.",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "Bu iPhone mobil veri kullanıyor. Mobil Veri Modu'nu kullanmak için SideInstaller'da devam et.",
     "Mobile data":

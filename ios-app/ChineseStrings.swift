@@ -1870,6 +1870,13 @@ let chineseStrings: [String: String] = [
         "飞行模式已打开，但 LocalDevVPN 没有连接。请打开它并重新连接。",
     "Waiting for mobile data…":
         "正在等待蜂窝数据…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "正在等设备配对端口…",
+    "Install failed — see the steps below.":
+        "安装失败，见下方步骤",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "设备连接在签名前断了，重新拨号失败（%@）。签名尚未开始。",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "这台 iPhone 正在使用蜂窝数据。在 SideInstaller 中继续以使用蜂窝数据模式。",
     "Mobile data":

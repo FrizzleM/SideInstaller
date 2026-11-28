@@ -1895,6 +1895,13 @@ let vietnameseStrings: [String: String] = [
         "Chế độ máy bay đã bật, nhưng LocalDevVPN chưa kết nối. Hãy mở nó và kết nối lại.",
     "Waiting for mobile data…":
         "Đang chờ dữ liệu di động…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "Đang chờ cổng ghép nối của thiết bị…",
+    "Install failed — see the steps below.":
+        "Cài đặt thất bại — xem các bước bên dưới.",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "Liên kết với thiết bị đã đứt trước khi ký và kết nối lại thất bại (%@). Việc ký chưa bắt đầu.",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "iPhone này đang dùng dữ liệu di động. Hãy tiếp tục trong SideInstaller để dùng Chế độ dữ liệu di động.",
     "Mobile data":

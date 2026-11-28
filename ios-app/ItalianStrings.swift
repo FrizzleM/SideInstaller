@@ -1899,6 +1899,13 @@ let italianStrings: [String: String] = [
         "La modalità aereo è attiva, ma LocalDevVPN non è connessa. Aprila e connettila di nuovo.",
     "Waiting for mobile data…":
         "In attesa dei dati cellulare…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "In attesa della porta di abbinamento del dispositivo…",
+    "Install failed — see the steps below.":
+        "Installazione non riuscita — vedi i passaggi qui sotto.",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "Il collegamento al dispositivo si è interrotto prima della firma e la riconnessione non è riuscita (%@). La firma non è iniziata.",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "Questo iPhone usa i dati cellulare. Continua in SideInstaller per usare la Modalità dati cellulare.",
     "Mobile data":

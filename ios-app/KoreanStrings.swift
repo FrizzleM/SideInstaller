@@ -1859,6 +1859,13 @@ let koreanStrings: [String: String] = [
         "에어플레인 모드는 켜졌지만 LocalDevVPN이 연결되어 있지 않습니다. LocalDevVPN을 열고 다시 연결하세요.",
     "Waiting for mobile data…":
         "모바일 데이터를 기다리는 중…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "기기의 페어링 포트를 기다리는 중…",
+    "Install failed — see the steps below.":
+        "설치 실패 — 아래 단계를 참조하세요.",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "서명 전에 기기 연결이 끊겼고 다시 연결하지 못했습니다(%@). 서명이 시작되지 않았습니다.",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "이 iPhone은 모바일 데이터를 사용 중입니다. 모바일 데이터 모드를 사용하려면 SideInstaller에서 계속하세요.",
     "Mobile data":

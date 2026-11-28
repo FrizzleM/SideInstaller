@@ -1247,8 +1247,11 @@ struct EnterpriseCertView: View {
                     Text(installStageText)
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
-                } else if let error = enterpriseInstallErrorText {
-                    Text(error)
+                } else if enterpriseInstallErrorText != nil {
+                    // 0.9.195: the full failure text lives on the install step
+                    // row below — here only a pointer, so one failure isn't
+                    // printed three times on this page.
+                    Text(L("Install failed — see the steps below."))
                         .font(.footnote)
                         .foregroundStyle(Theme.negative)
                 } else if let signOnlyMessage {
@@ -2437,11 +2440,10 @@ struct EnterpriseCertView: View {
                         Button(L("取消安装")) { CZFHaptics.impact(.light); engine.cancelOneClick() }
                         .font(.footnote)
                     }
-                } else if let error = enterpriseInstallErrorText {
+                } else if enterpriseInstallErrorText != nil {
+                    // 0.9.195: the card keeps only the retry button — the full
+                    // failure text lives on the install step row below.
                     HStack(spacing: 8) {
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundStyle(Theme.negative)
                         Spacer()
                         if let record = enterpriseInstallRecord {
                             Button(L("重试配对安装")) { CZFHaptics.impact(.light); startEngineInstall(record: record) }

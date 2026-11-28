@@ -1858,6 +1858,13 @@ let japaneseStrings: [String: String] = [
         "機内モードはオンですが、LocalDevVPN が接続されていません。LocalDevVPN を開いて、もう一度接続してください。",
     "Waiting for mobile data…":
         "モバイルデータ通信を待っています…",
+    // 0.9.195: cellular-install dial wait / pre-sign link check.
+    "Waiting for the device pairing port…":
+        "デバイスのペアリングポートを待っています…",
+    "Install failed — see the steps below.":
+        "インストールに失敗しました — 下の手順を参照してください。",
+    "The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.":
+        "署名前にデバイス接続が切れ、再ダイヤルに失敗しました（%@）。署名は開始されていません。",
     "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
         "この iPhone はモバイルデータ通信を使っています。SideInstaller で続けて、モバイルデータモードを使ってください。",
     "Mobile data":

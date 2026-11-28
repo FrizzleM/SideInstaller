@@ -582,6 +582,23 @@ final class Engine {
     @ObservationIgnored private var askedLocalNetwork = false
 
     @ObservationIgnored private var pipelineTask: Task<Void, Never>?
+
+    /// True while the pairing-port probe wait is running (L2, 0.9.195), so the
+    /// connect step's row can say the run is waiting for the listener instead
+    /// of looking stuck. Flipped from the device queue via `setMain`.
+    var waitingForPairingPort = false
+
+    /// Light keepalive that re-probes the device link while signing runs (L3,
+    /// 0.9.195): the link goes idle for minutes then, and iOS drops it. Stopped
+    /// at the install step's entry and at the end of every run; `nil` means
+    /// stopped, so stopping twice is a no-op, never a double-stop.
+    @ObservationIgnored private var linkKeepalive: Task<Void, Never>?
+
+    /// What the prestage step's dial failed with, when it failed (L4b,
+    /// 0.9.195): the pre-sign link check reads it instead of the prestage
+    /// swallowing the failure. Nil when the prestage dial worked, or when no
+    /// run has staged yet. Cleared by `resetRun`.
+    @ObservationIgnored private var prestageLinkError: String?
     /// The IPA download a run starts as soon as the network is up, so it runs
     /// alongside pairing and sign-in instead of after them.
     @ObservationIgnored private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
@@ -743,6 +760,14 @@ final class Engine {
         // Restore the last signed-in team so refresh lists can exclude other
         // teams' apps (enterprise certificates etc.) from a cold start.
         signingTeamID = UserDefaults.standard.string(forKey: Self.savedTeamKey)
+        // L2 (0.9.195): the pairing-port probe wait reports here, so the
+        // connect step's row can show it. The wait runs on the device queue;
+        // the flag itself carries no @MainActor isolation, so the write goes
+        // through `setMain` to land on the main thread.
+        connection.onListenerProbeWait = { [weak self] waiting in
+            guard let self else { return }
+            self.setMain { self.waitingForPairingPort = waiting }
+        }
         log("SideInstaller ready.")
         // Self-test of the Rust tracing -> FFI callback -> console path.
         ping()
@@ -855,6 +880,10 @@ final class Engine {
             // stale decline as this run's.
             self.downgradeDeclined = false
             self.downgradeDeclinedMessage = nil
+            // L4b (0.9.195): the last run's prestage dial failure goes with
+            // it — the pre-sign check must not read a stale dead link as
+            // this run's.
+            self.prestageLinkError = nil
         }
     }
 
@@ -1097,6 +1126,10 @@ final class Engine {
                 // starts now and runs while those steps do.
                 if !mobileDataOnly { startPrefetch() }
                 try await pairAndConnect(signsInEarly: !mobileDataOnly)
+                // L3 (0.9.195): the link is open — keep it answering while
+                // signing runs, so iOS doesn't drop it idle. Stopped at the
+                // install step's entry, and at the end of the run.
+                startLinkKeepalive()
                 if mobileDataOnly {
                     try await MobileDataMode.shared.requireInternet(.install)
                     startPrefetch()
@@ -1116,6 +1149,10 @@ final class Engine {
                 // Most of the app is the same signed or not, so that part goes
                 // to the device while signing runs.
                 startPrestage()
+                // L4a (0.9.195): signing burns minutes and App IDs — check
+                // the link is still alive before it starts, and re-dial now
+                // instead of failing at the install.
+                try await ensureLinkAliveBeforeSigning()
                 try await signApp()
                 // The certificate hand-off is built on the sign queue, which the
                 // install doesn't use, so it's ready once the install is done.
@@ -1165,6 +1202,10 @@ final class Engine {
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
+            // L3 (0.9.195): the keepalive ends with the run — success,
+            // failure and cancellation all land here, and the stop is a
+            // no-op when the install step already stopped it.
+            stopLinkKeepalive()
             stopBackgroundWork()
             // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
             // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
@@ -3836,8 +3877,83 @@ final class Engine {
 
     // MARK: Step 7 — install over AFC + installation_proxy
 
+    /// Starts the signing-window link keepalive (L3, 0.9.195): every 25 s it
+    /// asks the open tunnel for a fresh lockdownd answer on the device queue,
+    /// so iOS doesn't drop the tunnel idle while signing runs. A dead answer
+    /// only logs — the install step's re-dial owns reopening, and the
+    /// pre-sign check owns the signing gate. Lives and dies with the pipeline
+    /// task: stopped at the install step's entry and at the end of every run.
+    @MainActor
+    private func startLinkKeepalive() {
+        stopLinkKeepalive()
+        linkKeepalive = Task { @MainActor in
+            self.log("Link keepalive started — probing the device link every 25 s while signing runs.")
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 25_000_000_000)
+                if Task.isCancelled { break }
+                let alive = (try? await self.onDeviceQueue { self.connection.tunnelAnswers() }) ?? false
+                // A cancellation lands as a nil probe, not a dead link — don't
+                // log it as one.
+                if Task.isCancelled { break }
+                self.log(alive
+                    ? "Link keepalive: the device link still answers."
+                    : "Link keepalive: the device link stopped answering — the install step will re-dial it.")
+            }
+            self.log("Link keepalive stopped.")
+        }
+    }
+
+    /// Stops the link keepalive (L3). Idempotent: a stopped keepalive is nil,
+    /// so every stop path — install entry, run end — lands exactly once, and
+    /// a second stop is a no-op, never a double-stop.
+    @MainActor
+    private func stopLinkKeepalive() {
+        linkKeepalive?.cancel()
+        linkKeepalive = nil
+    }
+
+    /// The pre-sign link check (L4a, 0.9.195): signing takes minutes and an
+    /// App ID, so the run must not start it on a dead link. A live link
+    /// passes straight through; a dead one is re-dialled now, with the L1/L2
+    /// budget, and a re-dial that fails stops the run here with the reason,
+    /// before any signing time is burned.
+    @MainActor
+    private func ensureLinkAliveBeforeSigning() async throws {
+        if let prestageError = prestageLinkError {
+            log("Pre-sign link check: staging already reported the link dead (\(prestageError)) — checking it live before signing.")
+        }
+        let alive = (try? await onDeviceQueue { self.connection.tunnelAnswers() }) ?? false
+        try Task.checkCancellation()
+        if alive {
+            log("Pre-sign link check: the device link still answers — signing without a re-dial.")
+            return
+        }
+        log("Pre-sign link check: the device link stopped answering — re-dialling before signing …")
+        // The re-dial can wait up to ~30 s for the pairing port (L2), and
+        // the sign step is the one in flight — mark it active now so its row
+        // shows the wait instead of nothing until `signApp` starts.
+        setStep(.sign, .active)
+        let ip = deviceHost
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
+        do {
+            try await openDeviceLink { try self.connection.connect(deviceIP: ip, pairingFilePath: path) }
+        } catch is CancellationError {
+            // A cancel during the re-dial stays a cancel: it must reach the
+            // run's cancel branch, not the generic failure below (no failure
+            // history, no lastError, no failed step).
+            throw
+        } catch {
+            throw EngineError.message(L("The device link dropped before signing, and re-dialling it failed (%@). Signing didn't start.", short(error)))
+        }
+        log("Pre-sign link check: the device link is back — signing now.")
+    }
+
     @MainActor
     private func install(prestaged: DeviceConnection.PrestagedBundle? = nil) async throws {
+        // L3 (0.9.195): the install re-dials on its own entry — the
+        // keepalive's job is done, and its probes must not queue behind the
+        // install.
+        stopLinkKeepalive()
         guard let bundle = signedAppPath else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.install, .active)
         installProgress = 0
@@ -3878,14 +3994,29 @@ final class Engine {
                 return try await self.onDeviceQueue { () -> DeviceConnection.PrestagedBundle? in
                     let started = Date()
                     // The link may have sat idle since it opened, and iOS drops idle tunnels.
-                    try self.connection.connect(deviceIP: ip, pairingFilePath: rpPath)
+                    do {
+                        try self.connection.connect(deviceIP: ip, pairingFilePath: rpPath)
+                    } catch {
+                        // L4b (0.9.195): the dial result is recorded for the
+                        // pre-sign check instead of swallowed — a dead link
+                        // here is the same dead link signing would hit.
+                        // Written via `setMain`, so the main-actor read in
+                        // the pre-sign check sees it in main-queue order.
+                        let reason = self.short(error)
+                        self.setMain { self.prestageLinkError = reason }
+                        throw error
+                    }
                     let staged = try self.connection.prestageUnsignedBundle(ipaPath: ipa)
                     self.log(String(format: "Staged %d files signing won't change, straight from the IPA, in %.2f s.",
                                     staged.files.count, Date().timeIntervalSince(started)))
                     return staged
                 }
             } catch {
-                self.log("⚠️ Couldn't stage the app ahead of signing (\(self.short(error))); the install uploads all of it.")
+                if let linkError = self.prestageLinkError {
+                    self.log("⚠️ Couldn't stage the app ahead of signing — the device link was down (\(linkError)); the pre-sign check will re-dial it, and the install uploads all of it.")
+                } else {
+                    self.log("⚠️ Couldn't stage the app ahead of signing (\(self.short(error))); the install uploads all of it.")
+                }
                 return nil
             }
         }

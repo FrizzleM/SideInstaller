@@ -1782,7 +1782,8 @@ struct ContentView: View {
                             title: step.title(for: engine.installSource),
                             state: engine.stepStates[step] ?? .pending,
                             installProgress: engine.installProgress,
-                            isLast: idx == Step.allCases.count - 1)
+                            isLast: idx == Step.allCases.count - 1,
+                            waitingForPairingPort: engine.waitingForPairingPort)
                         // Staggered, so opening the list reads as it unrolling.
                         .cascadeItem(idx)
                 }
@@ -1803,7 +1804,8 @@ struct ContentView: View {
                            state: engine.stepStates[step] ?? .pending,
                            installProgress: engine.installProgress,
                            index: (Step.allCases.firstIndex(of: step) ?? 0) + 1,
-                           total: Step.allCases.count)
+                           total: Step.allCases.count,
+                           waitingForPairingPort: engine.waitingForPairingPort)
                 .id(step)
                 .transition(.push(from: .bottom))
         }
@@ -2671,6 +2673,7 @@ private struct StepRow: View {
     let state: StepState
     let installProgress: Double
     let isLast: Bool
+    let waitingForPairingPort: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -2682,7 +2685,8 @@ private struct StepRow: View {
                         .lineLimit(1)
                         .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer()
-                    StepBadge(step: step, state: state, installProgress: installProgress)
+                    StepBadge(step: step, state: state, installProgress: installProgress,
+                              waitingForPairingPort: waitingForPairingPort)
                 }
                 .frame(minHeight: 24)
                 if !isLast { Spacer(minLength: 12) }
@@ -2718,6 +2722,7 @@ private struct CurrentStepRow: View {
     let installProgress: Double
     let index: Int
     let total: Int
+    let waitingForPairingPort: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -2731,7 +2736,8 @@ private struct CurrentStepRow: View {
                     .foregroundStyle(Theme.muted)
             }
             Spacer(minLength: 8)
-            StepBadge(step: step, state: state, installProgress: installProgress)
+            StepBadge(step: step, state: state, installProgress: installProgress,
+                      waitingForPairingPort: waitingForPairingPort)
         }
         .animation(.smooth(duration: 0.3), value: state)
     }
@@ -2816,6 +2822,7 @@ private struct StepBadge: View {
     let step: Step
     let state: StepState
     let installProgress: Double
+    let waitingForPairingPort: Bool
 
     var body: some View {
         if step == .install, state == .active {
@@ -2824,6 +2831,15 @@ private struct StepBadge: View {
                 .foregroundStyle(Theme.accent)
                 .contentTransition(.numericText(value: installProgress))
                 .animation(.smooth(duration: 0.3), value: installProgress)
+                .transition(.opacity)
+        } else if state == .active, waitingForPairingPort, step == .connect || step == .sign {
+            // L2 (0.9.195): the first refused probe waits up to 30 s for the
+            // listener — say so in the badge instead of looking stuck on a
+            // spinner. The L4a pre-sign re-dial waits the same way, on the
+            // sign step's row (its step is marked active before the re-dial).
+            Text(L("Waiting for the device pairing port…"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.accent)
                 .transition(.opacity)
         } else if step == .sign, state == .active {
             // C6: signing takes a while with no percentage to show — say so
