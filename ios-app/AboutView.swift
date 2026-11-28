@@ -25,6 +25,17 @@ struct AboutView: View {
     @State private var isCheckingUpdate = false
     /// The in-flight manual check, so a second tap can cancel it.
     @State private var checkTask: Task<Void, Never>?
+    /// B-1 (0.9.194): which manual check is current — a cancelled
+    /// check's Task still resumes and writes its outcome, but only
+    /// while no newer check has taken over (a newer check bumps this,
+    /// and the stale Task returns without touching anything).
+    @State private var checkGeneration = 0
+    /// B-1 (0.9.194): true once a check has run past one leg's timeout
+    /// (~15s) — the detail line says so, so the row doesn't look stuck
+    /// and the user doesn't tap cancel on a check that is still working.
+    @State private var checkTakingLong = false
+    /// The timer that flips `checkTakingLong` after 15s.
+    @State private var checkSlowTask: Task<Void, Never>?
     /// What the last manual update check found; nil until one runs.
     @State private var updateCheckStatus: UpdateChecker.CheckResult?
     /// F-2 (0.9.178): true while the full release-notes sheet is up.
@@ -190,9 +201,18 @@ struct AboutView: View {
     private var updateCheckDetail: String? {
         if let selfUpdateError = updateChecker.selfUpdateError { return selfUpdateError }
         if let progress = updateChecker.selfUpdateProgressText { return progress }
-        if isCheckingUpdate { return L("Checking for updates… Tap again to cancel.") }
+        if isCheckingUpdate {
+            return checkTakingLong
+                ? L("Still connecting to GitHub… Tap again to cancel.")
+                : L("Checking for updates… Tap again to cancel.")
+        }
         switch updateCheckStatus {
-        case nil, .skipped: return nil
+        case nil: return nil
+        // B-1 (0.9.194): `.skipped` reaches here when a forced tap joined
+        // a run that did no work (the 24h stamp held) — it is a visible
+        // line now, not a blank row: the last check ran within the day
+        // and found nothing newer to offer.
+        case .skipped: return L("You're up to date.")
         case .upToDate: return L("You're up to date.")
         case .newer(let latest):
             return L("SideInstaller %@ is available — you're on %@.",
@@ -215,12 +235,22 @@ struct AboutView: View {
     }
 
     /// Run a check that ignores the 24-hour stamp. B5 (0.9.146): a second
-    /// tap while one is in flight cancels it, and the detail line goes back
-    /// to whatever the last check found — a cancelled check writes no
-    /// outcome, so "Checking…" can't stick around after the tap.
+    /// tap while one is in flight cancels it. B-1 (0.9.194): the cancel is
+    /// real now — the shared run is cancelled too (cancelling this view's
+    /// Task alone never reached it), and the row leaves "Checking…" at
+    /// once instead of waiting for the Task to unwind. The cancelled run
+    /// still reports: its outcome lands below unless a newer check has
+    /// taken over, so the row never goes back to blank (0.9.193 dropped
+    /// the result and a cancelled check left nothing on the row).
     private func runUpdateCheck() {
         if isCheckingUpdate {
             checkTask?.cancel()
+            checkSlowTask?.cancel()
+            updateChecker.cancelCheck()
+            isCheckingUpdate = false
+            checkTakingLong = false
+            checkTask = nil
+            checkSlowTask = nil
             return
         }
         // A fresh check clears the last self-update's outcome: it reports
@@ -228,13 +258,25 @@ struct AboutView: View {
         updateChecker.selfUpdateError = nil
         updateChecker.selfUpdateFinished = false
         isCheckingUpdate = true
+        checkTakingLong = false
+        checkGeneration += 1
+        let generation = checkGeneration
+        checkSlowTask = Task {
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled, generation == checkGeneration, isCheckingUpdate else { return }
+            checkTakingLong = true
+        }
         checkTask = Task {
             let result = await updateChecker.check(force: true)
-            if !Task.isCancelled {
-                updateCheckStatus = result
-            }
+            // A cancelled check still writes its outcome — only a newer
+            // check taking over may replace it.
+            guard generation == checkGeneration else { return }
+            updateCheckStatus = result
             isCheckingUpdate = false
+            checkTakingLong = false
             checkTask = nil
+            checkSlowTask?.cancel()
+            checkSlowTask = nil
         }
     }
 

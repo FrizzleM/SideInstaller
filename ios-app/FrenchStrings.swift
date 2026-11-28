@@ -1142,6 +1142,7 @@ let frenchStrings: [String: String] = [
         "SideInstaller installe SideStore et LiveContainer directement sur votre iPhone, sans PC.",
     "Checking for updates…": "Recherche de mises à jour…",
     "Checking for updates… Tap again to cancel.": "Recherche de mises à jour… Touchez à nouveau pour annuler.",
+    "Still connecting to GitHub… Tap again to cancel.": "Connexion à GitHub en cours… Touchez à nouveau pour annuler.",
     "You're up to date.": "Vous êtes à jour.",
     "Couldn't check for updates. Check your connection and try again.":
         "Impossible de vérifier les mises à jour. Vérifiez votre connexion et réessayez.",

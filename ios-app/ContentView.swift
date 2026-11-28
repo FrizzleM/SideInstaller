@@ -61,6 +61,10 @@ struct ContentView: View {
     @State private var isCheckingUpdate = false
     /// The in-flight banner check, so a second tap can cancel it.
     @State private var checkTask: Task<Void, Never>?
+    /// B-1 (0.9.194): which banner check is current — a cancelled
+    /// check's Task still resumes, but only while no newer check has
+    /// taken over (AboutView's `checkGeneration` 同款).
+    @State private var checkGeneration = 0
     /// F-2 (0.9.178): true while the full release-notes sheet is up.
     @State private var showingReleaseNotes = false
     /// F-1 (0.9.179): true while the certificate choice sheet is up —
@@ -546,15 +550,24 @@ struct ContentView: View {
     /// release is pending — AboutView's `runUpdateCheck` 同款, minus the
     /// status line: the banner itself reports the outcome, so there is
     /// nothing to store here. A second tap while one is in flight cancels
-    /// it, and a cancelled check writes no outcome.
+    /// it. B-1 (0.9.194): the cancel is real now — the shared run is
+    /// cancelled too (cancelling this view's Task alone never reached
+    /// it), and "Checking…" clears at once instead of waiting for the
+    /// Task to unwind.
     private func retryUpdateCheck() {
         if isCheckingUpdate {
             checkTask?.cancel()
+            updateChecker.cancelCheck()
+            isCheckingUpdate = false
+            checkTask = nil
             return
         }
         isCheckingUpdate = true
+        checkGeneration += 1
+        let generation = checkGeneration
         checkTask = Task {
             _ = await updateChecker.check(force: true)
+            guard generation == checkGeneration else { return }
             isCheckingUpdate = false
             checkTask = nil
         }

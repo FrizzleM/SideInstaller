@@ -1111,6 +1111,7 @@ let japaneseStrings: [String: String] = [
         "SideInstaller は、パソコンを使わずに SideStore と LiveContainer を iPhone に直接インストールします。",
     "Checking for updates…": "アップデートを確認中…",
     "Checking for updates… Tap again to cancel.": "アップデートを確認中…もう一度タップするとキャンセルします。",
+    "Still connecting to GitHub… Tap again to cancel.": "GitHub に接続中…もう一度タップするとキャンセルします。",
     "You're up to date.": "最新バージョンです。",
     "Couldn't check for updates. Check your connection and try again.":
         "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",

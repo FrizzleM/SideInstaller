@@ -1118,6 +1118,7 @@ let chineseStrings: [String: String] = [
         "SideInstaller 直接把 SideStore 和 LiveContainer 装到你的 iPhone 上，全程不需要电脑。",
     "Checking for updates…": "正在检查更新…",
     "Checking for updates… Tap again to cancel.": "正在检查更新…再点一次取消。",
+    "Still connecting to GitHub… Tap again to cancel.": "仍在连接 GitHub…再点一次取消。",
     "You're up to date.": "已是最新版本。",
     "Couldn't check for updates. Check your connection and try again.": "无法检查更新。请检查网络连接后重试。",
 

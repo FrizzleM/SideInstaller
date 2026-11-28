@@ -1133,6 +1133,7 @@ let vietnameseStrings: [String: String] = [
         "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
     "Checking for updates…": "Đang kiểm tra cập nhật…",
     "Checking for updates… Tap again to cancel.": "Đang kiểm tra cập nhật… Chạm lại để hủy.",
+    "Still connecting to GitHub… Tap again to cancel.": "Vẫn đang kết nối tới GitHub… Chạm lại để hủy.",
     "You're up to date.": "Bạn đang dùng phiên bản mới nhất.",
     "Couldn't check for updates. Check your connection and try again.":
         "Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối và thử lại.",

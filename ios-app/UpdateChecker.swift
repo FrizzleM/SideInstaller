@@ -124,47 +124,91 @@ final class UpdateChecker: ObservableObject {
     /// call's verified state (the three call sites — app launch, About,
     /// Install tab — can overlap). The `force` flag records whether the
     /// running check satisfies a forced caller: a forced run satisfies
-    /// everyone, a non-forced run only satisfies non-forced callers.
-    /// `generation` guards the clear: a forced caller queued behind a
-    /// non-forced run installs its own entry after ours finishes, and
-    /// our clear must not drop it.
-    private var inFlightCheck: (force: Bool, task: Task<CheckResult, Never>)?
+    /// everyone, a non-forced run only satisfies non-forced callers —
+    /// except when it actually fetched (0.9.194: a forced caller joins
+    /// any run that did network work and reuses its result; only a
+    /// `.skipped` run, which did no work at all, leaves a forced caller
+    /// to start its own). `generation` guards the clear: a forced caller
+    /// queued behind a non-forced run installs its own entry after ours
+    /// finishes, and our clear must not drop it. It also lets a waiter
+    /// tell a finished run apart from a fresh one that replaced it.
+    private var inFlightCheck: (force: Bool, generation: Int, task: Task<CheckResult, Never>)?
     private var inFlightCheckGeneration = 0
 
     /// Fetch the remote version and reveal the banner if it's newer.
     /// B2 (0.9.142): the stamp is only set once a version was really fetched.
     /// A failed check used to stamp too, so a launch with no network on the
     /// day a new version shipped silenced the banner for the next 24 hours.
+    /// B-1 (0.9.194): a forced tap joins the run in flight — whatever its
+    /// `force` flag — and reuses its result, instead of waiting for the
+    /// launch run to finish and then running its own (two 15s legs × two
+    /// runs = up to 60s of "Checking…" on a slow link). One exception: a
+    /// `.skipped` run did no network work, so it satisfies only
+    /// non-forced callers; a forced caller behind it starts its own run
+    /// once the skipped one is over. A waiter that finds its run
+    /// replaced while it waited joins the replacement — never two gates
+    /// at once. Cancelling a waiter only cancels the wait, never the
+    /// shared run: awaiting a Task's value neither throws nor cancels
+    /// the awaited task (same shape as the apps page awaiting
+    /// `manager.inFlightLoadTask`); the run itself is cancelled only
+    /// through `cancelCheck()`.
     @discardableResult
     func check(force: Bool = false) async -> CheckResult {
-        // Join a running check when it satisfies this call.
-        if let inFlight = inFlightCheck, inFlight.force || !force {
-            return await inFlight.task.value
+        while true {
+            if let inFlight = inFlightCheck {
+                let result = await inFlight.task.value
+                if inFlight.force || !force || result != .skipped {
+                    return result
+                }
+                // Forced caller behind a skipped run: the run is over
+                // (its value was just awaited). If another waiter has
+                // already started a fresh run, join that one instead of
+                // starting a second; otherwise fall through and start
+                // our own (the finished entry is replaced below, and
+                // its owner's clear then skips by generation).
+                if inFlightCheck?.generation != inFlight.generation {
+                    continue
+                }
+            }
+            // No usable run in flight: start one. This stretch runs on
+            // @MainActor with no suspension point between the read above
+            // and the store below, so two callers can't both start one.
+            inFlightCheckGeneration += 1
+            let generation = inFlightCheckGeneration
+            let task = Task { [weak self] in
+                guard let self else { return CheckResult.failed }
+                return await self.performCheck(force: force)
+            }
+            inFlightCheck = (force: force, generation: generation, task: task)
+            let result = await task.value
+            if inFlightCheckGeneration == generation { inFlightCheck = nil }
+            return result
         }
-        // A forced call behind a non-forced run waits for it, then runs
-        // its own — never two gates at once. Cancelling the waiter only
-        // cancels the wait, never the shared run: awaiting a Task's value
-        // neither throws nor cancels the awaited task (same shape as the
-        // apps page awaiting `manager.inFlightLoadTask`).
-        if let inFlight = inFlightCheck {
-            _ = await inFlight.task.value
-        }
-        inFlightCheckGeneration += 1
-        let generation = inFlightCheckGeneration
-        let task = Task { [weak self] in
-            guard let self else { return CheckResult.failed }
-            return await self.performCheck(force: force)
-        }
-        inFlightCheck = (force: force, task: task)
-        let result = await task.value
-        if inFlightCheckGeneration == generation { inFlightCheck = nil }
-        return result
+    }
+
+    /// B-1 (0.9.194): cancel the check in flight, so a second tap on
+    /// "Check for updates" really stops it. Cancelling the caller's own
+    /// Task never reached the run — awaiting a Task's value neither
+    /// throws nor cancels the awaited task — and `performCheck` had no
+    /// cancellation checks at all, so the tap only cancelled the wait
+    /// while both 15s legs ran on. The run ends promptly with `.failed`
+    /// (see the `Task.isCancelled` checks in `performCheck` /
+    /// `verifyReleaseAsset`); callers that joined it get that result
+    /// instead of waiting the legs out. The entry itself stays until the
+    /// run finishes and its owner clears it by generation — clearing it
+    /// here would let a new caller start a second gate while this one
+    /// is still winding down.
+    func cancelCheck() {
+        inFlightCheck?.task.cancel()
     }
 
     /// The check itself, pulled out of `check()` (B-2, 0.9.180) so the
     /// wrapper above can share one run between callers. Behaviour
     /// unchanged.
     private func performCheck(force: Bool) async -> CheckResult {
+        // B-1 (0.9.194): cancelled before starting — end at once instead
+        // of spending both 15s legs on a check nobody waits for.
+        if Task.isCancelled { return .failed }
         // One check a day: skip when the last successful check was recent.
         // A failed check stamps nothing, so the next launch tries again.
         let now = Date()
@@ -183,6 +227,13 @@ final class UpdateChecker: ObservableObject {
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let body = String(data: data, encoding: .utf8) else { return .failed }
+
+        // B-1 (0.9.194): cancelled between the two legs — don't start the
+        // gate's second 15s fetch for a check nobody waits for. Return
+        // before touching `latestVersion` / `showBanner`, so a cancelled
+        // re-check leaves the last verified state exactly as it was
+        // (B-3, 0.9.179).
+        if Task.isCancelled { return .failed }
 
         let latest = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !latest.isEmpty else { return .failed }
@@ -265,6 +316,12 @@ final class UpdateChecker: ObservableObject {
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let assets = json["assets"] as? [[String: Any]] else {
+            gateFailure = .network
+            return false
+        }
+        // B-1 (0.9.194): cancelled mid-gate — report it as a network
+        // failure, not a half-parsed release.
+        if Task.isCancelled {
             gateFailure = .network
             return false
         }

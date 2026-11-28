@@ -1112,6 +1112,7 @@ let koreanStrings: [String: String] = [
         "SideInstaller는 PC 없이 SideStore와 LiveContainer를 iPhone에 바로 설치해 줍니다.",
     "Checking for updates…": "업데이트 확인 중…",
     "Checking for updates… Tap again to cancel.": "업데이트 확인 중… 다시 탭하면 취소됩니다.",
+    "Still connecting to GitHub… Tap again to cancel.": "GitHub에 계속 연결 중… 다시 탭하면 취소됩니다.",
     "You're up to date.": "최신 버전입니다.",
     "Couldn't check for updates. Check your connection and try again.": "업데이트를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
 
