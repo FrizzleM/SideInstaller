@@ -1998,6 +1998,11 @@ final class DeviceConnection {
 
         let chipID = try uniqueChipID()
 
+        // F-2 (0.9.192): check the image covers this iPhone before
+        // anything is sent to the mounter — a mismatch fails here, in
+        // plain words, instead of as the mounter's generic error.
+        try checkDeveloperImageFitsDevice(manifestData: manifest)
+
         var client: OpaquePointer?
         try check(image_mounter_connect_rsd(adapter, handshake, &client),
                   "image_mounter_connect_rsd failed")
@@ -2022,6 +2027,67 @@ final class DeviceConnection {
             }
         }
         try check(err, "mounting the developer disk image failed")
+    }
+
+    /// Checks the downloaded personalized image covers this iPhone before
+    /// it is mounted (F-2, 0.9.192): the manifest's BuildIdentities name
+    /// the models the image was built for, and this iPhone's model
+    /// (ProductType, from lockdownd — the same `deviceInfo()` keys) must
+    /// be one of them, or mounting fails here, in plain words, instead of
+    /// as the mounter's generic error — and no re-download is suggested,
+    /// since the same image would fail the same way.
+    ///
+    /// Degraded by design: the mounter's real check is ApBoardID +
+    /// ApChipID, but those come from the image mounter's
+    /// QueryPersonalizationIdentifiers, not from lockdownd — no
+    /// lockdownd key for BoardId exists anywhere in this repo or in the
+    /// vendored idevice code, so there is no BoardId to compare against.
+    /// The model check still catches the "image too old" class: an image
+    /// older than this iPhone lists no identity for its model. When the
+    /// manifest can't be read, names no model, or the device won't say
+    /// its model, the check stands aside and mounting goes ahead as
+    /// before — an unknown manifest must not block a mount that would
+    /// have worked.
+    func checkDeveloperImageFitsDevice(manifestData: Data) throws {
+        var format = PropertyListSerialization.PropertyListFormat.xml
+        guard let plist = try? PropertyListSerialization.propertyList(
+                from: manifestData, options: [], format: &format),
+              let manifest = plist as? [String: Any],
+              let identities = manifest["BuildIdentities"] as? [[String: Any]],
+              !identities.isEmpty else {
+            Engine.shared.log("DDI: BuildManifest.plist unreadable — mounting without a precheck.")
+            return
+        }
+        // The model each identity covers, from its Info (falling back to
+        // the identity itself, and to a manifest-level ProductType).
+        var models = identities.compactMap { identity -> String? in
+            let info = identity["Info"] as? [String: Any]
+            return (info?["ProductType"] as? String) ?? (identity["ProductType"] as? String)
+        }
+        if models.isEmpty, let productType = manifest["ProductType"] as? String {
+            models = [productType]
+        }
+        guard !models.isEmpty else {
+            Engine.shared.log("DDI: BuildManifest names no model (\(identities.count) identities) — mounting without a precheck.")
+            return
+        }
+        let deviceModel: String?
+        do {
+            deviceModel = try deviceInfo().first(where: { $0.0 == "ProductType" })?.1
+        } catch {
+            Engine.shared.log("DDI: couldn't read this iPhone's model (\(error)) — mounting without a precheck.")
+            return
+        }
+        guard let deviceModel else {
+            Engine.shared.log("DDI: this iPhone reported no model — mounting without a precheck.")
+            return
+        }
+        Engine.shared.log("DDI: image covers \(identities.count) build identities "
+                          + "(\(Set(models).sorted().joined(separator: ", "))); "
+                          + "this iPhone is \(deviceModel).")
+        guard models.contains(deviceModel) else {
+            throw DeveloperImageUnsupported()
+        }
     }
 
     /// The device's UniqueChipID, which personalizing the image is keyed on.
@@ -2355,6 +2421,17 @@ final class DeviceConnection {
         defer { plist_mem_free(out) }
         let s = String(validatingUTF8: out) ?? ""
         return s.isEmpty ? nil : s
+    }
+}
+
+/// The downloaded personalized image has no build for this iPhone
+/// (F-2, 0.9.192): a definitive failure, not a download to retry — the
+/// same image would fail the same way. `prepareDeveloperDiskImage`
+/// reports this instead of an earlier variant's failure, so the user
+/// sees the plain-words reason.
+struct DeveloperImageUnsupported: Error, LocalizedError {
+    var errorDescription: String? {
+        L("This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.")
     }
 }
 

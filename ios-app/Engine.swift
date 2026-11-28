@@ -5804,9 +5804,12 @@ final class Engine {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                // F-2 (0.9.192): the precheck's verdict is definitive —
+                // the image has no build for this iPhone — so it outranks
+                // whatever an earlier variant said.
+                if error is DeveloperImageUnsupported || firstFailure == nil { firstFailure = error }
                 // What the preferred form said is what's reported; the
                 // fallback's failure is in the log.
-                if firstFailure == nil { firstFailure = error }
                 if index + 1 < variants.count {
                     log("The developer disk image didn't go on as a \(variant.logName) (\(short(error))). Trying the \(variants[index + 1].logName) …")
                 } else if index > 0 {

@@ -655,22 +655,44 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// Cancel is silent by design). This is the Downloads page's
     /// in-flight failure, not the history page's failure records (F-A,
     /// 0.9.164) — those live on past installs.
-    struct FailedDownload: Equatable {
+    struct FailedDownload: Codable, Equatable {
         let name: String
         let url: URL
         let error: String
     }
 
     /// F-1 (0.9.173): the failed downloads, in failure order.
-    @Published private(set) var failedDownloads: [FailedDownload] = []
+    /// B-2 (0.9.192): persisted in UserDefaults, so the retry survives
+    /// an app restart — a failure list that only lives in memory loses
+    /// its retry the moment the app is closed. Only the name, the URL
+    /// and the failure text are stored; nothing sensitive.
+    @Published private(set) var failedDownloads: [FailedDownload] = Self.loadFailedDownloads()
+
+    private static let failedDownloadsKey = "CZFFailedDownloads"
+
+    private static func loadFailedDownloads() -> [FailedDownload] {
+        guard let data = UserDefaults.standard.data(forKey: failedDownloadsKey) else { return [] }
+        return (try? JSONDecoder().decode([FailedDownload].self, from: data)) ?? []
+    }
+
+    private func storeFailedDownloads() {
+        guard let data = try? JSONEncoder().encode(failedDownloads) else { return }
+        UserDefaults.standard.set(data, forKey: Self.failedDownloadsKey)
+    }
 
     /// F-1 (0.9.173): drop one failed-download row (its Remove button).
-    func removeFailedDownload(_ failed: FailedDownload) { failedDownloads.removeAll { $0 == failed } }
+    func removeFailedDownload(_ failed: FailedDownload) {
+        failedDownloads.removeAll { $0 == failed }
+        storeFailedDownloads()
+    }
 
     /// F-3 (0.9.174): drop every failed-download row at once (the Failed
     /// section's Clear all, after its confirm box). The in-flight and
     /// queued downloads are untouched — only this list is cleared.
-    func clearFailedDownloads() { failedDownloads.removeAll() }
+    func clearFailedDownloads() {
+        failedDownloads.removeAll()
+        storeFailedDownloads()
+    }
 
     /// F-1 (0.9.163): one entry in the FIFO queue — the URL, the staged
     /// filename, and the continuation its waiter suspended in. A class,
@@ -1074,6 +1096,7 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         switch result {
         case .success:
             failedDownloads.removeAll { $0.url == request.url }
+            storeFailedDownloads()
         case .failure(let error):
             if (error as? URLError)?.code != .cancelled, !(error is CancellationError) {
                 // F-1 (0.9.173): one entry per URL — a re-failure of
@@ -1082,6 +1105,8 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                 failedDownloads.removeAll { $0.url == request.url }
                 failedDownloads.append(FailedDownload(name: request.name, url: request.url,
                                                       error: error.localizedDescription))
+                // B-2 (0.9.192): persist, so the retry survives a restart.
+                storeFailedDownloads()
             }
         }
         request.continuation = nil

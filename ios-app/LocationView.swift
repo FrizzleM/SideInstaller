@@ -235,6 +235,14 @@ struct GPXRoute {
         let filtered = Self.filterJumpPoints(found)
         found = filtered.kept
         droppedJumpPoints = filtered.dropped
+        // B-1 (0.9.192): a route with no timestamps at all gets a
+        // distance-only outlier pass too — see `filterDistanceOutliers`.
+        // A route with any time keeps the timed path above, untouched.
+        if found.allSatisfy({ $0.time == nil }) {
+            let distanceFiltered = Self.filterDistanceOutliers(found)
+            found = distanceFiltered.kept
+            droppedJumpPoints += distanceFiltered.dropped
+        }
 
         name = url.deletingPathExtension().lastPathComponent
         points = found.map(\.coordinate)
@@ -327,6 +335,50 @@ struct GPXRoute {
             .distance(from: CLLocation(latitude: end.coordinate.latitude,
                                        longitude: end.coordinate.longitude))
         return meters / endTime.timeIntervalSince(startTime)
+    }
+
+    /// Drops the stray fixes in a route with no timestamps at all (B-1,
+    /// 0.9.192): with no times, `filterJumpPoints` above keeps everything,
+    /// so one bad fix used to send the device on a fake long leg to it and
+    /// back. A leg counts as an outlier only when it is both far in
+    /// absolute terms (> 5 km) and far beyond the route's own scale
+    /// (> 10× the median leg), so a genuinely long route loses nothing.
+    /// Which end is bad follows the timed filter's logic: a bad middle
+    /// point makes both of its legs outliers, while a bad neighbour makes
+    /// only one; an end point goes when its only leg is an outlier and
+    /// the leg next to it is normal.
+    private static func filterDistanceOutliers(_ found: [RoutePoint])
+    -> (kept: [RoutePoint], dropped: Int) {
+        guard found.count >= 3 else { return (found, 0) }
+        let segments = zip(found, found.dropFirst()).map { pair in
+            CLLocation(latitude: pair.0.coordinate.latitude, longitude: pair.0.coordinate.longitude)
+                .distance(from: CLLocation(latitude: pair.1.coordinate.latitude,
+                                           longitude: pair.1.coordinate.longitude))
+        }
+        let sorted = segments.sorted()
+        let median = sorted[sorted.count / 2]
+        let threshold = max(10 * median, 5000)
+        guard segments.contains(where: { $0 > threshold }) else { return (found, 0) }
+        var kept: [RoutePoint] = []
+        kept.reserveCapacity(found.count)
+        var dropped = 0
+        for (index, point) in found.enumerated() {
+            let isOutlier: Bool
+            if index == 0 {
+                isOutlier = segments[0] > threshold && segments[1] <= threshold
+            } else if index == found.count - 1 {
+                isOutlier = segments[segments.count - 1] > threshold
+                    && segments[segments.count - 2] <= threshold
+            } else {
+                isOutlier = segments[index - 1] > threshold && segments[index] > threshold
+            }
+            if isOutlier {
+                dropped += 1
+            } else {
+                kept.append(point)
+            }
+        }
+        return (kept, dropped)
     }
 }
 
@@ -905,6 +957,16 @@ final class LocationManager: ObservableObject {
     /// Moves the location along `route`. The resend timer is off meanwhile,
     /// since this sends more often.
     private var playbackTask: Task<Void, Never>?
+    /// The timeline playing now, so a pause can resume it (F-3, 0.9.192).
+    private var currentTimeline: RouteTimeline?
+    /// Set while a playing route is paused (F-3, 0.9.192): the tick task
+    /// is stopped and the device keeps re-sending the point it reached,
+    /// so it doesn't jump back. `routeProgress` stays, so the page still
+    /// shows where playback got to.
+    @Published private(set) var isRoutePaused = false
+    /// Where playback resumes from, and the timeline it resumes on.
+    private var pausedElapsed: TimeInterval = 0
+    private var pausedTimeline: RouteTimeline?
     /// How often a playing route sends a new point: 5 Hz (F-3, 0.9.191 —
     /// Reloc's NMEA cadence; StikDebug's 0.5 s step made a fast route
     /// visibly jump between points).
@@ -1276,12 +1338,35 @@ final class LocationManager: ObservableObject {
     @discardableResult
     func savePlace(named name: String, at coordinate: CLLocationCoordinate2D) -> SavedPlace {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // B-3 (0.9.192): the same spot saved twice is one row, not two —
+        // within 15 m of a place already saved (the `addStopAtPin`口径),
+        // update that place's name instead of appending. An empty name
+        // never overwrites the name already there.
+        if let index = savedPlaces.firstIndex(where: { place in
+            CLLocation(latitude: place.latitude, longitude: place.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude,
+                                           longitude: coordinate.longitude)) < 15
+        }) {
+            if !trimmed.isEmpty { savedPlaces[index].name = trimmed }
+            storeSavedPlaces()
+            lastSuccess = L("Updated the saved place with that name.")
+            return savedPlaces[index]
+        }
         let place = SavedPlace(name: trimmed.isEmpty ? Self.format(coordinate) : trimmed,
                                latitude: coordinate.latitude,
                                longitude: coordinate.longitude)
         savedPlaces.append(place)
         storeSavedPlaces()
         return place
+    }
+
+    /// Renames a saved place (F-1, 0.9.192). An empty name falls back to
+    /// the coordinate, the same rule `savePlace` uses.
+    func renamePlace(_ place: SavedPlace, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let index = savedPlaces.firstIndex(where: { $0.id == place.id }) else { return }
+        savedPlaces[index].name = trimmed.isEmpty ? Self.format(place.coordinate) : trimmed
+        storeSavedPlaces()
     }
 
     func deletePlace(_ place: SavedPlace) {
@@ -1438,13 +1523,18 @@ final class LocationManager: ObservableObject {
     /// Sends where the route should be every `playbackTick`, going by the time
     /// that has actually passed. Stops at the first failed send and holds the
     /// last point that went through, as StikDebug does.
-    private func startPlayback(_ timeline: RouteTimeline) {
+    /// `elapsedOffset` resumes a paused route part-way through (F-3,
+    /// 0.9.192): the clock starts that far in, so playback continues
+    /// where it stopped instead of restarting.
+    private func startPlayback(_ timeline: RouteTimeline, from elapsedOffset: TimeInterval = 0) {
         stopResending()
-        routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
+        currentTimeline = timeline
+        routeProgress = RouteProgress(elapsed: elapsedOffset, duration: timeline.duration)
         playbackTask = Task { [weak self] in
             // Local to this task, so looping back just resets it — no
-            // captured var is mutated across the task boundary.
-            var started = Date()
+            // captured var is mutated across the task boundary. Offset
+            // by the resume point, so `elapsed` starts there.
+            var started = Date().addingTimeInterval(-elapsedOffset)
             while true {
                 try? await Task.sleep(for: .seconds(Self.playbackTick))
                 guard let self, !Task.isCancelled else { return }
@@ -1511,10 +1601,39 @@ final class LocationManager: ObservableObject {
         if simulated != nil { startResending() }
     }
 
+    /// Pauses a playing route where it is (F-3, 0.9.192): the tick task
+    /// stops, and the device keeps re-sending the point it reached, so
+    /// it doesn't jump back. The progress stays on screen, and `stopRoute`
+    /// still ends it outright.
+    func pauseRoute() {
+        guard isPlayingRoute, !isRoutePaused, let elapsed = routeProgress?.elapsed else { return }
+        pausedElapsed = elapsed
+        pausedTimeline = currentTimeline
+        playbackTask?.cancel()
+        playbackTask = nil
+        isRoutePaused = true
+        if simulated != nil { startResending() }
+        engine.log("Location: route paused at \(Int(elapsed)) s.")
+    }
+
+    /// Continues a paused route from where it stopped (F-3, 0.9.192):
+    /// the timeline is rebuilt with the remaining time, so the route
+    /// plays on from the paused point instead of restarting.
+    func resumeRoute() {
+        guard isRoutePaused, let timeline = pausedTimeline else { return }
+        isRoutePaused = false
+        pausedTimeline = nil
+        startPlayback(timeline, from: pausedElapsed)
+        engine.log("Location: route resumed at \(Int(pausedElapsed)) s.")
+    }
+
     private func cancelPlayback() {
         playbackTask?.cancel()
         playbackTask = nil
         routeProgress = nil
+        isRoutePaused = false
+        pausedTimeline = nil
+        currentTimeline = nil
     }
 
     // MARK: Planned routes
@@ -1766,6 +1885,10 @@ struct LocationView: View {
     /// is up.
     @State private var placeToSave: CLLocationCoordinate2D?
     @State private var placeName = ""
+    /// The saved place being renamed (F-1, 0.9.192), while the rename
+    /// prompt is up; the name starts as the place's current one.
+    @State private var placeToRename: SavedPlace?
+    @State private var renameText = ""
     @State private var showRouteImporter = false
     /// Bumped to scroll the map into view after moving it from further down.
     @State private var mapRequests = 0
@@ -1840,6 +1963,23 @@ struct LocationView: View {
         } message: {
             if let placeToSave {
                 Text(LocationManager.format(placeToSave))
+            }
+        }
+        // F-1 (0.9.192): rename a saved place, starting from its
+        // current name; leaving it blank falls back to the coordinate,
+        // the same rule saving uses.
+        .alert(L("Rename place"),
+               isPresented: Binding(get: { placeToRename != nil },
+                                    set: { if !$0 { placeToRename = nil } })) {
+            TextField(L("Name"), text: $renameText)
+            Button(L("Save")) {
+                if let placeToRename { manager.renamePlace(placeToRename, to: renameText) }
+                placeToRename = nil
+            }
+            Button(L("Cancel"), role: .cancel) { placeToRename = nil }
+        } message: {
+            if let placeToRename {
+                Text(LocationManager.format(placeToRename.coordinate))
             }
         }
         // Start setup in the background so it's ready when the user picks a
@@ -2471,6 +2611,14 @@ struct LocationView: View {
                     Label(L("Add as stop"), systemImage: "plus")
                 }
                 .disabled(manager.isPlayingPlannedRoute)
+                // F-1 (0.9.192): rename the place, starting from its
+                // current name.
+                Button {
+                    renameText = place.name
+                    placeToRename = place
+                } label: {
+                    Label(L("Rename"), systemImage: "pencil")
+                }
                 Button(role: .destructive) {
                     manager.deletePlace(place)
                 } label: {
@@ -2594,6 +2742,18 @@ struct LocationView: View {
             .transition(.opacity)
 
             current(progress)
+
+            // F-3 (0.9.192): pause the route where it is, or continue it
+            // from there — the device stays on the point it reached.
+            Button {
+                if manager.isRoutePaused { manager.resumeRoute() } else { manager.pauseRoute() }
+            } label: {
+                Label(manager.isRoutePaused ? L("Resume") : L("Pause"),
+                      systemImage: manager.isRoutePaused ? "play.fill" : "pause.fill")
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
 
             Button { manager.stopRoute() } label: {
                 Label(L("Stop here"), systemImage: "pause.fill")

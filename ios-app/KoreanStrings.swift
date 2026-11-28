@@ -373,6 +373,10 @@ let koreanStrings: [String: String] = [
     // Location › saved places and GPX routes.
     "Saved places": "저장된 장소",
     "Save this place": "이 장소 저장",
+    "Rename": "이름 바꾸기",
+    "Rename place": "장소 이름 바꾸기",
+    "Updated the saved place with that name.": "같은 이름의 저장된 장소를 업데이트했습니다.",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "이 개발자 디스크 이미지는 이 iPhone을 지원하지 않습니다. 이 모델용 빌드가 없습니다. 새 디스크 이미지를 기다리세요.",
     "Name": "이름",
     "Show on map": "지도에 표시",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":

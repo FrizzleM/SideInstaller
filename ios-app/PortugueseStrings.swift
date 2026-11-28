@@ -379,6 +379,10 @@ let portugueseStrings: [String: String] = [
     // Location › saved places and GPX routes.
     "Saved places": "Lugares salvos",
     "Save this place": "Salvar este lugar",
+    "Rename": "Renomear",
+    "Rename place": "Renomear lugar",
+    "Updated the saved place with that name.": "O lugar salvo com esse nome foi atualizado.",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "Esta imagem de disco de desenvolvedor não é compatível com este iPhone — não há build para este modelo. Aguarde uma imagem de disco mais recente.",
     "Name": "Nome",
     "Show on map": "Mostrar no mapa",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":

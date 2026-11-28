@@ -345,6 +345,10 @@ let turkishStrings: [String: String] = [
 
     "Saved places": "Kayıtlı yerler",
     "Save this place": "Bu yeri kaydet",
+    "Rename": "Yeniden adlandır",
+    "Rename place": "Yeri yeniden adlandır",
+    "Updated the saved place with that name.": "Bu addaki kayıtlı yer güncellendi.",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "Bu geliştirici disk görüntüsü bu iPhone'u desteklemiyor — bu model için derleme içermiyor. Daha yeni bir disk görüntüsü bekleyin.",
     "Name": "Ad",
     "Show on map": "Haritada göster",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":

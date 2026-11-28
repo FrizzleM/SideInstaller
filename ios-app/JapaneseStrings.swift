@@ -372,6 +372,10 @@ let japaneseStrings: [String: String] = [
     // Location › saved places and GPX routes.
     "Saved places": "保存した場所",
     "Save this place": "この場所を保存",
+    "Rename": "名前を変更",
+    "Rename place": "場所の名前を変更",
+    "Updated the saved place with that name.": "同じ名前の保存済み場所を更新しました。",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "この開発者ディスクイメージはこの iPhone に対応していません。このモデルのビルドが含まれていません。新しいディスクイメージをお待ちください。",
     "Name": "名前",
     "Show on map": "地図で表示",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":

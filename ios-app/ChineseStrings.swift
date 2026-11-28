@@ -373,6 +373,10 @@ let chineseStrings: [String: String] = [
     // Location › saved places and GPX routes.
     "Saved places": "已存储的地点",
     "Save this place": "存储此地点",
+    "Rename": "重命名",
+    "Rename place": "重命名地点",
+    "Updated the saved place with that name.": "已更新同名地点。",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "此开发者磁盘映像不支持这台 iPhone——其中没有适配本机型的构建。请等待新版磁盘映像。",
     "Name": "名称",
     "Show on map": "在地图上显示",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":

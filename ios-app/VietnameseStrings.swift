@@ -378,6 +378,10 @@ let vietnameseStrings: [String: String] = [
     // Location › saved places and GPX routes.
     "Saved places": "Địa điểm đã lưu",
     "Save this place": "Lưu địa điểm này",
+    "Rename": "Đổi tên",
+    "Rename place": "Đổi tên địa điểm",
+    "Updated the saved place with that name.": "Đã cập nhật địa điểm đã lưu có tên đó.",
+    "This developer disk image doesn't support this iPhone — it has no build for this model. Wait for a newer disk image.": "Ảnh đĩa nhà phát triển này không hỗ trợ iPhone này — không có bản dựng cho mẫu máy này. Hãy chờ ảnh đĩa mới hơn.",
     "Name": "Tên",
     "Show on map": "Xem trên bản đồ",
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
