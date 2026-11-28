@@ -1590,7 +1590,7 @@ final class Engine {
         setGuide(nil)
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        let device = try await openDeviceLink { try self.performConnect(ip: ip, pairingPath: path) }
+        let device = try await openDeviceLink { quick in try self.performConnect(ip: ip, pairingPath: path, quickProbe: quick) }
         deviceSummary = device.summary
         deviceUDID = device.udid
         deviceName = device.name
@@ -1604,14 +1604,14 @@ final class Engine {
         let name: String?
     }
 
-    private func performConnect(ip: String, pairingPath path: String) throws -> ConnectedDevice {
+    private func performConnect(ip: String, pairingPath path: String, quickProbe: Bool = false) throws -> ConnectedDevice {
         // A missing or empty pairing file surfaces as a confusing Socket(ENOENT).
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message(L("Pairing didn't finish — no pairing file yet."))
         }
         log("Pairing file OK (\(size) bytes). Connecting over TCP/RSD \(ip):\(DeviceConnection.rsdPort) …")
-        try connection.connect(deviceIP: ip, pairingFilePath: path)
+        try connection.connect(deviceIP: ip, pairingFilePath: path, quickProbe: quickProbe)
         log("Tunnel + RSD handshake established.")
         log(try connection.rsdSummary())
         let info = try connection.deviceInfo()
@@ -3936,7 +3936,7 @@ final class Engine {
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         do {
-            try await openDeviceLink { try self.connection.connect(deviceIP: ip, pairingFilePath: path) }
+            try await openDeviceLink { quick in try self.connection.connect(deviceIP: ip, pairingFilePath: path, quickProbe: quick) }
         } catch is CancellationError {
             // A cancel during the re-dial stays a cancel: it must reach the
             // run's cancel branch, not the generic failure below (no failure
@@ -3966,7 +3966,7 @@ final class Engine {
             // `isConnected` doesn't detect it, so reconnect first. Mobile Data
             // Mode reuses the tunnel it kept while that still answers.
             log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
-            try await openDeviceLink { try self.connection.connect(deviceIP: ip, pairingFilePath: path) }
+            try await openDeviceLink { quick in try self.connection.connect(deviceIP: ip, pairingFilePath: path, quickProbe: quick) }
             try await onDeviceQueue {
                 guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
                 self.log("Installing signed bundle via AFC + installation_proxy …")
@@ -5575,7 +5575,7 @@ final class Engine {
         }
         pairingFilePath = path
         let ip = deviceHost
-        let device = try await openDeviceLink { try self.performConnect(ip: ip, pairingPath: path) }
+        let device = try await openDeviceLink { quick in try self.performConnect(ip: ip, pairingPath: path, quickProbe: quick) }
         deviceSummary = device.summary
         deviceUDID = device.udid
         deviceName = device.name
@@ -5583,34 +5583,33 @@ final class Engine {
 
     /// Opens the device link with `connect`, which dials a tunnel, or reuses
     /// the one Mobile Data Mode kept (`DeviceConnection.keepsOpenTunnel`), on
-    /// the device queue. On mobile data alone a new tunnel needs Airplane Mode,
-    /// which `MobileDataMode.prepareNewTunnel` asks for first, unless one is
-    /// kept already; when the dial is refused all the same, because the kept
-    /// tunnel had closed or Airplane Mode went off too soon, it asks again and
-    /// dials once more.
+    /// the device queue. The dial goes first, as a fast probe (a single L1
+    /// attempt with no probe wait — `connect(true)`): only when it is
+    /// refused on mobile data alone does Mobile Data Mode ask for Airplane
+    /// Mode, and only then is the full L1/L2 budget spent on the re-dial.
+    /// A kept tunnel is tried first, inside `connect`. On Wi-Fi the sheet
+    /// never appears, and the trial dial failing for another reason spends
+    /// the full budget on one more dial, so the Wi-Fi behaviour is unchanged.
     @MainActor
-    private func openDeviceLink<T>(_ connect: @escaping () throws -> T) async throws -> T {
+    private func openDeviceLink<T>(_ connect: @escaping (Bool) throws -> T) async throws -> T {
         let mode = MobileDataMode.shared
-        // A kept tunnel is tried first, inside `connect`. On Wi-Fi this turns
-        // Mobile Data Mode off, and the tunnel opens the usual way.
-        if !(mode.isOn && connection.isConnected && !NetworkStatus.links().wifi) {
-            try await mode.prepareNewTunnel()
-        }
         do {
-            let result = try await onDeviceQueue(connect)
+            let result = try await onDeviceQueue { try connect(true) }
             mode.dialEnded(opened: true)
             return result
         } catch let error as DeviceConnection.TunnelError where error.refusedOnMobileData {
             mode.dialEnded(opened: false)
             guard try await mode.prepareNewTunnel(again: true) else { throw error }
-            do {
-                let result = try await onDeviceQueue(connect)
-                mode.dialEnded(opened: true)
-                return result
-            } catch {
-                mode.dialEnded(opened: false)
-                throw error
-            }
+        } catch {
+            // The trial dial failed for another reason (a refusal on Wi-Fi,
+            // say): the full L1/L2 budget hasn't been spent yet, so spend it
+            // now with one full dial — the Wi-Fi behaviour is unchanged.
+            mode.dialEnded(opened: false)
+        }
+        do {
+            let result = try await onDeviceQueue { try connect(false) }
+            mode.dialEnded(opened: true)
+            return result
         } catch {
             mode.dialEnded(opened: false)
             throw error
@@ -5799,7 +5798,7 @@ final class Engine {
         let ip = deviceHost
         // iOS may drop the tunnel during signing and `isConnected` doesn't
         // detect it, so reconnect first (same as install).
-        try await openDeviceLink { try self.connection.connect(deviceIP: ip, pairingFilePath: path) }
+        try await openDeviceLink { quick in try self.connection.connect(deviceIP: ip, pairingFilePath: path, quickProbe: quick) }
         try await onDeviceQueue {
             guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
             try self.connection.installSignedApp(bundlePath: signed)

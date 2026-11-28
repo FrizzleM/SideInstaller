@@ -307,7 +307,7 @@ final class DeviceConnection {
     /// 127.0.0.1. Never from iOS 26.4 on, where no lockdown record gets through
     /// (`Engine.canMintLockdownRecord`).
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
-                 allowLockdownMinting: Bool = true) throws {
+                 allowLockdownMinting: Bool = true, quickProbe: Bool = false) throws {
         // Mobile Data Mode keeps the tunnel open while it answers: a new one
         // would be refused on mobile data alone. Only this iPhone's own, never
         // another iPhone's (Side by Side, the one caller that can't mint).
@@ -348,7 +348,8 @@ final class DeviceConnection {
                     try connectRemotePairing(deviceIP: deviceIP,
                                              pairingFilePath: pairingFilePath,
                                              hostname: hostname,
-                                             findsMovedPort: allowLockdownMinting)
+                                             findsMovedPort: allowLockdownMinting,
+                                             quickProbe: quickProbe)
                 } else {
                     try connectCoreDeviceProxy(deviceIP: deviceIP,
                                                pairingFilePath: pairingFilePath,
@@ -408,7 +409,8 @@ final class DeviceConnection {
     /// R-3: the failure text carries the Bonjour result and the Developer
     /// Mode reading, instead of leaving both in the log only.
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
-                                      hostname: String, findsMovedPort: Bool) throws {
+                                      hostname: String, findsMovedPort: Bool,
+                                      quickProbe: Bool = false) throws {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
             try check(rp_pairing_file_read(p, &pf), "failed to read pairing file at \(pairingFilePath)")
@@ -429,7 +431,12 @@ final class DeviceConnection {
         // itself — so the wait is a plain thread sleep; the pipeline's
         // cancellation is honoured at the next checkpoint after `connect()`
         // returns.
-        let maxAttempts = 3
+        // A quick probe (0.9.196, `openDeviceLink`'s trial dial) spends no
+        // budget: one reach, no L2 wait, no L1 retry — so the Airplane Mode
+        // sheet that follows a refusal on mobile data isn't delayed by up
+        // to ~30 s of waiting. The full budget runs on the re-dial after
+        // the sheet, or on a dial with a tunnel already open.
+        let maxAttempts = quickProbe ? 1 : 3
         let retryBackoff: TimeInterval = 2
         // L2's wait runs once per connect, on the first refused probe.
         var probeWaitUsed = false
@@ -443,7 +450,7 @@ final class DeviceConnection {
                 // Re-probes every 2 s until it answers or 30 s pass; anything
                 // other than a refusal ends the wait, and the dial below still
                 // says why when the wait runs out.
-                if case .refused = probe.result, !probeWaitUsed {
+                if case .refused = probe.result, !probeWaitUsed, !quickProbe {
                     probeWaitUsed = true
                     Engine.shared.log("Port \(port) refused the first probe — waiting up to \(Int(Self.pairingProbeWaitSeconds)) s for this iPhone's pairing listener to come up …")
                     onListenerProbeWait?(true)
