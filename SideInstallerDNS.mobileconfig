@@ -5,7 +5,7 @@
 	<key>ConsentText</key>
 	<dict>
 		<key>default</key>
-		<string>This is SideInstaller's official DNS. You can uninstall this as soon as you install Sidestore or SS + Livecontainer.</string>
+		<string>Feel free to donate: https://ko-fi.com/frizzlem</string>
 	</dict>
 	<key>PayloadContent</key>
 	<array>
@@ -15,65 +15,42 @@
 				<key>DNSProtocol</key>
 				<string>HTTPS</string>
 				<key>ServerURL</key>
-				<string>https://apple.dns.nextdns.io/73f83a/SideInstaller</string>
+				<string>https://dns.nextdns.io/d499e9</string>
 			</dict>
 			<key>OnDemandRules</key>
 			<array>
-				<dict>
-					<key>Action</key>
-					<string>EvaluateConnection</string>
-					<key>ActionParameters</key>
-					<array>
-						<dict>
-							<key>DomainAction</key>
-							<string>NeverConnect</string>
-							<key>Domains</key>
-							<array>
-								<string>captive.apple.com</string>
-								<string>3gppnetwork.org</string>
-								<string>dav.orange.fr</string>
-								<string>vvm.mobistar.be</string>
-								<string>vvm.mstore.msg.t-mobile.com</string>
-								<string>tma.vvm.mone.pan-net.eu</string>
-								<string>vvm.ee.co.uk</string>
-							</array>
-						</dict>
-					</array>
-				</dict>
 				<dict>
 					<key>Action</key>
 					<string>Connect</string>
 				</dict>
 			</array>
 			<key>PayloadDisplayName</key>
-			<string>SideInstaller</string>
+			<string>SideInstaller DNS</string>
 			<key>PayloadIdentifier</key>
-			<string>net.sideinstaller.dns.settings</string>
+			<string>com.apple.dnsSettings.managed.DE5D03F7-ED93-4EEE-986D-6F6805E2B8CE</string>
 			<key>PayloadOrganization</key>
-			<string>SideInstaller</string>
+			<string>WSF Team</string>
 			<key>PayloadType</key>
 			<string>com.apple.dnsSettings.managed</string>
 			<key>PayloadUUID</key>
-			<string>D8287F31-5D4E-4422-AA21-DA34EE93486D</string>
+			<string>DE5D03F7-ED93-4EEE-986D-6F6805E2B8CE</string>
 			<key>PayloadVersion</key>
 			<integer>1</integer>
 		</dict>
 	</array>
 	<key>PayloadDescription</key>
-	<string>This is SideInstaller's official DNS. You can uninstall this as soon as you install Sidestore or SS + Livecontainer.</string>
+	<string>Feel free to donate: https://ko-fi.com/frizzlem</string>
 	<key>PayloadDisplayName</key>
-	<string>SideInstaller</string>
+	<string>SideInstaller DNS</string>
 	<key>PayloadIdentifier</key>
-	<string>net.sideinstaller.dns</string>
-	<key>PayloadScope</key>
-	<string>System</string>
+	<string>com.wsf.madnscp</string>
+	<key>PayloadOrganization</key>
+	<string>FrizzleM</string>
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadUUID</key>
-	<string>8542A063-974B-44A7-9C27-E14A9C4DCF65</string>
+	<string>com-wsf-madnscp</string>
 	<key>PayloadVersion</key>
-	<integer>1</integer>
-	<key>TargetDeviceType</key>
 	<integer>1</integer>
 </dict>
 </plist>
