@@ -234,15 +234,16 @@ struct GPXRoute {
         // below are computed on the kept ones.
         let filtered = Self.filterJumpPoints(found)
         found = filtered.kept
-        droppedJumpPoints = filtered.dropped
+        var dropped = filtered.dropped
         // B-1 (0.9.192): a route with no timestamps at all gets a
         // distance-only outlier pass too — see `filterDistanceOutliers`.
         // A route with any time keeps the timed path above, untouched.
         if found.allSatisfy({ $0.time == nil }) {
             let distanceFiltered = Self.filterDistanceOutliers(found)
             found = distanceFiltered.kept
-            droppedJumpPoints += distanceFiltered.dropped
+            dropped += distanceFiltered.dropped
         }
+        droppedJumpPoints = dropped
 
         name = url.deletingPathExtension().lastPathComponent
         points = found.map(\.coordinate)
