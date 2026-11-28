@@ -73,6 +73,13 @@ struct SettingsView: View {
     /// lives on `Engine` so the success path reads the same value.
     @AppStorage(Engine.deleteAfterInstallKey) private var deleteAfterInstall = false
 
+    /// 0.9.198 F-2: "Automatically clean up old versions after
+    /// installing" — with it on, a successful install deletes older
+    /// versions of the same app (the Downloads page's manual cleanup,
+    /// same guards). Off by default. The key lives on `Engine` so the
+    /// success path reads the same value.
+    @AppStorage(Engine.autoCleanOldVersionsKey) private var autoCleanOldVersions = false
+
     /// 内置隧道本端地址，与 BuiltinTunnel 共用同一 UserDefaults 键。
     @AppStorage("CZFBuiltinTunnelIfaceIP") private var builtinTunnelIfaceIP = "10.7.1.1/32"
     /// Device IP 填非法时弹一次提示（Tunnel 节和 Advanced 节两处栏共用）。
@@ -825,10 +832,12 @@ struct SettingsView: View {
         settingsGroup(title: L("Downloads"), systemImage: "arrow.down.circle") {
             Toggle(L("Wi-Fi only downloads"), isOn: $wifiOnlyDownloads)
             Toggle(L("Delete the IPA after installing"), isOn: $deleteAfterInstall)
+            Toggle(L("Automatically clean up old versions after installing"), isOn: $autoCleanOldVersions)
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
                 Text(L("Deletes the source IPA after a successful install. Files used for renewal are kept."))
+                Text(L("After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept."))
             }
         }
     }

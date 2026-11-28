@@ -2441,31 +2441,47 @@ extension IPALibrary {
     /// IPAs on disk with their app info, newest first, one per bundle ID (the
     /// same build can exist as both a download and an import).
     static func installable() -> [(entry: Entry, info: AppInfo)] {
-        var seen = Set<String>()
-        let scanned = scan().compactMap { entry -> (entry: Entry, info: AppInfo)? in
-            guard let info = appInfo(at: entry.url),
-                  seen.insert(info.bundleID).inserted else { return nil }
-            return (entry, info)
+        // B-1 (0.9.198): one entry per bundle ID — the winner used to be
+        // whichever file was modified last, so an old build re-imported
+        // (new mtime) beat the newer build already on disk, and renewal
+        // then reinstalled the old version over the new one with no
+        // warning (the install path has downgradeCheckForCurrentRun;
+        // renewal had nothing). The winner is now the newest version,
+        // then the newest file (`UpdateChecker.newestFirst`, shared
+        // with the duplicate cleanups); a missing version falls back
+        // to mtime.
+        var winners: [String: (entry: Entry, info: AppInfo)] = [:]
+        func consider(_ entry: Entry, _ info: AppInfo) {
+            guard let current = winners[info.bundleID] else {
+                winners[info.bundleID] = (entry, info)
+                return
+            }
+            if UpdateChecker.newestFirst(lhsVersion: info.version ?? "", lhsModified: entry.modified, lhsPath: entry.url.path,
+                                         rhsVersion: current.info.version ?? "", rhsModified: current.entry.modified, rhsPath: current.entry.url.path) {
+                winners[info.bundleID] = (entry, info)
+            }
+        }
+        for entry in scan() {
+            guard let info = appInfo(at: entry.url) else { continue }
+            consider(entry, info)
         }
         // scan() 只认文件名含 livecontainer/sidestore/madeira 的三个自家
         // 产品（加 Custom 里最新一个导入）。用户手导的 IPA——比如文件页
         // 里明明有的 iCTRL.ipa——就这么被漏掉，续签页还显示“没有对应
         // 的 IPA”，其实文件就在那。文件页能列出来的 IPA 都能当重签源，
         // 续签也必须认：根目录与 Custom 里所有 .ipa 都算上（仍按包名去
-        // 重、最新的赢，scan() 的结果优先）。
-        let extra = [documentsDir, customDir]
-            .flatMap { describe(namesIn: $0) }
-            .filter { $0.name.lowercased().hasSuffix(".ipa") }
-            .sorted { ($0.attrs[.modificationDate] as? Date ?? .distantPast) > ($1.attrs[.modificationDate] as? Date ?? .distantPast) }
-            .compactMap { (_, url, attrs) -> (entry: Entry, info: AppInfo)? in
-                guard let info = appInfo(at: url),
-                      seen.insert(info.bundleID).inserted else { return nil }
-                return (Entry(source: .custom, channel: .stable, url: url,
-                             size: (attrs[.size] as? Int) ?? 0,
-                             modified: attrs[.modificationDate] as? Date,
-                             isImported: true, version: nil), info)
-            }
-        return (scanned + extra).sorted {
+        // 重、版本最新的赢）。
+        for (_, url, attrs) in [documentsDir, customDir]
+            .flatMap({ describe(namesIn: $0) })
+            .filter({ $0.name.lowercased().hasSuffix(".ipa") })
+            .sorted({ ($0.attrs[.modificationDate] as? Date ?? .distantPast) > ($1.attrs[.modificationDate] as? Date ?? .distantPast) }) {
+            guard let info = appInfo(at: url) else { continue }
+            consider(Entry(source: .custom, channel: .stable, url: url,
+                           size: (attrs[.size] as? Int) ?? 0,
+                           modified: attrs[.modificationDate] as? Date,
+                           isImported: true, version: nil), info)
+        }
+        return winners.values.sorted {
             ($0.entry.modified ?? .distantPast) > ($1.entry.modified ?? .distantPast)
         }
     }

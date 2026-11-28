@@ -9,6 +9,9 @@ let turkishStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Bitiş tarihi",
+    "%@（已过期）": "%@ (süresi dolmuş)",
+    "%@（今天到期）": "%@ (bugün sona eriyor)",
+    "%@（剩 %d 天）": "%@ (kalan %d gün)",
     "Signed date": "İmza tarihi",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -68,6 +71,8 @@ let turkishStrings: [String: String] = [
     // Pre-iOS 27: the pairing file has to be imported
 
     "You'll need a pairing file": "Bir eşleme dosyasına ihtiyacın olacak",
+    "Free Apple ID limits": "Ücretsiz Apple Kimliği sınırları",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "Ücretsiz bir Apple Kimliği, uygulamaları 7 gün boyunca imzalar; en fazla 3 uygulama, haftada 10 App ID ve 3 cihazla sınırlıdır. Kurumsal sertifikaların bu sınırları yoktur.",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Bu iPhone iOS %@ çalıştırıyor. Yalnızca iOS %@ kendi kendine eşlenebilir, bu yüzden bilgisayarda — jitterbugpair veya pymobiledevice3 ile — bir eşleme dosyası oluşturup uygulamaya içe aktarman gerekir. SideInstaller adım adım gösterir.",
 
@@ -1661,7 +1666,9 @@ let turkishStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "Kurulumdan sonra IPA'yı sil",
+    "Automatically clean up old versions after installing": "Kurulumdan sonra eski sürümleri otomatik olarak temizle",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Başarılı kurulumdan sonra kaynak IPA'yı siler. Yenileme için kullanılan dosyalar saklanır.",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "Başarılı bir kurulumdan sonra, aynı uygulamanın eski sürümleri otomatik olarak silinir. Yenileme kaynakları korunur.",
     "Install an older version?": "Daha eski bir sürüm yüklensin mi?",
     "Installed: %@ · This IPA: %@": "Yüklü: %@ · Bu IPA: %@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Karşı tarafın iPhone'unun iOS sürümü okunamadı. Yeniden bağlanıp tekrar deneyin — sürümü bilmeden yüklemek, iPhone'larının çalıştıramayacağı bir uygulamayı yükleyebilir.",

@@ -10,6 +10,9 @@ let koreanStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "만료일",
+    "%@（已过期）": "%@ (만료됨)",
+    "%@（今天到期）": "%@ (오늘 만료)",
+    "%@（剩 %d 天）": "%@ (남은 %d일)",
     "Signed date": "서명 날짜",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -70,6 +73,8 @@ let koreanStrings: [String: String] = [
     // Pre-iOS 27: the pairing file has to be imported
 
     "You'll need a pairing file": "페어링 파일이 필요합니다",
+    "Free Apple ID limits": "무료 Apple ID 제한",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "무료 Apple ID로 서명한 앱은 7일간 유효하며, 최대 3개의 앱, 주당 10개의 App ID, 3대의 기기로 제한됩니다. 엔터프라이즈 인증서에는 이러한 제한이 없습니다.",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "이 iPhone의 iOS 버전은 %@입니다. 자기 자신과 페어링할 수 있는 것은 iOS %@ 이상뿐이라서, 컴퓨터에서 jitterbugpair나 pymobiledevice3로 페어링 파일을 만들어 앱으로 가져와야 합니다. 방법은 SideInstaller가 안내해 드립니다.",
 
@@ -1704,7 +1709,9 @@ let koreanStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "설치 후 IPA 삭제",
+    "Automatically clean up old versions after installing": "설치 후 이전 버전을 자동으로 정리",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "설치가 성공하면 원본 IPA를 삭제합니다. 갱신에 사용되는 파일은 유지됩니다.",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "설치가 성공하면 같은 앱의 이전 버전이 자동으로 삭제됩니다. 갱신 소스는 유지됩니다.",
     "Install an older version?": "이전 버전을 설치하시겠습니까?",
     "Installed: %@ · This IPA: %@": "설치됨: %@ · 이 IPA: %@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "상대방 iPhone의 iOS 버전을 읽을 수 없습니다. 다시 연결한 후 시도하세요. 버전을 모른 채 설치하면 상대방 iPhone에서 실행할 수 없는 앱이 설치될 수 있습니다.",

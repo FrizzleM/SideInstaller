@@ -9,6 +9,9 @@ let vietnameseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Ngày hết hạn",
+    "%@（已过期）": "%@ (đã hết hạn)",
+    "%@（今天到期）": "%@ (hết hạn hôm nay)",
+    "%@（剩 %d 天）": "%@ (còn %d ngày)",
     "Signed date": "Ngày ký",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -69,6 +72,8 @@ let vietnameseStrings: [String: String] = [
     // Pre-iOS 27: the pairing file has to be imported
 
     "You'll need a pairing file": "Bạn sẽ cần một tệp ghép nối",
+    "Free Apple ID limits": "Giới hạn của ID Apple miễn phí",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "ID Apple miễn phí ký ứng dụng trong 7 ngày, tối đa 3 ứng dụng, 10 ID ứng dụng mỗi tuần và 3 thiết bị. Chứng chỉ doanh nghiệp không có các giới hạn này.",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "iPhone này chạy iOS %@. Chỉ iOS %@ mới tự ghép nối được, nên bạn phải tạo tệp ghép nối trên máy tính — bằng jitterbugpair hoặc pymobiledevice3 — rồi nhập vào ứng dụng. SideInstaller sẽ hướng dẫn bạn từng bước.",
 
@@ -1740,7 +1745,9 @@ let vietnameseStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "Xóa IPA sau khi cài đặt",
+    "Automatically clean up old versions after installing": "Tự động dọn các phiên bản cũ sau khi cài đặt",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Xóa IPA gốc sau khi cài đặt thành công. Các tệp dùng để gia hạn được giữ lại.",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "Sau khi cài đặt thành công, các phiên bản cũ của cùng một ứng dụng sẽ tự động bị xóa. Các nguồn gia hạn được giữ lại.",
     "Install an older version?": "Cài đặt phiên bản cũ hơn?",
     "Installed: %@ · This IPA: %@": "Đã cài: %@ · IPA này: %@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Không đọc được phiên bản iOS của iPhone bên kia. Hãy kết nối lại rồi thử lại — cài đặt mà không biết phiên bản có thể cài ứng dụng mà iPhone của họ không chạy được.",

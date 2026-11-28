@@ -441,6 +441,10 @@ final class UpdateChecker: ObservableObject {
     /// page; only the watching stops.
     func cancelSelfUpdate() {
         selfUpdateTask?.cancel()
+        // 0.9.198: the user cancelled on purpose — the target marker
+        // must go with the run, or the next launch reports "didn't
+        // finish" for an update nobody wants any more.
+        UserDefaults.standard.removeObject(forKey: Self.selfUpdateTargetKey)
     }
 
     /// Downloads the verified release IPA into the custom slot and runs the

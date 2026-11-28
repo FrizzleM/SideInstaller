@@ -11,6 +11,9 @@ let portugueseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Validade",
+    "%@（已过期）": "%@ (expirado)",
+    "%@（今天到期）": "%@ (expira hoje)",
+    "%@（剩 %d 天）": "%@ (faltam %d dias)",
     "Signed date": "Data da assinatura",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -69,6 +72,8 @@ let portugueseStrings: [String: String] = [
     "Start": "Começar",
 
     "You'll need a pairing file": "Você vai precisar de um arquivo de pareamento",
+    "Free Apple ID limits": "Limites do ID Apple gratuito",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "Um ID Apple gratuito assina apps por 7 dias, com no máximo 3 apps, 10 IDs de app por semana e 3 dispositivos. Certificados empresariais não têm esses limites.",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Este iPhone tem o iOS %@. Só o iOS %@ consegue parear consigo mesmo, então você vai precisar criar um arquivo de pareamento num computador — com o jitterbugpair ou o pymobiledevice3 — e importá-lo no app. O SideInstaller te guia pelo processo.",
 
@@ -1735,7 +1740,9 @@ let portugueseStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "Excluir o IPA após a instalação",
+    "Automatically clean up old versions after installing": "Limpar automaticamente as versões antigas após a instalação",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Exclui o IPA de origem após uma instalação bem-sucedida. Os arquivos usados para renovação são mantidos.",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "Após uma instalação bem-sucedida, as versões antigas do mesmo app são excluídas automaticamente. As fontes de renovação são mantidas.",
     "Install an older version?": "Instalar uma versão mais antiga?",
     "Installed: %@ · This IPA: %@": "Instalada: %@ · Este IPA: %@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Não foi possível ler a versão do iOS do iPhone deles. Reconecte e tente novamente — instalar sem saber pode colocar um app que o iPhone deles não consegue executar.",

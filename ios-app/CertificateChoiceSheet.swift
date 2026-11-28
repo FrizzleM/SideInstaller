@@ -30,6 +30,10 @@ struct CertificateChoiceSheet: View {
     /// install page — the Apple ID choice below signs as the account
     /// picked here, not whatever Settings last had active.
     @EnvironmentObject private var accounts: AccountStore
+    /// 0.9.198 F-1: the Apple ID row's certificate expiry — the sheet
+    /// lives under RootView, which injects CertManager as an
+    /// environment object (RootView.swift:306).
+    @EnvironmentObject private var certManager: CertManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -81,7 +85,9 @@ struct CertificateChoiceSheet: View {
                 identity: .appleID,
                 systemImage: "person.crop.circle",
                 title: L("Apple ID"),
-                detail: L("Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon."))
+                detail: L("Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon."),
+                note: appleIDCertExpiryNote?.text,
+                noteIsAlert: appleIDCertExpiryNote?.isAlert ?? false)
             // 0.9.197: 自更新换的是正在跑的自己——installd 换包时终结旧进程，
             // 看着像闪退；开始前先明说，装完重开就是新版。只在自更新入口
             // 出现，分享进来的安装不走这条。
@@ -100,6 +106,40 @@ struct CertificateChoiceSheet: View {
             .buttonStyle(SecondaryButtonStyle())
         }
         .padding(20)
+        // 0.9.198 F-1: load the certificates lazily so the Apple ID row
+        // can name its expiry (ContentView revoke chooser 同款).
+        // The .task closure is @Sendable, so the @MainActor call needs
+        // the explicit annotation (L113 同款：裸 Task 里调 @MainActor
+        // 同步方法先标 @MainActor).
+        .task { @MainActor in certManager.ensureLoaded {} }
+    }
+
+    /// 0.9.198 F-1: the Apple ID row signs with this Apple ID's
+    /// certificate — show its expiry before the tap, so an expired
+    /// cert is visible here instead of failing mid-install. Soonest
+    /// expiring first (CertManager.sortedByExpiry); nothing shown
+    /// while the list hasn't loaded or no cert carries an expiry.
+    /// Expired only warns — the choice stays tappable, this never
+    /// blocks a signing method (renewal iron rule untouched).
+    private var appleIDCertExpiryNote: (text: String, isAlert: Bool)? {
+        guard let cert = CertManager.sortedByExpiry(certManager.certs).first(where: { $0.expiresAt != nil }),
+              let expiry = cert.expiresAt else { return nil }
+        return (L("Expiry date") + ": " + expiryLabel(expiry), cert.isExpired)
+    }
+
+    /// CertsView.expiryLabel 同款算法（自然日对齐，见 S7）：同一到期
+    /// 日在两页说法一致。只改日期显示，不动 ID 签名/续签逻辑。
+    private func expiryLabel(_ expiry: Date) -> String {
+        let date = expiry.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .omitted)
+                .locale(Localizer.locale))
+        let calendar = Calendar.current
+        let days = calendar.dateComponents([.day],
+            from: calendar.startOfDay(for: Date()),
+            to: calendar.startOfDay(for: expiry)).day ?? 0
+        if days < 0 { return L("%@（已过期）", date) }
+        if days == 0 { return L("%@（今天到期）", date) }
+        return L("%@（剩 %d 天）", date, days)
     }
 
     /// ContentView.pickInstallAccount 同款：切账号并等旧会话释放完，
@@ -113,7 +153,7 @@ struct CertificateChoiceSheet: View {
         engine.log("Signing choice: signing account switched to \(account.normalized).")
     }
 
-    private func choiceRow(identity: CZFSignIdentity, systemImage: String, title: String, detail: String) -> some View {
+    private func choiceRow(identity: CZFSignIdentity, systemImage: String, title: String, detail: String, note: String? = nil, noteIsAlert: Bool = false) -> some View {
         Button { onChoose(identity) } label: {
             // U-2 (0.9.190): new shell — the row is a PanelCard; the
             // Theme.control background and the 12pt corner are the
@@ -132,6 +172,15 @@ struct CertificateChoiceSheet: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
+                        // 0.9.198 F-1: the Apple ID row's certificate
+                        // expiry — an extra line under the detail, red
+                        // once expired, still tappable.
+                        if let note {
+                            Text(note)
+                                .font(.footnote)
+                                .foregroundStyle(noteIsAlert ? Theme.negative : Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Spacer()
                     // F-1 (0.9.190): mark the last-used signing method —

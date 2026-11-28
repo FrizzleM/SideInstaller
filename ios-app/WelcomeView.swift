@@ -29,13 +29,19 @@ struct WelcomeView: View {
                         pairingFileNotice
                             .welcomeItem(2)
                     }
-                    checkboxRow
+                    // 0.9.198 F-3: the free Apple ID limits, before the
+                    // first install — the four walls (7 days, 3 apps,
+                    // 10 App IDs a week, 3 devices) otherwise only show
+                    // up as errors mid-install.
+                    freeLimitsNotice
                         .welcomeItem(Engine.deviceCanSelfPair ? 2 : 3)
+                    checkboxRow
+                        .welcomeItem(Engine.deviceCanSelfPair ? 3 : 4)
                     Button(L("Start")) { hasAcceptedTOS = true }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!accepted)
                         .animation(.snappy(duration: 0.25), value: accepted)
-                        .welcomeItem(Engine.deviceCanSelfPair ? 3 : 4)
+                        .welcomeItem(Engine.deviceCanSelfPair ? 4 : 5)
                 }
                 .padding(.horizontal, 24)
                 .pageColumn()
@@ -80,6 +86,34 @@ struct WelcomeView: View {
             .fill(Color.orange.opacity(0.12)))
         .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
             .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
+    }
+
+    /// 0.9.198 F-3: the free Apple ID limits, same card shape as
+    /// `pairingFileNotice` — static text only, no logic, no state,
+    /// no new permission. The four limits are Apple's walls, not
+    /// SideInstaller's: 7-day expiry, at most 3 apps, 10 App IDs a
+    /// week, 3 devices (see SigningTeams.swift:189, Engine.swift:82).
+    private var freeLimitsNotice: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .font(.title3)
+                .foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("Free Apple ID limits"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(L("A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+            .fill(Theme.accent.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+            .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
     }
 
     /// The tickbox row, where only "Terms" itself opens the terms page.

@@ -9,6 +9,9 @@ let chineseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "到期日",
+    "%@（已过期）": "%@（已过期）",
+    "%@（今天到期）": "%@（今天到期）",
+    "%@（剩 %d 天）": "%@（剩 %d 天）",
     "Signed date": "签名日期",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -69,6 +72,8 @@ let chineseStrings: [String: String] = [
     // Pre-iOS 27: the pairing file has to be imported
 
     "You'll need a pairing file": "你需要一个配对文件",
+    "Free Apple ID limits": "免费 Apple ID 限制",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "免费 Apple ID 签的 App 只有 7 天有效期，最多装 3 个 App，每周 10 个 App ID，最多 3 台设备。企业证书不受这些限制。",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "本机运行 iOS %@。只有 iOS %@ 能与自身配对，因此你需要在电脑上用 jitterbugpair 或 pymobiledevice3 生成配对文件，再导入到 App 中。SideInstaller 会逐步引导你。",
 
@@ -1715,7 +1720,9 @@ let chineseStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "安装后删除 IPA",
+    "Automatically clean up old versions after installing": "安装成功后自动清理旧版本",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "安装成功后删除源 IPA。用于续签的文件会保留。",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "安装成功后，同一 App 的旧版本会自动删除。续签源文件会保留。",
     "Install an older version?": "安装旧版本？",
     "Installed: %@ · This IPA: %@": "已装：%@ · 此 IPA：%@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "读取不到对方 iPhone 的 iOS 版本。请重新连接再试——不知道版本就安装，可能会装上对方 iPhone 跑不了的应用。",

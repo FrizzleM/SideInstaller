@@ -189,6 +189,15 @@ final class Engine {
         UserDefaults.standard.bool(forKey: deleteAfterInstallKey)
     }
 
+    /// The Settings switch for 0.9.198 F-2: after a successful install,
+    /// delete older versions of the same app automatically. Off by
+    /// default. The key lives on `Engine` so the success path reads the
+    /// same value the Settings toggle writes.
+    static let autoCleanOldVersionsKey = "SIDAutoCleanOldVersions"
+    static var autoCleanOldVersions: Bool {
+        UserDefaults.standard.bool(forKey: autoCleanOldVersionsKey)
+    }
+
     /// A downloaded IPA was deleted by the F-1 post-install cleanup: the
     /// Downloads and Files lists rescan on it instead of waiting for the
     /// next time they're opened.
@@ -4469,6 +4478,16 @@ final class Engine {
         // F-1 (0.9.159): with the Settings switch on, the source IPA goes
         // away now that the install is done — renewal sources never do.
         deleteInstalledSourceIPAIfEnabled()
+        // 0.9.198 F-2: with the Settings switch on, older versions of the
+        // same app go away now that the install is done — the same
+        // cleanup the Downloads page runs by hand, same guards
+        // (installing / signing / renewing / renewal source). A failed
+        // delete only logs; the install already succeeded, so it must
+        // not turn into a failure.
+        if Self.autoCleanOldVersions {
+            let summary = DownloadsManager.shared.autoCleanupOldVersions()
+            log("Downloads: auto cleanup after install — \(summary)")
+        }
     }
 
     /// F-1 (0.9.159): deletes the IPA this run installed from, when the

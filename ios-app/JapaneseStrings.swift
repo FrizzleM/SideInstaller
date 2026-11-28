@@ -9,6 +9,9 @@ let japaneseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "有効期限",
+    "%@（已过期）": "%@（期限切れ）",
+    "%@（今天到期）": "%@（本日期限切れ）",
+    "%@（剩 %d 天）": "%@（残り %d 日）",
     "Signed date": "署名日",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
@@ -69,6 +72,8 @@ let japaneseStrings: [String: String] = [
     // Pre-iOS 27: the pairing file has to be imported
 
     "You'll need a pairing file": "ペアリングファイルが必要です",
+    "Free Apple ID limits": "無料 Apple ID の制限",
+    "A free Apple ID signs apps for 7 days, with at most 3 apps, 10 App IDs a week, and 3 devices. Enterprise certificates don't have these limits.": "無料の Apple ID で署名したアプリは 7 日間のみ有効で、最大 3 個のアプリ、週 10 個の App ID、3 台のデバイスまでです。エンタープライズ証明書にはこれらの制限はありません。",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "この iPhone は iOS %@ で動作しています。自分自身とペアリングできるのは iOS %@ 以降のみのため、パソコンで jitterbugpair または pymobiledevice3 を使ってペアリングファイルを作成し、アプリにインポートする必要があります。手順は SideInstaller が案内します。",
 
@@ -1703,7 +1708,9 @@ let japaneseStrings: [String: String] = [
     // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
 
     "Delete the IPA after installing": "インストール後に IPA を削除",
+    "Automatically clean up old versions after installing": "インストール後に古いバージョンを自動的に削除",
     "Deletes the source IPA after a successful install. Files used for renewal are kept.": "インストール成功後に元の IPA を削除します。更新に使うファイルは残ります。",
+    "After a successful install, older versions of the same app are deleted automatically. Renewal sources are kept.": "インストールが成功すると、同じアプリの古いバージョンが自動的に削除されます。更新用のソースは保持されます。",
     "Install an older version?": "古いバージョンをインストールしますか？",
     "Installed: %@ · This IPA: %@": "インストール済み: %@ · この IPA: %@",
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "相手の iPhone の iOS バージョンを読み取れませんでした。再接続してもう一度お試しください。バージョンが分からないままインストールすると、相手の iPhone で動かないアプリが入るおそれがあります。",

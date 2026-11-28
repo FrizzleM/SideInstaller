@@ -55,7 +55,24 @@ enum DeepLink: Hashable {
 
         switch action {
         case "install":
-            guard let raw = query["url"], let link = Engine.downloadLink(raw) else {
+            // B-2 (0.9.198): the inner IPA link often carries its own
+            // query (?token=…&sig=…), and queryItems splits on every
+            // "&", so everything after the first "&" was lost and the
+            // download failed with a generic error that never said the
+            // link was cut. Take the raw query and keep everything
+            // after the "url=" parameter name (re-joining the "&"
+            // segments the inner link was split into), then decode
+            // once; a link the sender already percent-encoded decodes
+            // to the same value queryItems gave.
+            var raw = query["url"]
+            if let encodedQuery = components.percentEncodedQuery {
+                let segments = encodedQuery.split(separator: "&", omittingEmptySubsequences: false)
+                if let idx = segments.firstIndex(where: { $0.lowercased().hasPrefix("url=") }) {
+                    let rest = String(segments[idx...].joined(separator: "&").dropFirst(4))
+                    raw = rest.removingPercentEncoding ?? rest
+                }
+            }
+            guard let raw, let link = Engine.downloadLink(raw) else {
                 return .invalid(L("That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from."))
             }
             return .link(.install(link))

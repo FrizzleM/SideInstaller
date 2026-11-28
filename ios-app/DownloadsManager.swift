@@ -48,6 +48,12 @@ final class DownloadsManager: ObservableObject {
     /// True once `refresh()` has run (tells "not loaded" apart from "empty").
     @Published private(set) var hasLoaded = false
 
+    /// 0.9.198 F-2: shared instance for callers without a view (Engine's
+    /// post-install auto-cleanup) — the Downloads page keeps its own
+    /// @StateObject; this instance's list is only used inside
+    /// `autoCleanupOldVersions`, which rebuilds it from disk first.
+    static let shared = DownloadsManager()
+
     private var engine: Engine { Engine.shared }
 
     /// Total bytes across every IPA, for the header summary.
@@ -257,6 +263,22 @@ final class DownloadsManager: ObservableObject {
             lastError = L("This file is being renewed. Wait until it finishes.")
         }
         refresh()
+    }
+
+    /// 0.9.198 F-2: the manual "clean up old versions" run from code —
+    /// rebuilds the list from disk first (this shared instance has no
+    /// view driving refresh()), then runs the same preview + delete
+    /// and returns the same summary the button shows. Failures only
+    /// log, never turn a finished install into a failure.
+    @MainActor
+    func autoCleanupOldVersions() -> String {
+        downloads = IPALibrary.scan().map {
+            DownloadedIPA(source: $0.source, channel: $0.channel, url: $0.url,
+                          size: $0.size, modified: $0.modified, isImported: $0.isImported,
+                          version: $0.version)
+        }
+        hasLoaded = true
+        return cleanupOldVersions()
     }
 
     /// F-2 (0.9.161): what "clean up old versions" would delete, before
