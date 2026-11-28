@@ -196,9 +196,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingSigningChoice, onDismiss: { runDeferredSelfUpdateChoice() }) {
                 CertificateChoiceSheet(
-                    isSelfUpdate: true,
                     onChoose: { deferredSelfUpdateChoice = $0; showingSigningChoice = false },
-                    onCancel: { showingSigningChoice = false }
+                    onCancel: { showingSigningChoice = false },
+                    isSelfUpdate: true
                 )
             }
             .alert(L("LocalDevVPN 隧道"), isPresented: $showLOCStopNote) {
