@@ -202,9 +202,9 @@ struct FilesTabView: View {
     @State private var pendingMoveDestDir = ""
     /// 批量删除待确认（工具栏“删除所选”点后先弹确认，带数量）。
     @State private var pendingDeleteSelection = false
-    /// F-1 (0.9.188)：清理重复待确认——(组数, 待删项)，nil = 不弹；
-    /// 独立于 pendingDeleteSelection，不复用它的绑定。
-    @State private var pendingDuplicateCleanup: (groups: Int, toDelete: [LocalFileItem])?
+    /// F-1 (0.9.188)：清理重复待确认——(组数, 待删项, 真重复组数,
+    /// 旧版本组数)，nil = 不弹；独立于 pendingDeleteSelection，不复用它的绑定。
+    @State private var pendingDuplicateCleanup: (groups: Int, toDelete: [LocalFileItem], duplicateGroups: Int, oldVersionGroups: Int)?
     /// 通用失败提示（UI-5：由 B-3 的删除失败 alert 泛化而来——页尾 opMessage
     /// 在列表底下，顶部看不到，任何失败都可经这条 alert 可见；
     /// UI-2(b)：opMessage 的 .onChange 里 opFailed == true 时也会把
@@ -552,9 +552,13 @@ struct FilesTabView: View {
     /// 这行 IPA 是不是某 App 续签用的源（行内角标 + 详情页同认）：
     /// 路径对上，或包名对上（改名/移过文件夹后路径变了，包名还能认）。
     /// 认进页时读的缓存清单，不每行读盘。
-    private func renewalSource(for item: LocalFileItem) -> RenewalSourceEntry? {
+    /// 0.9.197：包名兜底只保每 Bundle ID 最新一份——清理旧版本时传
+    /// `allowBundleIDFallback: false`（候选本就是排过序的旧份；包名
+    /// 兜底会把一张续签记录护住该 App 全部历史版本，清理失效），那时
+    /// 只认记录的路径。删文件警告仍走默认。
+    private func renewalSource(for item: LocalFileItem, allowBundleIDFallback: Bool = true) -> RenewalSourceEntry? {
         if let hit = renewalSources.first(where: { $0.ipaPath == item.url.path }) { return hit }
-        guard item.isIPA else { return nil }
+        guard allowBundleIDFallback, item.isIPA else { return nil }
         guard let bundleID = fileIPAInfo[item.url.path]?.bundleID, !bundleID.isEmpty else { return nil }
         return renewalSources.first(where: { $0.bundleID == bundleID })
     }
@@ -1250,7 +1254,7 @@ struct FilesTabView: View {
         // F-1 (0.9.188)：清理重复确认——独立 Bool state（不用
         // pendingDeleteSelection / opErrorMessage 的绑定），Side 惯例
         // .alert（不用 Live 的 confirmationDialog）。
-        .alert(L("Clean up duplicate IPAs"), isPresented: Binding(
+        .alert(L("Clean up duplicates & old versions"), isPresented: Binding(
             get: { pendingDuplicateCleanup != nil },
             set: { if !$0 { pendingDuplicateCleanup = nil } }
         )) {
@@ -1260,7 +1264,7 @@ struct FilesTabView: View {
             }
             Button(L("Cancel"), role: .cancel) { pendingDuplicateCleanup = nil }
         } message: {
-            Text(L("Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.", pendingDuplicateCleanup?.groups ?? 0, pendingDuplicateCleanup?.toDelete.count ?? 0))
+            Text(L("Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.", pendingDuplicateCleanup?.duplicateGroups ?? 0, pendingDuplicateCleanup?.oldVersionGroups ?? 0, pendingDuplicateCleanup?.toDelete.count ?? 0))
         }
         // UI-5：通用失败提示（B-3 的删除失败 alert 泛化而来——页尾 importCard 的
         // opMessage 在列表底下，顶部看不到；失败 alert 只在操作执行后
@@ -1423,7 +1427,7 @@ struct FilesTabView: View {
                     CZFHaptics.impact(.light)
                     pendingDuplicateCleanup = duplicates
                 } label: {
-                    Text(L("Clean up duplicates (%d)", duplicates.toDelete.count))
+                    Text(L("Clean up old copies (%d)", duplicates.toDelete.count))
                 }
                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 .controlSize(.small)
@@ -2667,28 +2671,48 @@ struct FilesTabView: View {
     /// 产物）与未解析的行不进分组；非 IPA 行不进分组。同组留修改时间
     /// 最新的一份，其余进待删集（整组永不全删；mtime 打平用路径兜底
     /// 保确定性）。与 Downloads 页的“清理旧版本”（每 Bundle ID 只留
-    /// 最新版本，跨版本删）不是一回事，不共用函数。
-    private func duplicateCleanup(in partition: FilePartition) -> (groups: Int, toDelete: [LocalFileItem]) {
+    /// 最新版本，跨版本删）同款排序（`UpdateChecker.newestFirst`），
+    /// 分组仍各做各的（两边条目类型与信息来源不同）。
+    /// 0.9.197：分组 key 改成 Bundle ID——旧 key 下不同版本各成一组，
+    /// 清理永远删不到旧版本（自更新/签名只存新文件、从不删旧的，旧版
+    /// 越堆越多，用户 2026-11-29 00:01 定自更新后自动清、只留最新）。
+    /// 组内按版本（`UpdateChecker.newestFirst`，与 Downloads 页同款
+    /// 排序）再按修改时间排，只留最新一份；版本或构建号为空的行仍不
+    /// 参与（无版本证不出谁旧，误删不如不删），Signed 目录与未解析的
+    /// 行同前不进分组。返回里 duplicateGroups 是组内版本与构建号全
+    /// 相同的组（真重复），oldVersionGroups 是其余组（旧版本/旧构建），
+    /// alert 文案两数分开报。
+    private func duplicateCleanup(in partition: FilePartition) -> (groups: Int, toDelete: [LocalFileItem], duplicateGroups: Int, oldVersionGroups: Int) {
         var groups: [String: [LocalFileItem]] = [:]
         for item in partition.ipas where item.isIPA && !item.isInSignedDir {
             guard let info = fileIPAInfo[item.url.path],
                   !info.bundleID.isEmpty,
                   let version = info.version, !version.isEmpty,
                   let build = info.build, !build.isEmpty else { continue }
-            groups["\(info.bundleID)\n\(version)\n\(build)", default: []].append(item)
+            groups[info.bundleID, default: []].append(item)
         }
         var toDelete: [LocalFileItem] = []
         var groupCount = 0
+        var duplicateGroups = 0
+        var oldVersionGroups = 0
         for members in groups.values where members.count > 1 {
             groupCount += 1
+            let versions = Set(members.compactMap { fileIPAInfo[$0.url.path]?.version })
+            let builds = Set(members.compactMap { fileIPAInfo[$0.url.path]?.build })
+            if versions.count == 1 && builds.count == 1 {
+                duplicateGroups += 1
+            } else {
+                oldVersionGroups += 1
+            }
             let sorted = members.sorted {
-                let a = $0.modified ?? .distantPast, b = $1.modified ?? .distantPast
-                if a != b { return a > b }
-                return $0.url.path < $1.url.path
+                let aVersion = fileIPAInfo[$0.url.path]?.version ?? ""
+                let bVersion = fileIPAInfo[$1.url.path]?.version ?? ""
+                return UpdateChecker.newestFirst(lhsVersion: aVersion, lhsModified: $0.modified, lhsPath: $0.url.path,
+                                                 rhsVersion: bVersion, rhsModified: $1.modified, rhsPath: $1.url.path)
             }
             toDelete.append(contentsOf: sorted.dropFirst())
         }
-        return (groupCount, toDelete)
+        return (groupCount, toDelete, duplicateGroups, oldVersionGroups)
     }
 
     /// F-1 (0.9.188)：执行清理重复——删前一刻按当时列表重算一次
@@ -2711,7 +2735,10 @@ struct FilesTabView: View {
             if engine.isInstallingSource(path: item.url.path) { skippedInstalling += 1; continue }
             if engine.isSigningSource(path: item.url.path) { skippedSigning += 1; continue }
             if engine.isRenewingSource(path: item.url.path) { skippedRenewing += 1; continue }
-            if renewalSource(for: item) != nil { skippedRenewalSource += 1; continue }
+            // 0.9.197: 候选本就是旧份，包名兜底不适用——一张续签记录护住
+            // 该 App 全部历史版本，清理永远删不到旧版；只认记录的路径
+            //（最新那份根本不在候选里）。
+            if renewalSource(for: item, allowBundleIDFallback: false) != nil { skippedRenewalSource += 1; continue }
             hadIPA = true
             if removeFileFromDisk(item) {
                 deleted += 1
@@ -2750,7 +2777,7 @@ struct FilesTabView: View {
             opFailed = true
             opErrorMessage = opMessage
         } else {
-            opMessage = L("Cleaned up %d duplicate IPAs.", deleted)
+            opMessage = L("Cleaned up %d old copies.", deleted)
             opFailed = false
         }
     }

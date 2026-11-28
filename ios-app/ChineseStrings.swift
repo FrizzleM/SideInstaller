@@ -1738,10 +1738,6 @@ let chineseStrings: [String: String] = [
     "Clean up %d old versions?": "清理 %d 个旧版本？",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "每个 App 只保留最新版本。删掉的文件无法恢复。",
     "Cleaned up %d old versions.": "已清理 %d 个旧版本。",
-    "Clean up duplicates (%d)": "清理重复（%d）",
-    "Clean up duplicate IPAs": "清理重复包",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "发现 %d 组重复包，共 %d 个旧包将被删除，每组保留修改时间最新的一份，此操作无法撤销。",
-    "Cleaned up %d duplicate IPAs.": "已清理 %d 个重复包。",
     "Failed to delete %d files: %@": "有 %d 个文件删除失败：%@",
     "%d renewal source files were skipped.": "其中 %d 个续签用的文件已跳过。",
     "Including %d signed IPAs installed via enterprise install.": "其中 %d 个已签名包通过企业安装完成。",
@@ -1889,4 +1885,13 @@ let chineseStrings: [String: String] = [
     "Refreshing… %ds": "正在刷新…%d秒",
     "Location refresh timed out — the session may have closed. Try again.": "刷新定位超时，会话可能已断开，请重试。",
     "No simulated location to refresh yet — set one first.": "还没有可刷新的模拟位置，请先设置一个。",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "更新时会退出一次，属正常，装完重新打开就是新版。",
+    "Updated to %@ — you're on the latest version.": "已更新到 %@，现在就是最新版。",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "自更新到 %@ 没完成，点“检查更新”再试一次。",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "发现 %d 组重复包和 %d 组旧版本，共 %d 个旧包将被删除，每组保留最新版本，此操作无法撤销。",
+    "Clean up old copies (%d)": "清理旧包（%d）",
+    "Cleaned up %d old copies.": "已清理 %d 个旧包。",
+    "Clean up duplicates & old versions": "清理重复与旧版本",
 ]

@@ -1763,10 +1763,6 @@ let vietnameseStrings: [String: String] = [
     "Clean up %d old versions?": "Dọn %d phiên bản cũ?",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "Chỉ giữ lại phiên bản mới nhất của mỗi ứng dụng. Không thể khôi phục các tệp đã xóa.",
     "Cleaned up %d old versions.": "Đã dọn %d phiên bản cũ.",
-    "Clean up duplicates (%d)": "Dọn dẹp trùng lặp (%d)",
-    "Clean up duplicate IPAs": "Dọn dẹp IPA trùng lặp",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "Tìm thấy %d nhóm IPA trùng lặp. %d bản sao cũ sẽ bị xóa. Bản sao được sửa đổi gần đây nhất trong mỗi nhóm được giữ lại. Thao tác này không thể hoàn tác.",
-    "Cleaned up %d duplicate IPAs.": "Đã dọn dẹp %d IPA trùng lặp.",
     "Failed to delete %d files: %@": "Không thể xóa %d tệp: %@",
     "%d renewal source files were skipped.": "Đã bỏ qua %d tệp nguồn gia hạn.",
     "Including %d signed IPAs installed via enterprise install.": "Trong đó %d IPA đã ký được cài đặt qua cài đặt doanh nghiệp.",
@@ -1914,4 +1910,13 @@ let vietnameseStrings: [String: String] = [
     "Refreshing… %ds": "Đang làm mới… %d giây",
     "Location refresh timed out — the session may have closed. Try again.": "Làm mới vị trí đã hết thời gian — phiên có thể đã đóng. Hãy thử lại.",
     "No simulated location to refresh yet — set one first.": "Chưa có vị trí mô phỏng nào để làm mới — hãy đặt một vị trí trước.",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "Ứng dụng sẽ thoát một lần trong lúc cập nhật — đó là bình thường. Mở lại sau đó và bạn sẽ dùng phiên bản mới.",
+    "Updated to %@ — you're on the latest version.": "Đã cập nhật lên %@ — bạn đang dùng phiên bản mới nhất.",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "Tự cập nhật lên %@ chưa xong — chạm vào “Kiểm tra cập nhật” để thử lại.",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "Tìm thấy %d nhóm trùng lặp và %d nhóm phiên bản cũ. %d bản sao cũ sẽ bị xóa. Phiên bản mới nhất trong mỗi nhóm được giữ lại. Thao tác này không thể hoàn tác.",
+    "Clean up old copies (%d)": "Dọn dẹp bản sao cũ (%d)",
+    "Cleaned up %d old copies.": "Đã dọn dẹp %d bản sao cũ.",
+    "Clean up duplicates & old versions": "Dọn dẹp bản trùng lặp và phiên bản cũ",
 ]

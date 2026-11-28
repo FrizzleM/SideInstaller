@@ -1726,10 +1726,6 @@ let japaneseStrings: [String: String] = [
     "Clean up %d old versions?": "%d 件の古いバージョンを整理しますか？",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "各アプリの最新バージョンのみ残します。削除したファイルは復元できません。",
     "Cleaned up %d old versions.": "%d 件の古いバージョンを整理しました。",
-    "Clean up duplicates (%d)": "重複を整理（%d）",
-    "Clean up duplicate IPAs": "重複した IPA を整理",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "%d グループの重複 IPA が見つかりました。%d 件の古いコピーが削除されます。各グループで最後に変更されたコピーが残ります。この操作は取り消せません。",
-    "Cleaned up %d duplicate IPAs.": "%d 件の重複 IPA を整理しました。",
     "Failed to delete %d files: %@": "%d 件のファイルの削除に失敗しました: %@",
     "%d renewal source files were skipped.": "%d 件の更新元ファイルがスキップされました。",
     "Including %d signed IPAs installed via enterprise install.": "うち %d 件の署名済み IPA をエンタープライズインストールでインストールしました。",
@@ -1877,4 +1873,13 @@ let japaneseStrings: [String: String] = [
     "Refreshing… %ds": "更新中…%d秒",
     "Location refresh timed out — the session may have closed. Try again.": "位置情報の更新がタイムアウトしました。セッションが切れた可能性があります。もう一度お試しください。",
     "No simulated location to refresh yet — set one first.": "更新するシミュレーション位置がまだありません。先に設定してください。",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "アップデート中にアプリが一度終了しますが、正常な動作です。あとでもう一度開けば新しいバージョンになっています。",
+    "Updated to %@ — you're on the latest version.": "%@ に更新しました — 最新バージョンです。",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "%@ への自己更新が完了しませんでした — 「アップデートを確認」をタップして再試行してください。",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "重複グループが %d 件、古いバージョンのグループが %d 件見つかりました。%d 件の古いコピーが削除されます。各グループでは最新バージョンが残ります。この操作は取り消せません。",
+    "Clean up old copies (%d)": "古いコピーを整理（%d）",
+    "Cleaned up %d old copies.": "%d 件の古いコピーを整理しました。",
+    "Clean up duplicates & old versions": "重複と古いバージョンを整理",
 ]

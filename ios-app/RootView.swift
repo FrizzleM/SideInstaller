@@ -352,6 +352,15 @@ struct RootView: View {
             if let question, old?.request != question.request {
                 SoundEffects.play(.attention)
             }
+            // C31 扩展 (0.9.197)：选队 sheet 与 2FA 同款——弹着时安装页
+            // 暂存，清掉后放行；放行只在两张登录 sheet 都清了时才做
+            //（见 `releaseInstallSheetIfReady`）。
+            if question != nil {
+                if showInstallSheet { showInstallSheetPending = true }
+                showInstallSheet = false
+            } else {
+                releaseInstallSheetIfReady()
+            }
         }
         .onChange(of: engine.twoFactor) { old, phase in
             // C31：2FA 来了先落安装页（全屏 sheet 盖住 TabView 时 2FA sheet
@@ -359,9 +368,8 @@ struct RootView: View {
             if phase != nil {
                 if showInstallSheet { showInstallSheetPending = true }
                 showInstallSheet = false
-            } else if showInstallSheetPending {
-                showInstallSheetPending = false
-                showInstallSheet = true
+            } else {
+                releaseInstallSheetIfReady()
             }
             // A code is wanted, or the one entered was turned down.
             if let phase, phase.isAsking {
@@ -374,14 +382,27 @@ struct RootView: View {
         }
     }
 
-    /// C31：安装页与 2FA sheet 不能同时 present——2FA 弹着时只记 pending，
-    /// 等 2FA 清掉再补开安装页（否则 UIKit 静默丢弃 present）。
+    /// C31：安装页与登录 sheet 不能同时 present——登录 sheet 弹着时
+    /// 只记 pending，等登录 sheet 清掉再补开安装页（否则 UIKit 静默
+    /// 丢弃 present）。
+    /// 0.9.197：登录 sheet 是两张——2FA 与选队（`engine.signInAccount`
+    /// 在此基底不存在，登录 sheet 由 `twoFactor` + `teamQuestion` 驱动，
+    /// 见 `signInSheet`），任一张在都暂存。
     private func openInstallSheet() {
-        if engine.twoFactor != nil {
+        if engine.twoFactor != nil || engine.teamQuestion != nil {
             showInstallSheetPending = true
         } else {
             showInstallSheet = true
         }
+    }
+
+    /// 0.9.197：暂缓的安装页只在两张登录 sheet 都清了时才放行——
+    /// 2FA 答完清掉、选队 sheet 紧接着起来的瞬间只看一张会把安装页
+    /// 提前放出来，再被选队 sheet 盖住吞掉（与 C31 原 bug 同款）。
+    private func releaseInstallSheetIfReady() {
+        guard showInstallSheetPending, engine.twoFactor == nil, engine.teamQuestion == nil else { return }
+        showInstallSheetPending = false
+        showInstallSheet = true
     }
 
     /// The sign-in sheet's content now. The team question comes once the code

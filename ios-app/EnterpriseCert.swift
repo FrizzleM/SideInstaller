@@ -1673,10 +1673,15 @@ enum RenewalSourceStore {
 
     /// 这个文件是不是某 App 续签用的源：路径对上，或包名对上（改名/移
     /// 过文件夹后路径变了，包名还能认出来），都算。
-    static func source(forFileURL url: URL, bundleID: String?) -> RenewalSourceEntry? {
+    /// 0.9.197：包名兜底只保每 Bundle ID 最新一份——清理旧版本时传
+    /// `allowBundleIDFallback: false`（候选本就是排过序的旧份；包名
+    /// 兜底会把一张续签记录护住该 App 全部历史版本，两个清理都失效），
+    /// 那时只认记录的路径。删单文件警告与装完删源仍走默认（那文件
+    /// 就是当前最新的那份，兜底语义不变）。
+    static func source(forFileURL url: URL, bundleID: String?, allowBundleIDFallback: Bool = true) -> RenewalSourceEntry? {
         let entries = load()
         if let hit = entries.first(where: { $0.ipaPath == url.path }) { return hit }
-        guard let bundleID, !bundleID.isEmpty else { return nil }
+        guard allowBundleIDFallback, let bundleID, !bundleID.isEmpty else { return nil }
         return entries.first { $0.bundleID == bundleID }
     }
 }

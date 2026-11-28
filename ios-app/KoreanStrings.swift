@@ -1727,10 +1727,6 @@ let koreanStrings: [String: String] = [
     "Clean up %d old versions?": "이전 버전 %d개를 정리하시겠습니까?",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "각 앱의 최신 버전만 유지합니다. 삭제된 파일은 복원할 수 없습니다.",
     "Cleaned up %d old versions.": "이전 버전 %d개를 정리했습니다.",
-    "Clean up duplicates (%d)": "중복 정리 (%d)",
-    "Clean up duplicate IPAs": "중복 IPA 정리",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "%d개의 중복 IPA 그룹을 찾았습니다. %d개의 이전 복사본이 삭제됩니다. 각 그룹에서 가장 최근에 수정된 복사본이 유지됩니다. 이 작업은 되돌릴 수 없습니다.",
-    "Cleaned up %d duplicate IPAs.": "%d개의 중복 IPA를 정리했습니다.",
     "Failed to delete %d files: %@": "%d개 파일 삭제 실패: %@",
     "%d renewal source files were skipped.": "%d개의 갱신 원본 파일을 건너뛰었습니다.",
     "Including %d signed IPAs installed via enterprise install.": "그중 %d개의 서명된 IPA를 엔터프라이즈 설치로 설치했습니다.",
@@ -1878,4 +1874,13 @@ let koreanStrings: [String: String] = [
     "Refreshing… %ds": "새로고침 중…%d초",
     "Location refresh timed out — the session may have closed. Try again.": "위치 새로고침 시간이 초과되었습니다. 세션이 종료되었을 수 있습니다. 다시 시도하세요.",
     "No simulated location to refresh yet — set one first.": "새로고침할 시뮬레이션된 위치가 아직 없습니다. 먼저 설정하세요.",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "업데이트 중에 앱이 한 번 종료됩니다. 정상입니다. 이후 다시 열면 새 버전으로 실행됩니다.",
+    "Updated to %@ — you're on the latest version.": "%@로 업데이트했습니다 — 최신 버전입니다.",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "%@로의 자체 업데이트가 완료되지 않았습니다 — “업데이트 확인”을 눌러 다시 시도하세요.",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "중복 그룹 %d개와 이전 버전 그룹 %d개를 찾았습니다. %d개의 이전 복사본이 삭제됩니다. 각 그룹에서 최신 버전이 유지됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "Clean up old copies (%d)": "이전 복사본 정리 (%d)",
+    "Cleaned up %d old copies.": "%d개의 이전 복사본을 정리했습니다.",
+    "Clean up duplicates & old versions": "중복 및 이전 버전 정리",
 ]

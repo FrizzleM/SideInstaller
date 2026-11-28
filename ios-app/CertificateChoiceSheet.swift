@@ -20,6 +20,10 @@ struct SigningChoiceRequest: Identifiable {
 struct CertificateChoiceSheet: View {
     var onChoose: (CZFSignIdentity) -> Void
     var onCancel: () -> Void
+    /// 0.9.197: true when the sheet picks how a self-update signs (About /
+    /// Install banner) — the sheet then says up front that the app quits
+    /// once while updating. Share-in installs keep the default: no note.
+    var isSelfUpdate: Bool = false
 
     @Environment(Engine.self) private var engine
     /// P1-2 (0.9.186): the signing account picker, same store as the
@@ -78,6 +82,15 @@ struct CertificateChoiceSheet: View {
                 systemImage: "person.crop.circle",
                 title: L("Apple ID"),
                 detail: L("Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon."))
+            // 0.9.197: 自更新换的是正在跑的自己——installd 换包时终结旧进程，
+            // 看着像闪退；开始前先明说，装完重开就是新版。只在自更新入口
+            // 出现，分享进来的安装不走这条。
+            if isSelfUpdate {
+                Text(L("The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             // U-2 (0.9.190): new shell — the quiet secondary button,
             // full width (AccountViews 同款 label 内 maxWidth).
             Button(role: .cancel) { onCancel() } label: {

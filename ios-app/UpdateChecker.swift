@@ -105,6 +105,40 @@ final class UpdateChecker: ObservableObject {
     /// every few days at most, so one check a day is enough (S6).
     private static let lastCheckKey = "SIDUpdateCheckerLastCheck"
 
+    /// 0.9.197: UserDefaults key for the self-update that was started but
+    /// whose run never got to report back — installd kills the old process
+    /// while replacing it, so the run's own `finished` branch usually never
+    /// runs. The target version is written before the install starts
+    /// (`startSelfUpdate`) and read back once at launch (see `init`):
+    /// reached means the update landed, anything else means it didn't.
+    /// CZF prefix, `lastCheckKey` style.
+    private static let selfUpdateTargetKey = "CZFSelfUpdateTargetVersion"
+
+    /// 0.9.197: the self-update the last launch verified as landed — the
+    /// About row reports it until a fresh check supersedes it (a fresh
+    /// check clears it in `AboutView.runUpdateCheck`). Nil unless this
+    /// launch started with a pending target the running version covers.
+    @Published var selfUpdateLandedVersion: String?
+
+    init() {
+        // 0.9.197: verify last run's self-update — installd terminates the
+        // old process while replacing it, so a self-update that looked
+        // like a crash usually installed fine. One-shot: the marker is
+        // consumed here, whatever the outcome, so a missed update is
+        // reported once, not nagged every launch.
+        if let target = UserDefaults.standard.string(forKey: Self.selfUpdateTargetKey) {
+            UserDefaults.standard.removeObject(forKey: Self.selfUpdateTargetKey)
+            if !Self.isNewer(target, than: currentVersion) {
+                // Current covers the target (equal, or newer still) —
+                // the update landed.
+                selfUpdateLandedVersion = target
+                cleanupSelfUpdateOldVersions()
+            } else {
+                selfUpdateError = L("Self-update to %@ didn't finish — tap Check for updates to try again.", target)
+            }
+        }
+    }
+
     /// What a check found. `.skipped` means the daily gate held and no
     /// request went out (only when `force` is false).
     enum CheckResult: Equatable {
@@ -428,6 +462,13 @@ final class UpdateChecker: ObservableObject {
         selfUpdateError = nil
         selfUpdateFinished = false
         isSelfUpdating = true
+        // 0.9.197: write down the version this run is installing — installd
+        // kills the old process while replacing it, so this Task's `finished`
+        // branch usually never runs; the next launch verifies against this
+        // marker instead (see `init`).
+        if let latest = latestVersion {
+            UserDefaults.standard.set(latest, forKey: Self.selfUpdateTargetKey)
+        }
         selfUpdateTask = Task {
             // F-1 (0.9.179): the download phase is shared with the
             // enterprise branch (`downloadSelfUpdateIPA`).
@@ -482,6 +523,14 @@ final class UpdateChecker: ObservableObject {
                 }
                 if engine.finished {
                     selfUpdateFinished = true
+                    // 0.9.197: the update installed — keep only the newly
+                    // installed copy of this app, drop the older library
+                    // copies (Signed/ untouched; the three guards + the
+                    // renewal-source skip apply). The process is usually
+                    // killed by installd mid-install and never reaches
+                    // here; the launch verification in `init` runs the
+                    // same cleanup when it confirms the update landed.
+                    cleanupSelfUpdateOldVersions()
                 }
             } else if let guide = engine.guide {
                 // B-2 (0.9.163): 向导优先于 lastError——runOneClick 入口
@@ -585,5 +634,75 @@ final class UpdateChecker: ObservableObject {
             if l != r { return l > r }
         }
         return false
+    }
+
+    /// 0.9.197: newest-first order for two files of one bundle ID — higher
+    /// version, then later modification, then path (stable tiebreak).
+    /// Shared by Files `duplicateCleanup` and Downloads `cleanupPreview`:
+    /// same ranking, different item types, so the comparator (not a generic
+    /// grouping) is the shared piece.
+    nonisolated static func newestFirst(lhsVersion: String, lhsModified: Date?, lhsPath: String,
+                                        rhsVersion: String, rhsModified: Date?, rhsPath: String) -> Bool {
+        if lhsVersion != rhsVersion { return isNewer(lhsVersion, than: rhsVersion) }
+        let a = lhsModified ?? .distantPast
+        let b = rhsModified ?? .distantPast
+        if a != b { return a > b }
+        return lhsPath < rhsPath
+    }
+
+    /// 0.9.197: a self-update that landed leaves its older library copies
+    /// behind (self-update / signing only ever store the new file). Delete
+    /// the old ones for this app's own bundle ID, keeping the newest
+    /// (version, then modification). Root-level library copies only:
+    /// the Signed/ subtree and subfolders are never touched, and the
+    /// Custom/ slot holds only the newest import anyway
+    /// (`replaceCustomImport` evicts the old slot). Deletion runs the
+    /// cleanup's own three guards (installing / signing / renewing) plus
+    /// the renewal-source skip; a failed delete only logs, so cleanup
+    /// never turns a landed update into a failure. Returns how many
+    /// files were deleted.
+    /// Called from the `finished` branch of `startSelfUpdate` when the
+    /// process survives, and from `init` when the launch check verifies
+    /// the update landed — installd usually kills the process mid-install,
+    /// so the launch path is the one that actually runs.
+    @discardableResult
+    func cleanupSelfUpdateOldVersions() -> Int {
+        let engine = Engine.shared
+        let fm = FileManager.default
+        let root = IPALibrary.documentsDir
+        guard let ownID = Bundle.main.bundleIdentifier, !ownID.isEmpty else { return 0 }
+        let urls = (try? fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles])) ?? []
+        var candidates: [(url: URL, version: String, modified: Date?)] = []
+        for url in urls where url.pathExtension.lowercased() == "ipa" {
+            guard let info = IPALibrary.appInfo(at: url), info.bundleID == ownID,
+                  let version = info.version, !version.isEmpty else { continue }
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            candidates.append((url, version, modified))
+        }
+        guard candidates.count > 1 else { return 0 }
+        let ranked = candidates.sorted {
+            Self.newestFirst(lhsVersion: $0.version, lhsModified: $0.modified, lhsPath: $0.url.path,
+                             rhsVersion: $1.version, rhsModified: $1.modified, rhsPath: $1.url.path)
+        }
+        var deleted = 0
+        for old in ranked.dropFirst() {
+            let path = old.url.path
+            if engine.isInstallingSource(path: path)
+                || engine.isSigningSource(path: path)
+                || engine.isRenewingSource(path: path) { continue }
+            if RenewalSourceStore.source(forFileURL: old.url, bundleID: ownID, allowBundleIDFallback: false) != nil { continue }
+            do {
+                try fm.removeItem(at: old.url)
+                DownloadLedger.forget(old.url)
+                engine.log("Self-update cleanup: removed old \(old.url.lastPathComponent).")
+                deleted += 1
+            } catch {
+                engine.log("⛔️ Self-update cleanup: couldn't delete \(old.url.lastPathComponent) (\(error.localizedDescription))")
+            }
+        }
+        return deleted
     }
 }

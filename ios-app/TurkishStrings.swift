@@ -1684,10 +1684,6 @@ let turkishStrings: [String: String] = [
     "Clean up %d old versions?": "%d eski sürüm temizlensin mi?",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "Her uygulamanın yalnızca en yeni sürümü tutulur. Silinen dosyalar kurtarılamaz.",
     "Cleaned up %d old versions.": "%d eski sürüm temizlendi.",
-    "Clean up duplicates (%d)": "Yinelenenleri temizle (%d)",
-    "Clean up duplicate IPAs": "Yinelenen IPA'ları temizle",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "%d grup yinelenen IPA bulundu. %d eski kopya silinecek. Her grupta en son değiştirilen kopya saklanır. Bu işlem geri alınamaz.",
-    "Cleaned up %d duplicate IPAs.": "%d yinelenen IPA temizlendi.",
     "Failed to delete %d files: %@": "%d dosya silinemedi: %@",
     "%d renewal source files were skipped.": "%d yenileme kaynak dosyası atlandı.",
     "Including %d signed IPAs installed via enterprise install.": "Bunların %d tanesi imzalı IPA kurumsal kurulumla yüklendi.",
@@ -1835,4 +1831,13 @@ let turkishStrings: [String: String] = [
     "Refreshing… %ds": "Yenileniyor… %d sn",
     "Location refresh timed out — the session may have closed. Try again.": "Konum yenileme zaman aşımına uğradı; oturum kapanmış olabilir. Yeniden deneyin.",
     "No simulated location to refresh yet — set one first.": "Yenilenecek simüle edilmiş bir konum yok; önce bir tane ayarlayın.",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "Uygulama güncelleme sırasında bir kez kapanacak — bu normal. Sonrasında yeniden açtığınızda yeni sürümde olacaksınız.",
+    "Updated to %@ — you're on the latest version.": "%@ sürümüne güncellendi — en son sürümdesiniz.",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "%@ sürümüne kendi kendine güncelleme tamamlanamadı — yeniden denemek için “Güncellemeleri denetle”ye dokunun.",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "%d yinelenen grup ve %d eski sürüm grubu bulundu. %d eski kopya silinecek. Her grupta en yeni sürüm saklanır. Bu işlem geri alınamaz.",
+    "Clean up old copies (%d)": "Eski kopyaları temizle (%d)",
+    "Cleaned up %d old copies.": "%d eski kopya temizlendi.",
+    "Clean up duplicates & old versions": "Yinelenenleri ve eski sürümleri temizle",
 ]

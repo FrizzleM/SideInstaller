@@ -279,10 +279,13 @@ final class DownloadsManager: ObservableObject {
         var skipped = 0
         for (_, group) in byBundleID {
             guard group.count > 1 else { continue }
-            // Newest first: higher version, then later modification.
+            // Newest first: higher version, then later modification
+            // (0.9.197: `UpdateChecker.newestFirst`, shared with the
+            // Files page duplicate cleanup — same ranking, plus a path
+            // tiebreak so equal files order deterministically).
             let ranked = group.sorted { a, b in
-                if a.version != b.version { return UpdateChecker.isNewer(a.version, than: b.version) }
-                return (a.item.modified ?? .distantPast) > (b.item.modified ?? .distantPast)
+                UpdateChecker.newestFirst(lhsVersion: a.version, lhsModified: a.item.modified, lhsPath: a.item.url.path,
+                                          rhsVersion: b.version, rhsModified: b.item.modified, rhsPath: b.item.url.path)
             }
             for old in ranked.dropFirst() {
                 let path = old.item.url.path
@@ -293,8 +296,12 @@ final class DownloadsManager: ObservableObject {
                     skipped += 1
                     continue
                 }
+                // 0.9.197: 候选本就是旧份，包名兜底不适用——一张续签记录
+                // 护住该 App 全部历史版本，清理永远删不到旧版；只认
+                // 记录的路径（最新那份根本不在候选里）。
                 if RenewalSourceStore.source(forFileURL: old.item.url,
-                                            bundleID: IPALibrary.appInfo(at: old.item.url)?.bundleID) != nil {
+                                            bundleID: IPALibrary.appInfo(at: old.item.url)?.bundleID,
+                                            allowBundleIDFallback: false) != nil {
                     skipped += 1
                     continue
                 }

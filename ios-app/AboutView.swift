@@ -44,6 +44,9 @@ struct AboutView: View {
     /// a verified update doesn't install straight away any more, the
     /// user picks enterprise or Apple ID signing first.
     @State private var showingSigningChoice = false
+    /// 0.9.197: 0.9.193 deferred 同款——点下的自更新选择先存这里，等
+    /// sheet 真正消失后 onDismiss 再跑（见 `runDeferredSelfUpdateChoice`）。
+    @State private var deferredSelfUpdateChoice: CZFSignIdentity?
 
     var body: some View {
         NavigationStack {
@@ -64,9 +67,10 @@ struct AboutView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showCrypto) { CryptoDonationsView() }
             .sheet(isPresented: $showReport) { ReportProblemView() }
-            .sheet(isPresented: $showingSigningChoice) {
+            .sheet(isPresented: $showingSigningChoice, onDismiss: { runDeferredSelfUpdateChoice() }) {
                 CertificateChoiceSheet(
-                    onChoose: { showingSigningChoice = false; chooseSelfUpdateIdentity($0, updateChecker: updateChecker, certWorkspace: certWorkspace) },
+                    isSelfUpdate: true,
+                    onChoose: { deferredSelfUpdateChoice = $0; showingSigningChoice = false },
                     onCancel: { showingSigningChoice = false }
                 )
             }
@@ -123,6 +127,17 @@ struct AboutView: View {
 
     private var versionPillColor: Color {
         updateChecker.selfUpdateAvailable || updateChecker.isSelfUpdating ? Theme.accent : Theme.accent2
+    }
+
+    /// 0.9.197: 0.9.193 deferred 同款（`SigningChoiceSheetModifier`）——
+    /// 点下的选择只记下并清掉请求，后续动作推迟到 sheet 真正消失后的
+    /// onDismiss 再跑；dismiss 与后续的 present 不撞同一事务。取消
+    /// （onCancel / 下滑）时没有攒下的选择，直接 no-op。
+    @MainActor
+    private func runDeferredSelfUpdateChoice() {
+        guard let choice = deferredSelfUpdateChoice else { return }
+        deferredSelfUpdateChoice = nil
+        chooseSelfUpdateIdentity(choice, updateChecker: updateChecker, certWorkspace: certWorkspace)
     }
 
     /// The version row's tap: install when a verified update is waiting,
@@ -201,6 +216,11 @@ struct AboutView: View {
     private var updateCheckDetail: String? {
         if let selfUpdateError = updateChecker.selfUpdateError { return selfUpdateError }
         if let progress = updateChecker.selfUpdateProgressText { return progress }
+        // 0.9.197: 上次自更新已落地上——启动校验报的，不是检查跑出来的；
+        // 新检查一跑（runUpdateCheck）就清掉，让检查结果接管。
+        if let landed = updateChecker.selfUpdateLandedVersion {
+            return L("Updated to %@ — you're on the latest version.", landed)
+        }
         if isCheckingUpdate {
             return checkTakingLong
                 ? L("Still connecting to GitHub… Tap again to cancel.")
@@ -257,6 +277,7 @@ struct AboutView: View {
         // the new check, not the old install.
         updateChecker.selfUpdateError = nil
         updateChecker.selfUpdateFinished = false
+        updateChecker.selfUpdateLandedVersion = nil
         isCheckingUpdate = true
         checkTakingLong = false
         checkGeneration += 1

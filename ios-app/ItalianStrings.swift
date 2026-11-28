@@ -1767,10 +1767,6 @@ let italianStrings: [String: String] = [
     "Clean up %d old versions?": "Pulire %d vecchie versioni?",
     "Only the newest version of each app is kept. Deleted files can't be recovered.": "Viene conservata solo la versione più recente di ogni app. I file eliminati non possono essere recuperati.",
     "Cleaned up %d old versions.": "%d vecchie versioni eliminate.",
-    "Clean up duplicates (%d)": "Elimina duplicati (%d)",
-    "Clean up duplicate IPAs": "Elimina IPA duplicati",
-    "Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.": "Trovati %d gruppi di IPA duplicati. Verranno eliminate %d vecchie copie. Di ogni gruppo viene conservata la copia modificata più di recente. Questa azione non può essere annullata.",
-    "Cleaned up %d duplicate IPAs.": "%d IPA duplicati eliminati.",
     "Failed to delete %d files: %@": "Impossibile eliminare %d file: %@",
     "%d renewal source files were skipped.": "%d file di origine per il rinnovo ignorati.",
     "Including %d signed IPAs installed via enterprise install.": "Di cui %d IPA firmati installati tramite installazione enterprise.",
@@ -1918,4 +1914,13 @@ let italianStrings: [String: String] = [
     "Refreshing… %ds": "Aggiornamento… %ds",
     "Location refresh timed out — the session may have closed. Try again.": "Aggiornamento della posizione scaduto: la sessione potrebbe essersi chiusa. Riprova.",
     "No simulated location to refresh yet — set one first.": "Ancora nessuna posizione simulata da aggiornare: impostane prima una.",
+    // 0.9.197: self-update exit note + landed/failed report; duplicate
+    // cleanup now groups by bundle ID (duplicates vs old versions).
+    "The app will quit once while updating — that's normal. Reopen it afterwards and you'll be on the new version.": "L'app si chiuderà una volta durante l'aggiornamento — è normale. Riaprila dopo e sarai sulla nuova versione.",
+    "Updated to %@ — you're on the latest version.": "Aggiornato a %@ — sei sull'ultima versione.",
+    "Self-update to %@ didn't finish — tap Check for updates to try again.": "L'aggiornamento a %@ non è andato a buon fine — tocca «Cerca aggiornamenti» per riprovare.",
+    "Found %d duplicate groups and %d old-version groups. %d old copies will be deleted. The newest version in each group is kept. This can't be undone.": "Trovati %d gruppi duplicati e %d gruppi di vecchie versioni. Verranno eliminate %d vecchie copie. Di ogni gruppo viene conservata la versione più recente. Questa azione non può essere annullata.",
+    "Clean up old copies (%d)": "Elimina vecchie copie (%d)",
+    "Cleaned up %d old copies.": "%d vecchie copie eliminate.",
+    "Clean up duplicates & old versions": "Elimina duplicati e vecchie versioni",
 ]

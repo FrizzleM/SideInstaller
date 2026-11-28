@@ -71,6 +71,9 @@ struct ContentView: View {
     /// a verified update doesn't install straight away any more, the
     /// user picks enterprise or Apple ID signing first.
     @State private var showingSigningChoice = false
+    /// 0.9.197: 0.9.193 deferred 同款——点下的自更新选择先存这里，等
+    /// sheet 真正消失后 onDismiss 再跑（见 `runDeferredSelfUpdateChoice`）。
+    @State private var deferredSelfUpdateChoice: CZFSignIdentity?
     /// The tunnel was closed by hand from the pill: the holder-only
     /// auto-reconnect must not pull it back up until it comes up again.
     @State private var tunnelManualOff = false
@@ -191,9 +194,10 @@ struct ContentView: View {
             .sheet(isPresented: $showPrecheck) {
                 PrecheckSheet(onContinue: continueAfterPrecheck, missingCapabilities: missingCapabilities)
             }
-            .sheet(isPresented: $showingSigningChoice) {
+            .sheet(isPresented: $showingSigningChoice, onDismiss: { runDeferredSelfUpdateChoice() }) {
                 CertificateChoiceSheet(
-                    onChoose: { showingSigningChoice = false; chooseSelfUpdateIdentity($0, updateChecker: updateChecker, certWorkspace: certWorkspace) },
+                    isSelfUpdate: true,
+                    onChoose: { deferredSelfUpdateChoice = $0; showingSigningChoice = false },
                     onCancel: { showingSigningChoice = false }
                 )
             }
@@ -544,6 +548,17 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    /// 0.9.197: 0.9.193 deferred 同款（`SigningChoiceSheetModifier`）——
+    /// 点下的选择只记下并清掉请求，后续动作推迟到 sheet 真正消失后的
+    /// onDismiss 再跑；dismiss 与后续的 present 不撞同一事务。取消
+    /// （onCancel / 下滑）时没有攒下的选择，直接 no-op。
+    @MainActor
+    private func runDeferredSelfUpdateChoice() {
+        guard let choice = deferredSelfUpdateChoice else { return }
+        deferredSelfUpdateChoice = nil
+        chooseSelfUpdateIdentity(choice, updateChecker: updateChecker, certWorkspace: certWorkspace)
     }
 
     /// F-1 (0.9.178): re-run the version check from the banner while the
