@@ -112,6 +112,17 @@ struct JITView: View {
                         }
                         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     }
+                    // B-1 (0.9.191): while the session is still connecting
+                    // there used to be only a spinner — no way to cancel
+                    // the start. `cancelStart` now ends the connect wait
+                    // (the session itself keeps connecting on its own
+                    // thread and lands attached or ended as usual).
+                    if status.phase == .connecting {
+                        Button { manager.cancelStart() } label: {
+                            Text(L("Cancel")).frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    }
                 }
             }
             .transition(.cardAppear)

@@ -1862,4 +1862,8 @@ let koreanStrings: [String: String] = [
         "모바일 데이터 모드",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "GPX, KML 또는 GeoJSON 파일이나 좌표 목록을 가져오면 기기가 선택한 속도로 경로를 따라 이동합니다. 끝나면 마지막 지점에 머무릅니다. 단, 완료 시 실제 위치로 복원이 켜져 있는 경우는 제외합니다.",
+    "Refresh location service": "위치 서비스 새로고침",
+    "Refreshing… %ds": "새로고침 중…%d초",
+    "Location refresh timed out — the session may have closed. Try again.": "위치 새로고침 시간이 초과되었습니다. 세션이 종료되었을 수 있습니다. 다시 시도하세요.",
+    "No simulated location to refresh yet — set one first.": "새로고침할 시뮬레이션된 위치가 아직 없습니다. 먼저 설정하세요.",
 ]

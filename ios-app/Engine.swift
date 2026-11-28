@@ -4654,8 +4654,8 @@ final class Engine {
         scheduleTunnelIdleStop()
     }
 
-    /// 闲置停计时：持有为零且内置隧道可用时才设 60 秒定时；到时二次核对三路
-    /// 长时持有（在跑安装 / 在跑续签 / 定位模拟中），任一成立就不停。
+    /// 闲置停计时：持有为零且内置隧道可用时才设 60 秒定时；到时二次核对四路
+    /// 长时持有（在跑安装 / 在跑续签 / 定位模拟中 / JIT 会话进行中），任一成立就不停。
     @MainActor private func scheduleTunnelIdleStop() {
         tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
         guard tunnelHolders == 0, BuiltinTunnel.useBuiltinDirectly else { return }
@@ -4664,7 +4664,11 @@ final class Engine {
                 guard Engine.shared.tunnelHolders == 0,
                       !Engine.shared.isRunning,
                       !SideloadedAppsManager.shared.isRefreshing,
-                      !Engine.shared.connection.isSimulatingLocation else { return }
+                      !Engine.shared.connection.isSimulatingLocation,
+                      // B-2 (0.9.191)：JIT 会话走自己的 DeviceConnection，
+                      // `isSimulatingLocation` 在它跑时恒为 false，60 秒
+                      // 闲置停以前会杀掉正在跑的 JIT 会话的隧道。
+                      !JITManager.isSessionRunning else { return }
                 await BuiltinTunnel.stop()
                 Engine.shared.refreshNetworkStatus()
             }

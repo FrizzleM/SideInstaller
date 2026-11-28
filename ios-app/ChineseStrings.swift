@@ -1873,4 +1873,8 @@ let chineseStrings: [String: String] = [
         "蜂窝数据模式",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "导入 GPX、KML 或 GeoJSON 文件，或一份坐标列表，设备就会按你选的速度沿路线移动。走完后停在最后一个点，除非你开了完成后恢复真实位置。",
+    "Refresh location service": "刷新定位服务",
+    "Refreshing… %ds": "正在刷新…%d秒",
+    "Location refresh timed out — the session may have closed. Try again.": "刷新定位超时，会话可能已断开，请重试。",
+    "No simulated location to refresh yet — set one first.": "还没有可刷新的模拟位置，请先设置一个。",
 ]

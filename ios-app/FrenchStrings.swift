@@ -1908,4 +1908,8 @@ let frenchStrings: [String: String] = [
         "Mode données cellulaires",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Importez un fichier GPX, KML ou GeoJSON, ou une liste de coordonnées, et l’appareil le parcourt à la vitesse choisie. À la fin, il reste au dernier point, sauf si la restauration de la position réelle est activée.",
+    "Refresh location service": "Actualiser le service de localisation",
+    "Refreshing… %ds": "Actualisation… %ds",
+    "Location refresh timed out — the session may have closed. Try again.": "Le rafraîchissement de la position a expiré — la session a peut-être été fermée. Réessayez.",
+    "No simulated location to refresh yet — set one first.": "Aucune position simulée à actualiser pour l'instant — définissez-en une d'abord.",
 ]

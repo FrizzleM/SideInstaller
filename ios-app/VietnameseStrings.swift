@@ -1898,4 +1898,8 @@ let vietnameseStrings: [String: String] = [
         "Chế độ dữ liệu di động",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, thiết bị sẽ di chuyển theo đó với tốc độ bạn chọn. Khi kết thúc, thiết bị ở lại điểm cuối cùng, trừ khi bạn đã bật khôi phục vị trí thực khi xong.",
+    "Refresh location service": "Làm mới dịch vụ vị trí",
+    "Refreshing… %ds": "Đang làm mới… %d giây",
+    "Location refresh timed out — the session may have closed. Try again.": "Làm mới vị trí đã hết thời gian — phiên có thể đã đóng. Hãy thử lại.",
+    "No simulated location to refresh yet — set one first.": "Chưa có vị trí mô phỏng nào để làm mới — hãy đặt một vị trí trước.",
 ]

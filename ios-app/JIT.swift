@@ -907,6 +907,17 @@ final class JITManager: ObservableObject {
     private var sessionID: UUID?
     /// Waiting for the session's tunnel (`waitUntilConnected`).
     private var connectWaiters: [CheckedContinuation<Void, Never>] = []
+    /// The timeout racing `waitUntilConnected` (B-1, 0.9.191).
+    private var connectTimeoutTask: Task<Void, Never>?
+    /// Backstop for the connect wait: the dial has its own timeout and
+    /// `run()` always ends, but the wait must not outlive it.
+    private static let connectWaitTimeout: TimeInterval = 120
+    /// True while a JIT session is running (B-2, 0.9.191): the tunnel
+    /// idle stop must not kill its tunnel. Set when a session starts,
+    /// cleared when it ends — `status != nil` on the one manager, as a
+    /// static so `Engine`'s idle timer can read it without owning the
+    /// manager.
+    static var isSessionRunning = false
     /// Silent audio, so SideInstaller isn't suspended while the app it opened
     /// is in front: a debugger that stops answering leaves the app frozen at
     /// its next request.
@@ -1061,10 +1072,42 @@ final class JITManager: ObservableObject {
         startTask?.cancel()
     }
 
-    /// Returns once the session has its tunnel, or has ended.
+    /// Returns once the session has its tunnel, or has ended. Cancellable,
+    /// with a timeout: the old `withCheckedContinuation` never resumed on
+    /// cancel, so a Cancel tap while connecting did nothing (B-1, 0.9.191)
+    /// — and the Mobile Data Mode action around the start never finished,
+    /// so Airplane Mode stayed on and the silent keep-alive kept playing.
+    /// The session itself keeps connecting on its own thread; when it
+    /// lands, `handle(.phase)` still ends it normally.
     private func waitUntilConnected() async {
         guard let status, status.phase == .connecting else { return }
-        await withCheckedContinuation { connectWaiters.append($0) }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                connectWaiters.append(continuation)
+                connectTimeoutTask = Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(Self.connectWaitTimeout))
+                    guard !Task.isCancelled else { return }
+                    self.resumeConnectWaiters()
+                }
+            }
+        } onCancel: { [weak self] in
+            // The handler runs off the main actor, so the resume goes
+            // through a main-actor hop; resuming is exactly-once — the
+            // waiters leave the list when resumed. Weak capture: the
+            // handler is non-isolated `@Sendable`, and the manager owns
+            // the waiters, so there is nothing to resume if it is gone.
+            Task { @MainActor in self?.resumeConnectWaiters() }
+        }
+    }
+
+    /// Resumes every `waitUntilConnected` waiter exactly once, and drops
+    /// the timeout that was racing it. The phase handler, the cancel
+    /// handler and the timeout all funnel through here.
+    private func resumeConnectWaiters() {
+        connectTimeoutTask?.cancel()
+        connectTimeoutTask = nil
+        connectWaiters.forEach { $0.resume() }
+        connectWaiters.removeAll()
     }
 
     /// Quits the app the session is attached to, which ends the session.
@@ -1129,6 +1172,8 @@ final class JITManager: ObservableObject {
     private func start(_ app: JITApp, _ jitProtocol: JITProtocol, deviceIP: String,
                        pairingFilePath: String) {
         status = Status(app: app, jitProtocol: jitProtocol)
+        // B-2 (0.9.191): the tunnel idle stop must not kill this session.
+        Self.isSessionRunning = true
         // Before the launch, which puts the app in front.
         keepAlive.startAudio()
         let id = UUID()
@@ -1149,8 +1194,7 @@ final class JITManager: ObservableObject {
                 // Past the tunnel, one way or the other: Mobile Data Mode's
                 // popups needn't wait for it any more.
                 MobileDataMode.shared.dialEnded(opened: !phase.isEnded)
-                connectWaiters.forEach { $0.resume() }
-                connectWaiters.removeAll()
+                resumeConnectWaiters()
             }
             if case .ended(let outcome) = phase {
                 end(outcome)
@@ -1172,6 +1216,7 @@ final class JITManager: ObservableObject {
 
     private func end(_ outcome: JITSession.Outcome) {
         let name = status?.app.name ?? ""
+        Self.isSessionRunning = false
         keepAlive.stopAudio()
         session = nil
         sessionID = nil

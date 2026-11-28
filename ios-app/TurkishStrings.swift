@@ -1819,4 +1819,8 @@ let turkishStrings: [String: String] = [
         "Mobil Veri Modu",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "Bir GPX, KML veya GeoJSON dosyası ya da bir koordinat listesi içe aktarın; cihaz seçtiğiniz hızla rota boyunca hareket eder. Bittiğinde son noktada kalır; tamamlandığında gerçek konuma dönme açık değilse.",
+    "Refresh location service": "Konum hizmetini yenile",
+    "Refreshing… %ds": "Yenileniyor… %d sn",
+    "Location refresh timed out — the session may have closed. Try again.": "Konum yenileme zaman aşımına uğradı; oturum kapanmış olabilir. Yeniden deneyin.",
+    "No simulated location to refresh yet — set one first.": "Yenilenecek simüle edilmiş bir konum yok; önce bir tane ayarlayın.",
 ]

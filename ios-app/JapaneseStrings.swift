@@ -1861,4 +1861,8 @@ let japaneseStrings: [String: String] = [
         "モバイルデータモード",
     "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
         "GPX、KML、GeoJSON ファイル、または座標のリストをインポートすると、デバイスが選択した速度でそのルートを移動します。終了時は最後の地点に留まります。ただし、完了時に実際の位置に戻す設定がオンの場合は除きます。",
+    "Refresh location service": "位置情報サービスを更新",
+    "Refreshing… %ds": "更新中…%d秒",
+    "Location refresh timed out — the session may have closed. Try again.": "位置情報の更新がタイムアウトしました。セッションが切れた可能性があります。もう一度お試しください。",
+    "No simulated location to refresh yet — set one first.": "更新するシミュレーション位置がまだありません。先に設定してください。",
 ]

@@ -197,6 +197,9 @@ struct GPXRoute {
     let times: [Date]?
     /// Length along the points, in meters.
     let distance: CLLocationDistance
+    /// Points dropped as physically impossible jumps (F-2, 0.9.191), so
+    /// the import log can say how many went.
+    let droppedJumpPoints: Int
 
     /// One spot rather than a path (a lone waypoint, or a track that never
     /// moved). The page moves the map there instead of keeping a route, as
@@ -222,10 +225,16 @@ struct GPXRoute {
     init(contentsOf url: URL) throws {
         let fileName = url.lastPathComponent
         let data = try Data(contentsOf: url)
-        let found = try RouteFile.points(in: data, fileName: fileName)
+        var found = try RouteFile.points(in: data, fileName: fileName)
         guard !found.isEmpty else {
             throw EngineError.message(L("%@ has no track, route or waypoints in it.", fileName))
         }
+        // F-2 (0.9.191): drop the physically impossible jumps before
+        // anything else reads the points, so `times` and `distance`
+        // below are computed on the kept ones.
+        let filtered = Self.filterJumpPoints(found)
+        found = filtered.kept
+        droppedJumpPoints = filtered.dropped
 
         name = url.deletingPathExtension().lastPathComponent
         points = found.map(\.coordinate)
@@ -245,6 +254,79 @@ struct GPXRoute {
             total + CLLocation(latitude: pair.0.latitude, longitude: pair.0.longitude)
                 .distance(from: CLLocation(latitude: pair.1.latitude, longitude: pair.1.longitude))
         }
+    }
+
+    /// Faster than any airliner: a segment implying more than this can't
+    /// be a real move.
+    private static let maxPlausibleSpeed: CLLocationSpeed = 1000 / 3.6  // 1000 km/h, in m/s
+
+    /// Drops the points a device could not have reached from the previous
+    /// kept point (F-2, 0.9.191). Only segments whose two ends both have
+    /// times, in order, are judged — a point without a time, or one whose
+    /// time goes backwards, is always kept, so a file with patchy or odd
+    /// timestamps loses nothing. When a segment is too fast, one point
+    /// ahead decides which end is the bad fix: if the last kept point
+    /// reaches the next point at a sane speed, this point is the outlier
+    /// and goes; if it can't reach the next point either, the last kept
+    /// point is the outlier and goes instead — so one bad first fix
+    /// doesn't take the whole route with it. With no next point to tell
+    /// (the last point), the current point goes: the point that survived
+    /// every check before it is the likelier good one. This is a
+    /// deliberate split from StikDebug, which takes every point as-is:
+    /// one bad fix used to send the device along a fake long leg to it
+    /// and back, since `RouteTimeline` interpolates the whole list.
+    private static func filterJumpPoints(_ found: [RoutePoint])
+    -> (kept: [RoutePoint], dropped: Int) {
+        guard found.count > 1 else { return (found, 0) }
+        var kept: [RoutePoint] = []
+        kept.reserveCapacity(found.count)
+        var dropped = 0
+        var index = found.startIndex
+        while index < found.endIndex {
+            let point = found[index]
+            if let last = kept.last,
+               let startTime = last.time, let endTime = point.time, endTime > startTime,
+               let speed = Self.impliedSpeed(from: last, to: point), speed > maxPlausibleSpeed {
+                // Too fast from the last kept point — which end is bad?
+                let nextIndex = index + 1
+                if nextIndex < found.endIndex,
+                   let nextTime = found[nextIndex].time, nextTime > startTime,
+                   let nextSpeed = Self.impliedSpeed(from: last, to: found[nextIndex]),
+                   nextSpeed <= maxPlausibleSpeed {
+                    // `last` reaches the next point fine: `point` is the outlier.
+                    dropped += 1
+                    index += 1
+                    continue
+                }
+                if nextIndex < found.endIndex,
+                   let nextTime = found[nextIndex].time, nextTime > startTime {
+                    // `last` can't reach the next point either: `last` is
+                    // the outlier — drop it and keep `point` in its place.
+                    kept.removeLast()
+                    dropped += 1
+                } else {
+                    // No next point to judge by: drop this one.
+                    dropped += 1
+                    index += 1
+                    continue
+                }
+            }
+            kept.append(point)
+            index += 1
+        }
+        return (kept, dropped)
+    }
+
+    /// The speed a segment between two timed points implies, in m/s; nil
+    /// when either end has no time or the times don't go forward.
+    private static func impliedSpeed(from start: RoutePoint, to end: RoutePoint) -> CLLocationSpeed? {
+        guard let startTime = start.time, let endTime = end.time, endTime > startTime else {
+            return nil
+        }
+        let meters = CLLocation(latitude: start.coordinate.latitude, longitude: start.coordinate.longitude)
+            .distance(from: CLLocation(latitude: end.coordinate.latitude,
+                                       longitude: end.coordinate.longitude))
+        return meters / endTime.timeIntervalSince(startTime)
     }
 }
 
@@ -805,11 +887,28 @@ final class LocationManager: ObservableObject {
     /// every 4s (as StikDebug does).
     private var resendTimer: Timer?
     private static let resendInterval: TimeInterval = 4
+    /// Consecutive re-send failures; three in a row (~12 s) counts as a
+    /// closed session (B-3, 0.9.191).
+    private var resendFailures = 0
+    private static let maxResendFailures = 3
+    /// One-tap rebuild of the location session (F-1, 0.9.191): while it
+    /// runs, the button counts down its 7 s budget.
+    @Published private(set) var isRefreshingLocation = false
+    @Published private(set) var refreshCountdown: Int?
+    /// The last point a simulate put through, so a refresh still knows
+    /// what to re-send after the session closed (when `simulated` is
+    /// already nil). Cleared by a deliberate stop, not by a dead session.
+    @Published private(set) var lastSimulated: CLLocationCoordinate2D?
+    private var refreshTask: Task<Void, Never>?
+    private var refreshTimer: Timer?
+    private static let refreshBudgetSeconds = 7
     /// Moves the location along `route`. The resend timer is off meanwhile,
     /// since this sends more often.
     private var playbackTask: Task<Void, Never>?
-    /// How often a playing route sends a new point (StikDebug's step).
-    private static let playbackTick: TimeInterval = 0.5
+    /// How often a playing route sends a new point: 5 Hz (F-3, 0.9.191 —
+    /// Reloc's NMEA cadence; StikDebug's 0.5 s step made a fast route
+    /// visibly jump between points).
+    private static let playbackTick: TimeInterval = 0.2
     private static let savedPlacesKey = "locationSavedPlaces"
 
     var isSimulating: Bool { simulated != nil }
@@ -989,6 +1088,7 @@ final class LocationManager: ObservableObject {
             try await engine.simulateLocation(latitude: coordinate.latitude,
                                               longitude: coordinate.longitude)
             simulated = coordinate
+            lastSimulated = coordinate
             keepAlive.startAudio()
             startResending()
             // A planned route starting at the device would start elsewhere now.
@@ -1035,6 +1135,7 @@ final class LocationManager: ObservableObject {
         stopResending()
         defer {
             simulated = nil
+            lastSimulated = nil
             if startsFromDevice { dropPlannedRoute() }
             stage = .notReady
             keepAlive.stopAll()
@@ -1047,6 +1148,7 @@ final class LocationManager: ObservableObject {
     /// anything that rebuilds the tunnel (an install, a re-pair) closes it.
     private func startResending() {
         stopResending()
+        resendFailures = 0
         // Capture `self` weakly in the timer closure: the timer retains the
         // closure until invalidated, so a strong capture would keep the manager
         // alive.
@@ -1057,8 +1159,22 @@ final class LocationManager: ObservableObject {
                     self.sessionClosed()
                     return
                 }
-                try? await self.engine.simulateLocation(latitude: simulated.latitude,
-                                                        longitude: simulated.longitude)
+                do {
+                    try await self.engine.simulateLocation(latitude: simulated.latitude,
+                                                           longitude: simulated.longitude)
+                    self.resendFailures = 0
+                } catch {
+                    // B-3 (0.9.191): a dead session used to fail here
+                    // forever while the page still showed "simulating" —
+                    // the only liveness check above is the pointer, which
+                    // stays non-nil after the session dies. Three misses
+                    // in a row (~12 s) counts as a closed session, and
+                    // `sessionClosed` reports it the same way.
+                    self.resendFailures += 1
+                    if self.resendFailures >= Self.maxResendFailures {
+                        self.sessionClosed()
+                    }
+                }
             }
         }
     }
@@ -1080,6 +1196,77 @@ final class LocationManager: ObservableObject {
     private func stopResending() {
         resendTimer?.invalidate()
         resendTimer = nil
+    }
+
+    /// Rebuilds the location session and re-sends the point the device is
+    /// spoofed to (F-1, 0.9.191) — the one-tap way back after the session
+    /// died underneath us, instead of picking the point again and tapping
+    /// Set location. Reuses `performSimulate`, which re-runs setup once
+    /// the stage is back to not-ready; the point comes from `simulated`
+    /// while simulating, or from `lastSimulated` after the session
+    /// closed. The button counts down the 7 s budget while it runs
+    /// (Reloc's countdown); a rebuild that outlives the budget is
+    /// cancelled and reported as a timeout.
+    func refreshLocationService() {
+        guard !isRefreshingLocation, !isPlayingRoute, !isBusy else { return }
+        guard let coordinate = simulated ?? lastSimulated else {
+            lastError = L("No simulated location to refresh yet — set one first.")
+            return
+        }
+        isRefreshingLocation = true
+        refreshCountdown = Self.refreshBudgetSeconds
+        lastError = nil
+        lastSuccess = nil
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self else {
+                // The manager went away mid-refresh: nothing is left to
+                // count down for, so the timer stops with it.
+                timer.invalidate()
+                return
+            }
+            Task { @MainActor in
+                guard let remaining = self.refreshCountdown else { return }
+                if remaining <= 1 {
+                    // Budget spent: stop waiting and say so; the rebuild
+                    // task is cancelled, and its cleanup reports nothing
+                    // more (see the `CancellationError` catch below).
+                    self.refreshTask?.cancel()
+                    self.endRefresh()
+                    self.lastError = ErrorHelp.explained(
+                        L("Location refresh timed out — the session may have closed. Try again."))
+                } else {
+                    self.refreshCountdown = remaining - 1
+                }
+            }
+        }
+        refreshTask = Task {
+            do {
+                // Force setup to run again: the old session is the thing
+                // that died, so re-using it is not a rebuild.
+                stopResending()
+                stage = .notReady
+                try await performSimulate(coordinate)
+                lastSuccess = L("Location set to %@.", Self.format(coordinate))
+            } catch is CancellationError {
+                // Timed out above, or the page went away: the timeout path
+                // already reported; a plain cancel stays quiet.
+            } catch {
+                lastError = message(error)
+            }
+            endRefresh()
+        }
+    }
+
+    /// Stops the refresh countdown and clears its state; every exit of
+    /// `refreshLocationService` goes through here, so calling it twice
+    /// (timeout, then the cancelled task landing) is harmless.
+    private func endRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        refreshTask = nil
+        refreshCountdown = nil
+        isRefreshingLocation = false
     }
 
     // MARK: Saved places
@@ -1132,8 +1319,18 @@ final class LocationManager: ObservableObject {
                 dropPlannedRoute()
                 route = imported
                 routeSpeed = imported.times == nil ? .walk : .recorded
-                engine.log("Location: loaded route \(imported.name) "
-                           + "(\(imported.points.count) points, \(Int(imported.distance)) m).")
+                // F-2 (0.9.191): say when points were dropped as jumps —
+                // the file the user picked still has them, and the
+                // difference from StikDebug (which plays them all) is
+                // worth one line in the log.
+                var loaded = "Location: loaded route \(imported.name) "
+                    + "(\(imported.points.count) points, \(Int(imported.distance)) m"
+                if imported.droppedJumpPoints > 0 {
+                    loaded += ", dropped \(imported.droppedJumpPoints) jump point"
+                        + (imported.droppedJumpPoints == 1 ? "" : "s")
+                        + " too fast to be real"
+                }
+                engine.log(loaded + ").")
             }
             return imported
         } catch {
@@ -1194,6 +1391,7 @@ final class LocationManager: ObservableObject {
             try await engine.simulateLocation(latitude: start.latitude,
                                               longitude: start.longitude)
             simulated = start
+            lastSimulated = start
             keepAlive.startAudio()
             startPlayback(timeline)
             engine.log("Location: playing \(name) over \(Int(timeline.duration)) s.")
@@ -1279,6 +1477,7 @@ final class LocationManager: ObservableObject {
                 // Stopped or replaced while that was sending.
                 guard !Task.isCancelled else { return }
                 self.simulated = coordinate
+                self.lastSimulated = coordinate
                 self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration,
                                                    segment: timeline.segment(at: elapsed))
                 if elapsed >= timeline.duration {
@@ -1804,6 +2003,29 @@ struct LocationView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .disabled(manager.isBusy)
+                }
+
+                // F-1 (0.9.191): one-tap rebuild of the location session —
+                // while simulating, or after the session closed underneath
+                // us (the last point is remembered, so there is still
+                // something to re-send). Hidden while a route plays: the
+                // rebuild would fight playback.
+                if manager.lastSimulated != nil, !manager.isPlayingRoute {
+                    Button { manager.refreshLocationService() } label: {
+                        HStack(spacing: 8) {
+                            if manager.isRefreshingLocation {
+                                ProgressView().controlSize(.small)
+                                Text(L("Refreshing… %ds", manager.refreshCountdown ?? 0))
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                Text(L("Refresh location service"))
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .disabled(manager.isBusy || manager.isRefreshingLocation)
                 }
             }
         }
