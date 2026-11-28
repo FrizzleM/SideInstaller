@@ -670,7 +670,7 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     private static let failedDownloadsKey = "CZFFailedDownloads"
 
-    private static func loadFailedDownloads() -> [FailedDownload] {
+    private nonisolated static func loadFailedDownloads() -> [FailedDownload] {
         guard let data = UserDefaults.standard.data(forKey: failedDownloadsKey) else { return [] }
         return (try? JSONDecoder().decode([FailedDownload].self, from: data)) ?? []
     }
