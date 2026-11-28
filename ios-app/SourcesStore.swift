@@ -251,6 +251,12 @@ final class SourceStore: ObservableObject {
         // F-3 (0.9.161): restore the persisted last-check times.
         let checked = Self.loadLastChecked()
         for i in sources.indices { sources[i].lastCheckedAt = checked[sources[i].url.absoluteString] }
+        // B-2 (0.9.192): restore the persisted failed downloads. Loaded
+        // here, not in the property initializer — a @MainActor static
+        // call in a stored property initializer chokes the compiler
+        // ("failed to produce diagnostic", checks 46108370470 /
+        // 46108800123 / 46109231288).
+        failedDownloads = Self.loadFailedDownloads()
     }
 
     /// F-3 (0.9.161): per-source last-check time, persisted across launches
@@ -666,11 +672,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// an app restart — a failure list that only lives in memory loses
     /// its retry the moment the app is closed. Only the name, the URL
     /// and the failure text are stored; nothing sensitive.
-    @Published private(set) var failedDownloads: [FailedDownload] = SourceStore.loadFailedDownloads()
+    @Published private(set) var failedDownloads: [FailedDownload] = []
 
     private static let failedDownloadsKey = "CZFFailedDownloads"
 
-    private nonisolated static func loadFailedDownloads() -> [FailedDownload] {
+    private static func loadFailedDownloads() -> [FailedDownload] {
         guard let data = UserDefaults.standard.data(forKey: failedDownloadsKey) else { return [] }
         return (try? JSONDecoder().decode([FailedDownload].self, from: data)) ?? []
     }
