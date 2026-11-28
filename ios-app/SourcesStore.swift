@@ -666,7 +666,7 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// an app restart — a failure list that only lives in memory loses
     /// its retry the moment the app is closed. Only the name, the URL
     /// and the failure text are stored; nothing sensitive.
-    @Published private(set) var failedDownloads: [FailedDownload] = Self.loadFailedDownloads()
+    @Published private(set) var failedDownloads: [FailedDownload] = SourceStore.loadFailedDownloads()
 
     private static let failedDownloadsKey = "CZFFailedDownloads"
 
