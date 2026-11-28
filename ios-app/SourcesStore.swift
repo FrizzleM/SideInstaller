@@ -251,12 +251,6 @@ final class SourceStore: ObservableObject {
         // F-3 (0.9.161): restore the persisted last-check times.
         let checked = Self.loadLastChecked()
         for i in sources.indices { sources[i].lastCheckedAt = checked[sources[i].url.absoluteString] }
-        // B-2 (0.9.192): restore the persisted failed downloads. Loaded
-        // here, not in the property initializer — a @MainActor static
-        // call in a stored property initializer chokes the compiler
-        // ("failed to produce diagnostic", checks 46108370470 /
-        // 46108800123 / 46109231288).
-        failedDownloads = Self.loadFailedDownloads()
     }
 
     /// F-3 (0.9.161): per-source last-check time, persisted across launches
@@ -604,6 +598,15 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// cancel it — `download(from:)` queues behind the running one and
     /// starts when its turn comes (see `pending` / `pumpIfIdle`).
     static let shared = IPADownloader()
+
+    /// B-2 (0.9.192): restore the persisted failed downloads here, not
+    /// in the property initializer — a static call in a stored property
+    /// initializer chokes the compiler ("failed to produce diagnostic",
+    /// checks 46108370470 / 46108800123 / 46109231288).
+    override init() {
+        super.init()
+        failedDownloads = Self.loadFailedDownloads()
+    }
 
     @Published private(set) var progress: Double = 0
 
