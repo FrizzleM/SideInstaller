@@ -132,7 +132,10 @@ struct CertificateChoiceSheet: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        // 0.9.193: plain 样式没有按压反馈，点下去像没点——下次再崩
+        // 视频里看不出点了哪一行；复用仓内现成的 CZFPressButtonStyle
+        //（按下整行变淡 + 微缩），只改观感，不改点击行为。
+        .buttonStyle(CZFPressButtonStyle())
     }
 }
 
@@ -167,8 +170,12 @@ struct SigningChoiceSheetModifier: ViewModifier {
     @Environment(Engine.self) private var engine
     @EnvironmentObject private var certWorkspace: CertWorkspace
 
+    /// 0.9.193: 点下的选择先存这里，等 sheet 真正消失后
+    /// （onDismiss）再跑后续动作，见 `choose`。
+    @State private var deferredChoice: DeferredSigningChoice?
+
     func body(content: Content) -> some View {
-        content.sheet(item: Bindable(engine).pendingSigningChoice) { request in
+        content.sheet(item: Bindable(engine).pendingSigningChoice, onDismiss: { runDeferredChoice() }) { request in
             CertificateChoiceSheet(
                 onChoose: { choose($0, request: request) },
                 onCancel: { engine.pendingSigningChoice = nil }
@@ -181,17 +188,44 @@ struct SigningChoiceSheetModifier: ViewModifier {
     /// staged IPA to the signing page. The identity is remembered
     /// (B-2) either way; the request is cleared first, so the sheet
     /// is gone before the Install sheet / signing page comes forward.
+    ///
+    /// 0.9.193: "cleared first" was not enough — the follow-up ran in
+    /// the same transaction as the dismiss (enterprise: dismiss + 切
+    /// 设置 tab + NavigationLink 推入；Apple ID: dismiss + 全屏
+    /// cover present)，present/push 与 dismiss 撞在同一个事务里，
+    /// UIKit 直接 trap，闪退回主屏幕，下一屏永远画不出来。整条链
+    /// 无强制解包，崩的就是这个竞态。所以 `choose` 现在只记下选择
+    /// 并清掉请求，后续动作推迟到 sheet 真正消失后的 onDismiss
+    /// （`runDeferredChoice`）再跑；两条路都串行化，视频看不出
+    /// 点了哪个，不能只修一条。语义不变。
     private func choose(_ identity: CZFSignIdentity, request: SigningChoiceRequest) {
+        deferredChoice = DeferredSigningChoice(identity: identity, ipaURL: request.ipaURL)
         engine.pendingSigningChoice = nil
         identity.store()
-        switch identity {
+    }
+
+    /// 0.9.193: `choose` 的后半段，从 sheet 的 onDismiss 跑——这时
+    /// sheet 已真正消失，后面的 present/push 不再与 dismiss 同事务。
+    /// 取消（onCancel / 下滑）时没有攒下的选择，直接 no-op。
+    /// 语义与修前逐行一致：Apple ID 开安装页跑一键管线，企业路把
+    /// 暂存 IPA 交给签名页；只换了时机，不改签名逻辑本身。
+    private func runDeferredChoice() {
+        guard let deferred = deferredChoice else { return }
+        deferredChoice = nil
+        switch deferred.identity {
         case .appleID:
             engine.installSource = .custom
             engine.sharedIPAReady = true
             engine.runOneClick()
         case .enterprise:
-            certWorkspace.selectedIPA = request.ipaURL
+            certWorkspace.selectedIPA = deferred.ipaURL
             certWorkspace.openEnterpriseSign = true
         }
     }
+}
+
+/// 0.9.193: 点下时攒着、sheet 消失后才跑的选择（见上）。
+private struct DeferredSigningChoice {
+    let identity: CZFSignIdentity
+    let ipaURL: URL
 }

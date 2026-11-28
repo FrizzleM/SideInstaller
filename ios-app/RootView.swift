@@ -224,11 +224,17 @@ struct RootView: View {
         }
         // U-UI：文件页/源页把 IPA 交给企业证书页时（CertWorkspace.openEnterpriseSign），
         // 切到设置 tab 并让企业区自动打开；标志由这里清掉，只触发一次。
+        // 0.9.193: NavigationLink 激活别跟 tab 切换放在同一个事务里——
+        // 分享进来的那路，choice sheet 才刚消失，同一事务里 tab 切 +
+        // 推入同样会撞 present/push 竞态。先切 tab，下一轮 runloop
+        // 再让企业区推入；文件页/源页直接触发的那路也同款走，行为一致。
         .onChange(of: certWorkspace.openEnterpriseSign) { _, open in
             guard open else { return }
             certWorkspace.openEnterpriseSign = false
             page = .settings
-            settingsEnterpriseRequest = true
+            DispatchQueue.main.async {
+                settingsEnterpriseRequest = true
+            }
         }
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
